@@ -59,7 +59,7 @@ export default function AboutScreen() {
         <View style={styles.brandCard}>
           <View style={styles.logo}><Text style={styles.logoText}>知</Text></View>
           <View style={styles.brandCopy}>
-            <Text style={styles.title}>知帐 zhizhang</Text>
+            <Text style={styles.title}>知帐</Text>
             <Text style={styles.subtitle}>智能记账，轻量生活</Text>
           </View>
           <View style={styles.currentBadge}>

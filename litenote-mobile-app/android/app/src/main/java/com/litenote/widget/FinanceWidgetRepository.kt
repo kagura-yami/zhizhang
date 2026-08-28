@@ -8,7 +8,9 @@ import com.litenote.BuildConfig
 import com.litenote.auth.AuthTokenModule
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.time.LocalDate
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
 
@@ -20,7 +22,6 @@ object FinanceWidgetRepository {
     private const val PREFS = "finance_widget_cache"
     private const val KEY_STATS = "stats"
     private const val KEY_SYNCED_AT = "synced_at"
-    private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
     private val client = OkHttpClient.Builder()
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(12, TimeUnit.SECONDS)
@@ -46,9 +47,12 @@ object FinanceWidgetRepository {
         if (token.isNullOrBlank()) return Result(null, loggedIn = false, error = false)
 
         return try {
-            val today = LocalDate.now()
-            val start = today.withDayOfMonth(1).format(dateFormatter)
-            val end = today.format(dateFormatter)
+            // 使用 Calendar 兼容 Android 7/7.1（minSdk 24），避免 java.time 在旧设备上触发类加载崩溃。
+            val today = Calendar.getInstance()
+            val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            val end = dateFormatter.format(today.time)
+            today.set(Calendar.DAY_OF_MONTH, 1)
+            val start = dateFormatter.format(today.time)
             val base = BuildConfig.API_BASE_URL.trimEnd('/')
             val url = "$base/bills/statistics?startDate=$start&endDate=$end&granularity=daily"
             val request = Request.Builder()

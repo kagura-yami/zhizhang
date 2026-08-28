@@ -53,7 +53,7 @@ object UpdateNotificationHelper {
                 ?: "打开应用即可查看更新内容"
             val notification = NotificationCompat.Builder(appContext, CHANNEL_ID)
                 .setSmallIcon(com.litenote.R.mipmap.ic_launcher)
-                .setContentTitle("知帐 zhizhang 有新版本")
+                .setContentTitle("知帐有新版本")
                 .setContentText("版本 $version 已发布，点击查看更新")
                 .setStyle(NotificationCompat.BigTextStyle().bigText("版本 $version 已发布\n$detail"))
                 .setContentIntent(pendingIntent)

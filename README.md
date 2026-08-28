@@ -1,13 +1,13 @@
-# 知帐 zhizhang
+# 知帐
 
-![知帐 zhizhang 项目图标](litenote-mobile-app/public/icons/logo.png)
+![知帐项目图标](litenote-mobile-app/public/icons/logo.png)
 
 知帐（zhizhang）是一款面向 Android 的智能记账应用，支持手动、语音、拍照、AI 对话和支付通知自动记账，并提供统计图表、预算、财务目标和电子发票中心。
 
 ## 当前版本
 
-- Android：`0.0.60`
-- APK：[下载最新版](https://note.kagurayami.top/downloads/app-latest.apk) · [0.0.60](https://note.kagurayami.top/downloads/app-v0.0.60.apk)
+- Android：`0.0.61`
+- APK：[下载最新版](https://note.kagurayami.top/downloads/app-latest.apk) · [0.0.61](https://note.kagurayami.top/downloads/app-v0.0.61.apk)
 - 生产 API：`https://note.kagurayami.top/`
 - API 文档：`https://note.kagurayami.top/api-docs`
 

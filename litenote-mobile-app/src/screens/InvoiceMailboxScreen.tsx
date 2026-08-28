@@ -44,10 +44,10 @@ const providerHelp: Record<InvoiceMailboxProvider, {
   },
   outlook: {
     title: 'Outlook 官方授权方式',
-    steps: ['点击下方按钮并登录 Outlook 网页版', '在 Microsoft 授权页同意读取邮件权限', '授权完成后返回知帐 zhizhang，应用会自动读取收件箱中的发票附件'],
+    steps: ['点击下方按钮并登录 Outlook 网页版', '在 Microsoft 授权页同意读取邮件权限', '授权完成后返回知帐，应用会自动读取收件箱中的发票附件'],
     url: 'https://login.microsoftonline.com/',
     buttonLabel: '打开 Microsoft 登录页',
-    notice: '知帐 zhizhang 使用 Microsoft Graph 读取发票邮件，无需手动开启 IMAP，也不需要填写邮箱密码或授权码。',
+    notice: '知帐使用 Microsoft Graph 读取发票邮件，无需手动开启 IMAP，也不需要填写邮箱密码或授权码。',
   },
   gmail: {
     title: 'Gmail应用专用密码获取方式',
@@ -112,7 +112,7 @@ export default function InvoiceMailboxScreen() {
         if (callbackEmail) setEmail(callbackEmail);
         setCredential('');
         void load();
-      alert('Outlook 登录成功', '邮箱已完成授权，知帐 zhizhang 会自动回扫全部含“发票”的邮件并整理 PDF 附件。');
+      alert('Outlook 登录成功', '邮箱已完成授权，知帐会自动回扫全部含“发票”的邮件并整理 PDF 附件。');
       } else {
         alert('Outlook 登录未完成', callbackMessage || '授权已取消，请重试。');
       }
@@ -210,7 +210,7 @@ export default function InvoiceMailboxScreen() {
         <View style={styles.hero}>
           <View style={styles.heroIcon}><Mail size={28} color={colors.primary} /></View>
           <Text style={styles.title}>自动整理电子发票</Text>
-          <Text style={styles.subtitle}>知帐 zhizhang 会扫描绑定邮箱中主题、正文或附件名含“发票”的邮件，自动保存 PDF、提取信息并尝试关联账单。</Text>
+          <Text style={styles.subtitle}>知帐会扫描绑定邮箱中主题、正文或附件名含“发票”的邮件，自动保存 PDF、提取信息并尝试关联账单。</Text>
         </View>
 
         <View style={styles.card}>
@@ -228,7 +228,7 @@ export default function InvoiceMailboxScreen() {
           {provider === 'outlook' && (
             <View style={styles.oauthPanel}>
               <Text style={styles.oauthTitle}>推荐使用官方登录</Text>
-              <Text style={styles.oauthDescription}>点击后会打开 Microsoft 登录页，授权完成后自动返回知帐 zhizhang，不需要填写邮箱密码或授权码。</Text>
+              <Text style={styles.oauthDescription}>点击后会打开 Microsoft 登录页，授权完成后自动返回知帐，不需要填写邮箱密码或授权码。</Text>
               <TouchableOpacity style={styles.oauthButton} onPress={loginOutlook} disabled={oauthLoading} activeOpacity={0.8} accessibilityRole="button">
                 {oauthLoading ? <ActivityIndicator color="#FFFFFF" /> : <><Mail size={18} color="#FFFFFF" /><Text style={styles.oauthButtonText}>登录 Outlook 并授权邮箱读取</Text></>}
               </TouchableOpacity>
