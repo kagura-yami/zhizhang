@@ -1,6 +1,6 @@
 # 知帐
 
-![知帐项目图标](litenote-mobile-app/public/icons/logo.png)
+![知帐项目图标](mobile/public/icons/logo.png)
 
 知帐（zhizhang）是一款面向 Android 的智能记账应用，支持手动、语音、拍照、AI 对话和支付通知自动记账，并提供统计图表、预算、财务目标和电子发票中心。
 
@@ -25,8 +25,8 @@
 ## 项目结构
 
 ```text
-LiteNote/
-├── litenote-backend/          # NestJS REST/SSE API
+Zhizhang/
+├── backend/                   # NestJS REST/SSE API
 │   ├── src/
 │   │   ├── auth/              # JWT 认证、登录与生物识别
 │   │   ├── bills/             # 账单 CRUD、自动分类与统计
@@ -39,12 +39,12 @@ LiteNote/
 │   │   └── app-version/       # APK 版本检查与发布
 │   ├── prisma/                # PostgreSQL Schema
 │   └── docker-compose.yml     # 后端 + PostgreSQL
-├── litenote-mobile-app/       # React Native Android 客户端
+├── mobile/                    # React Native Android 客户端
 │   ├── src/screens/           # 页面与业务流程
 │   ├── src/components/        # 通用 UI 与图表组件
 │   ├── src/services/          # API、通知、AI、语音和更新服务
 │   └── android/               # Android 原生层与深链回调
-└── docs/                      # 部署与运维文档
+└── docs/                      # 架构、部署与交接文档
 ```
 
 ## 技术栈
@@ -76,7 +76,7 @@ npm run install:all
 ### 启动后端
 
 ```bash
-copy litenote-backend/.env.example litenote-backend/.env
+copy backend/.env.example backend/.env
 # 编辑 .env，至少配置 JWT_SECRET、DATABASE_URL、EMAIL_CREDENTIALS_KEY
 npm run backend:start:dev
 ```
@@ -85,7 +85,7 @@ npm run backend:start:dev
 
 ### 启动 Android
 
-移动端开发环境 API 地址配置在 `litenote-mobile-app/.env.development`，生产环境配置在 `.env.production`（不要提交真实配置）。
+移动端开发环境 API 地址配置在 `mobile/.env.development`，生产环境配置在 `.env.production`（不要提交真实配置）。
 
 ```bash
 npm run mobile:android:dev
@@ -109,14 +109,14 @@ Android App
       └── 阿里云 ECS HTTPS 入口
           └── FRP :7017
               └── 本机 remote-frpc
-                  └── Docker LiteNote API :3006
+                  └── Docker 知帐 API :3006
                       └── Docker PostgreSQL
 ```
 
 后端目录中的常用脚本：
 
 ```powershell
-cd D:\Dev\Consultation\LiteNote\litenote-backend
+cd D:\Dev\Projects\Zhizhang\backend
 .\start.ps1   # 构建并启动
 .\logs.ps1    # 跟随日志
 .\stop.ps1    # 停止容器，保留数据库卷
@@ -133,7 +133,7 @@ Outlook 登录按钮需要管理员预先注册 Microsoft Entra 应用。普通�
 - Web 重定向 URI：`https://note.kagurayami.top/invoice-mailbox/oauth/outlook/callback`
 - Microsoft Graph Delegated 权限：`Mail.Read`、`offline_access`、`openid`、`profile`、`email`
 
-将真实值只写入服务器 `litenote-backend/.env`，不要写入 Git：
+将真实值只写入服务器 `backend/.env`，不要写入 Git：
 
 ```env
 OUTLOOK_OAUTH_CLIENT_ID=你的应用客户端ID
@@ -159,7 +159,7 @@ GET  http://127.0.0.1:3006/app-version/latest?platform=android
 GET  http://127.0.0.1:3006/app-version/check?currentVersion=0.0.38&platform=android
 ```
 
-发布文件位于 `litenote-backend/public/downloads/`，稳定地址为 `/downloads/app-latest.apk`。
+发布文件位于 `backend/public/downloads/`，稳定地址为 `/downloads/app-latest.apk`。
 
 ## 安全约定
 

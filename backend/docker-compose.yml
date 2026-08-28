@@ -1,9 +1,9 @@
-name: litenote
+name: zhizhang
 
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: litenote-postgres
+    container_name: zhizhang-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -21,8 +21,8 @@ services:
   app:
     build:
       context: .
-    image: litenote-backend:local
-    container_name: litenote-backend
+    image: zhizhang-backend:local
+    container_name: zhizhang-backend
     ports:
       - '3006:3006'
     volumes:
@@ -48,3 +48,4 @@ services:
 volumes:
   postgres-data:
     name: litenote-postgres-data
+    external: true

@@ -2,13 +2,13 @@
 
 ## Analysis Purpose
 
-梳理 LiteNote 的代码边界、运行依赖、持久化数据与访问链路，并记录本机 Docker + 阿里云 ECS FRP 的实际部署方式。
+梳理知帐的代码边界、运行依赖、持久化数据与访问链路，并记录本机 Docker + 阿里云 ECS FRP 的实际部署方式。
 
 ## Codebase Structure
 
 ```text
-LiteNote/
-├── litenote-backend/          NestJS REST API
+Zhizhang/
+├── backend/                   NestJS REST API
 │   ├── src/                   认证、账单、分类、账户、预算、AI、更新服务
 │   ├── prisma/                PostgreSQL 数据模型
 │   ├── Dockerfile             后端多阶段镜像构建
@@ -16,7 +16,7 @@ LiteNote/
 │   ├── start.ps1              构建并启动
 │   ├── stop.ps1               停止容器，保留数据
 │   └── logs.ps1               跟随后端日志
-├── litenote-mobile-app/       React Native Android 客户端
+├── mobile/                    React Native Android 客户端
 │   ├── src/screens/           页面
 │   ├── src/components/        UI、业务与图表组件
 │   ├── src/services/          HTTP、AI、语音、通知与更新服务
@@ -41,7 +41,7 @@ LiteNote/
 
 ## Codebase Conventions
 
-- 后端功能按领域模块放在 `litenote-backend/src/<domain>/`。
+- 后端功能按领域模块放在 `backend/src/<domain>/`。
 - DTO 与 Controller、Service 同模块组织。
 - 移动端统一从 `src/services/` 调用 API，通过环境文件切换地址。
 - 运行密钥只保存在被 Git 忽略的 `.env` 中。
@@ -83,17 +83,17 @@ React Native App
 - 本地 Swagger：`http://127.0.0.1:3006/api-docs`
 - 公网 API：`https://note.kagurayami.top/`
 - 公网 Swagger：`https://note.kagurayami.top/api-docs`
-- Android APK：`https://note.kagurayami.top/downloads/app-v0.0.39.apk`
+- Android APK：`https://note.kagurayami.top/downloads/app-v0.0.64.apk`
 - 稳定下载地址：`https://note.kagurayami.top/downloads/app-latest.apk`
-- Android 版本：`0.0.39`（通用四 ABI release 包）
-- APK SHA256：`CEC52E0C4AA915D09C530576B6AB21EE1F6CDFC8D6B29A7D84D4D4BF39538288`
+- Android 版本：`0.0.64`（通用四 ABI release 包）
+- APK SHA256：`C9CBB7717ECEEA150D1CE7F591E3C24B4AEAA0304A9A872D6BC785C307BCFC12`
 - 数据库卷：`litenote-postgres-data`
-- 头像目录：`litenote-backend/uploads/`
-- APK 与热更新目录：`litenote-backend/public/downloads/`
+- 头像目录：`backend/uploads/`
+- APK 与热更新目录：`backend/public/downloads/`
 - FRP 配置：`D:\Dev\frpEnv\frpc.toml` 与 `D:\Dev\frpEnv\.env`
 
 ```powershell
-cd D:\Dev\Consultation\LiteNote\litenote-backend
+cd D:\Dev\Projects\Zhizhang\backend
 .\start.ps1
 .\logs.ps1
 .\stop.ps1
@@ -103,9 +103,9 @@ cd D:\Dev\Consultation\LiteNote\litenote-backend
 
 ## Android release 构建与签名
 
-- 生产 API 配置保存在被 Git 忽略的 `litenote-mobile-app/.env.production`，当前地址为 `https://note.kagurayami.top/`。
+- 生产 API 配置保存在被 Git 忽略的 `mobile/.env.production`，当前地址为 `https://note.kagurayami.top/`。
 - release 包禁止明文 HTTP，合并后的 Manifest 中 `usesCleartextTraffic=false`。
-- release 签名文件为 `litenote-mobile-app/android/app/litenote-release.keystore`，密码配置为 `litenote-mobile-app/android/keystore.properties`；两者均被 Git 忽略。
-- 必须将签名文件和密码配置加密备份到项目目录之外。签名丢失后，无法对已安装的 LiteNote 进行同包名覆盖升级。
+- release 签名文件为 `mobile/android/app/zhizhang-release.keystore`，密码配置为 `mobile/android/keystore.properties`；两者均被 Git 忽略。
+- 必须将签名文件和密码配置加密备份到项目目录之外。当前包名为 `com.zhizhang`，签名丢失后无法覆盖升级已安装的知帐。
 - 发布接口为本地 `POST http://127.0.0.1:3006/app-version/upload`；上传成功后，版本信息可从 `https://note.kagurayami.top/app-version/latest?platform=android` 查询。
 - Outlook OAuth2 变量只配置在服务器 `.env`：`OUTLOOK_OAUTH_CLIENT_ID`、`OUTLOOK_OAUTH_CLIENT_SECRET`、`OUTLOOK_OAUTH_REDIRECT_URI`；真实值不得写入 Git。回调地址为 `https://note.kagurayami.top/invoice-mailbox/oauth/outlook/callback`。个人 Microsoft 账号使用 Microsoft Graph `Mail.Read` 委托权限读取发票邮件。
