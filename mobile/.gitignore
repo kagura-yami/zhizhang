@@ -79,7 +79,7 @@ yarn-error.log
 
 # Android release signing secrets
 android/keystore.properties
-android/app/litenote-release.keystore
+android/app/zhizhang-release.keystore
 
 # IDE
 .vscode/

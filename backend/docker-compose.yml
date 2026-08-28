@@ -47,5 +47,5 @@ services:
 
 volumes:
   postgres-data:
-    name: litenote-postgres-data
+    name: zhizhang-postgres-data
     external: true

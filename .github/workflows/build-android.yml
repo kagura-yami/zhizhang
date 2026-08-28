@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'litenote-mobile-app/**'
+      - 'mobile/**'
   workflow_dispatch:
 
 concurrency:
@@ -30,7 +30,7 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-          cache-dependency-path: litenote-mobile-app/package-lock.json
+          cache-dependency-path: mobile/package-lock.json
 
       - name: Setup JDK
         uses: actions/setup-java@v4
@@ -69,13 +69,13 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
             ~/.gradle/native
-          key: gradle-${{ hashFiles('litenote-mobile-app/android/gradle/wrapper/gradle-wrapper.properties', 'litenote-mobile-app/android/app/build.gradle') }}
+          key: gradle-${{ hashFiles('mobile/android/gradle/wrapper/gradle-wrapper.properties', 'mobile/android/app/build.gradle') }}
           restore-keys: gradle-
           save-always: true
 
       - name: Install dependencies
         run: npm install
-        working-directory: litenote-mobile-app
+        working-directory: mobile
 
       - name: Decode release keystore
         run: |
@@ -83,7 +83,7 @@ jobs:
             echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
             echo "RELEASE_KEYSTORE=true" >> $GITHUB_ENV
           fi
-        working-directory: litenote-mobile-app
+        working-directory: mobile
 
       - name: Configure git for CI
         run: |
@@ -92,7 +92,7 @@ jobs:
 
       - name: Run release (bump version + build + upload + commit)
         run: node scripts/release.js patch --ci "CI auto release"
-        working-directory: litenote-mobile-app
+        working-directory: mobile
         env:
           RELEASE_STORE_FILE: ${{ env.RELEASE_KEYSTORE == 'true' && 'release.keystore' || '' }}
           RELEASE_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -104,5 +104,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: app-release
-          path: litenote-mobile-app/android/app/build/outputs/apk/release/*.apk
+          path: mobile/android/app/build/outputs/apk/release/*.apk
           retention-days: 30

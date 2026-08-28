@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'litenote-backend/**'
+      - 'backend/**'
   workflow_dispatch:
 
 jobs:
@@ -25,11 +25,11 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./litenote-backend
+          context: ./backend
           push: true
           tags: |
-            ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/litenote-backend:latest
-            ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/litenote-backend:${{ github.sha }}
+            ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/zhizhang-backend:latest
+            ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/zhizhang-backend:${{ github.sha }}
 
       - name: Deploy to ECS via SSH
         uses: appleboy/ssh-action@v1
@@ -38,7 +38,7 @@ jobs:
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
           script: |
-            cd /opt/litenote-backend
+            cd /opt/zhizhang-backend
             docker login ${{ secrets.ACR_REGISTRY }} -u ${{ secrets.ACR_USERNAME }} -p ${{ secrets.ACR_PASSWORD }}
             export ACR_REGISTRY=${{ secrets.ACR_REGISTRY }}
             export ACR_NAMESPACE=${{ secrets.ACR_NAMESPACE }}

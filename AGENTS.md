@@ -24,7 +24,7 @@ cd D:\Dev\Projects\Zhizhang\backend
 .\stop.ps1
 ```
 
-不要使用 `docker compose down -v`，数据库卷 `litenote-postgres-data` 保存现有业务数据。
+不要使用 `docker compose down -v`，数据库业务数据现在保存在外部卷 `zhizhang-postgres-data`；旧卷 `litenote-postgres-data` 仅作为迁移回滚保留，确认迁移稳定前不得删除。
 
 ## 构建和发布红线
 

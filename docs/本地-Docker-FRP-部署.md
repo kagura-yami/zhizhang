@@ -87,7 +87,7 @@ React Native App
 - 稳定下载地址：`https://note.kagurayami.top/downloads/app-latest.apk`
 - Android 版本：`0.0.64`（通用四 ABI release 包）
 - APK SHA256：`C9CBB7717ECEEA150D1CE7F591E3C24B4AEAA0304A9A872D6BC785C307BCFC12`
-- 数据库卷：`litenote-postgres-data`
+- 数据库卷：`zhizhang-postgres-data`（旧卷 `litenote-postgres-data` 仅用于回滚）
 - 头像目录：`backend/uploads/`
 - APK 与热更新目录：`backend/public/downloads/`
 - FRP 配置：`D:\Dev\frpEnv\frpc.toml` 与 `D:\Dev\frpEnv\.env`
