@@ -6,8 +6,8 @@
 
 ## 当前版本
 
-- Android：`0.0.57`
-- APK：[下载最新版](https://note.kagurayami.top/downloads/app-latest.apk) · [0.0.57](https://note.kagurayami.top/downloads/app-v0.0.57.apk)
+- Android：`0.0.58`
+- APK：[下载最新版](https://note.kagurayami.top/downloads/app-latest.apk) · [0.0.58](https://note.kagurayami.top/downloads/app-v0.0.58.apk)
 - 生产 API：`https://note.kagurayami.top/`
 - API 文档：`https://note.kagurayami.top/api-docs`
 
@@ -68,8 +68,8 @@ LiteNote/
 ### 安装依赖
 
 ```bash
-git clone https://github.com/kagura-yami/Auto-LiteNote.git
-cd Auto-LiteNote
+git clone https://github.com/kagura-yami/zhizhang.git
+cd zhizhang
 npm run install:all
 ```
 

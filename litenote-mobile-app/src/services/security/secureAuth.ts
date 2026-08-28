@@ -32,7 +32,7 @@ export async function getAuthSession(options: { requireBiometric?: boolean } = {
     const gate = await Keychain.getGenericPassword({
       service: BIOMETRIC_SERVICE,
       authenticationPrompt: {
-        title: '验证身份以进入 LiteNote',
+        title: '验证身份以进入知帐 zhizhang',
         subtitle: '使用指纹或人脸识别解锁',
         cancel: '取消',
       },

@@ -36,8 +36,8 @@ class EnvironmentConfig {
       DEBUG_NETWORK: Config.DEBUG_NETWORK === 'true',
       DEBUG_REDUX: Config.DEBUG_REDUX === 'true',
       MOCK_API: Config.MOCK_API === 'true',
-      APP_NAME: Config.APP_NAME || 'LiteNote',
-      APP_VERSION: Config.APP_VERSION || '1.0.0',
+      APP_NAME: Config.APP_NAME || '知帐 zhizhang',
+      APP_VERSION: Config.APP_VERSION || '0.0.58',
       BUILD_NUMBER: Config.BUILD_NUMBER || '1',
     };
 

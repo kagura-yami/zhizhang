@@ -115,7 +115,7 @@ export default function AboutScreen() {
 
         <TouchableOpacity
           style={styles.githubButton}
-          onPress={() => Linking.openURL('https://github.com/kagura-yami/Auto-LiteNote').catch(() => alert('提示', '无法打开项目地址'))}
+          onPress={() => Linking.openURL('https://github.com/kagura-yami/zhizhang').catch(() => alert('提示', '无法打开项目地址'))}
           activeOpacity={0.85}
         >
           <Github size={19} color={styles._colors.stroke} />
