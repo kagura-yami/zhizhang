@@ -4,6 +4,7 @@
 
 - `backend/`：NestJS 10 + Prisma 6 后端，默认监听本机 `3006`。
 - `mobile/`：React Native 0.81 Android 客户端，应用名“知帐”，包名 `com.zhizhang`，JS 注册名 `zhizhang`。
+- `Bot/`：知帐微信机器人内测群助手（企业微信自建应用），独立运行在本机 `3007`，不提交到 GitHub。
 - `docs/`：部署、架构和交接文档；`backend/public/downloads/` 与 `backend/uploads/` 是运行数据，不属于 Git 源码。
 
 ## 常用入口
@@ -36,4 +37,4 @@ cd D:\Dev\Projects\Zhizhang\backend
 
 ## 迁移后的目录约定
 
-旧的目录名已统一为 `backend/` 与 `mobile/`。运行时仍保留旧数据库卷名以复用已有数据；不要为了改名删除或重建该卷。
+项目目录统一为 `backend/`、`mobile/` 和不入库的 `Bot/`。运行时使用外部卷 `zhizhang-postgres-data`；旧卷只作为回滚备份保留，不要在观察期内删除。

@@ -16,3 +16,6 @@ node_modules/
 
 # Environment (root level)
 .env.local
+
+# 本地内测群机器人，不纳入知帐主仓库
+Bot/
