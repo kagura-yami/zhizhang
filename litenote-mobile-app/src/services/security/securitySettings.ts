@@ -1,7 +1,7 @@
 /** 非敏感的安全偏好。令牌和用户信息不在这里保存。 */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const AUTO_LOGIN_KEY = '@litenote/security/auto_login';
+const AUTO_LOGIN_KEY = '@zhizhang/security/auto_login';
 
 export async function getAutoLoginSetting(): Promise<boolean> {
   try {

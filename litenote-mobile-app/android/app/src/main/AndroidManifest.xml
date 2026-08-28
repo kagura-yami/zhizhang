@@ -66,7 +66,7 @@
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.DEFAULT" />
             <category android:name="android.intent.category.BROWSABLE" />
-            <data android:scheme="litenote" android:host="invoice-mailbox" android:pathPrefix="/oauth/callback" />
+            <data android:scheme="zhizhang" android:host="invoice-mailbox" android:pathPrefix="/oauth/callback" />
         </intent-filter>
       </activity>
       
@@ -108,7 +108,7 @@
           android:exported="false">
           <intent-filter>
               <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-              <action android:name="com.litenote.widget.ACTION_REFRESH" />
+              <action android:name="com.zhizhang.widget.ACTION_REFRESH" />
           </intent-filter>
           <meta-data
               android:name="android.appwidget.provider"

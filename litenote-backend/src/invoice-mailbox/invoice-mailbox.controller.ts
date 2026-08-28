@@ -28,7 +28,7 @@ export class InvoiceMailboxController {
   @Public()
   @Get('oauth/outlook/callback')
   async outlookCallback(@Query('state') state: string, @Query('code') code: string, @Query('error') error: string, @Res() response: Response) {
-    const deepLink = (params: string) => response.redirect(302, `litenote://invoice-mailbox/oauth/callback?${params}`);
+    const deepLink = (params: string) => response.redirect(302, `zhizhang://invoice-mailbox/oauth/callback?${params}`);
     if (error) return deepLink(`status=error&message=${encodeURIComponent('Microsoft 登录未完成')}`);
     try {
       if (!state || !code) throw new Error('回调参数不完整');

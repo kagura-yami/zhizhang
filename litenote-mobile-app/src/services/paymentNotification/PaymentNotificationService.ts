@@ -4,7 +4,7 @@
  * 用于管理支付通知监听的权限。
  * 实际的支付检测和记账逻辑已移至 Android 原生层处理。
  *
- * @author LiteNote
+ * @author zhizhang
  * @since 1.0.0
  */
 

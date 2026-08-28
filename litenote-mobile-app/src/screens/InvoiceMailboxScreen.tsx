@@ -101,7 +101,7 @@ export default function InvoiceMailboxScreen() {
 
   useEffect(() => {
     const handleOAuthUrl = (url: string) => {
-      if (!url.startsWith('litenote://invoice-mailbox/oauth/callback')) return;
+      if (!url.startsWith('zhizhang://invoice-mailbox/oauth/callback')) return;
       const query = url.split('?')[1] || '';
       setOauthLoading(false);
       const status = getCallbackParam(query, 'status');

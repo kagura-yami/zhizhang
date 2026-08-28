@@ -21,11 +21,11 @@ export type HomeSecondaryMetric =
   | 'dailyBalance'
   | 'none';
 
-const STORAGE_KEY = '@litenote/home_display_mode';
-const BUDGET_CARD_STORAGE_KEY = '@litenote/home_budget_card_enabled';
-const MAIN_METRIC_STORAGE_KEY = '@litenote/home_main_metric';
-const SECONDARY_METRIC_STORAGE_KEY = '@litenote/home_secondary_metric';
-const HOME_SECTIONS_STORAGE_KEY = '@litenote/home_sections';
+const STORAGE_KEY = '@zhizhang/home_display_mode';
+const BUDGET_CARD_STORAGE_KEY = '@zhizhang/home_budget_card_enabled';
+const MAIN_METRIC_STORAGE_KEY = '@zhizhang/home_main_metric';
+const SECONDARY_METRIC_STORAGE_KEY = '@zhizhang/home_secondary_metric';
+const HOME_SECTIONS_STORAGE_KEY = '@zhizhang/home_sections';
 
 export const DEFAULT_HOME_SECTIONS: HomeSectionId[] = ['bills'];
 

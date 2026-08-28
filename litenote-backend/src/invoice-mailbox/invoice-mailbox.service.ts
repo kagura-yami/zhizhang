@@ -301,7 +301,7 @@ export class InvoiceMailboxService implements OnModuleInit, OnModuleDestroy {
     ].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','))].join('\n');
     archive.append(`\uFEFF${csv}`, { name: '发票清单.csv' });
     void archive.finalize();
-    return { stream, fileName: `LiteNote-发票-${new Date().toISOString().slice(0, 10)}.zip` };
+    return { stream, fileName: `知帐-发票-${new Date().toISOString().slice(0, 10)}.zip` };
   }
 
   private async listInvoiceRecords(userId: string, query: Partial<InvoiceMailboxQueryDto>, ids?: number[], limit = 100) {
@@ -643,7 +643,7 @@ export class InvoiceMailboxService implements OnModuleInit, OnModuleDestroy {
         const response = await fetch(link, {
           signal: AbortSignal.timeout(20_000),
           redirect: 'follow',
-          headers: { Accept: 'application/pdf,application/octet-stream;q=0.9,*/*;q=0.1', 'User-Agent': 'LiteNote-InvoiceSync/1.0' },
+          headers: { Accept: 'application/pdf,application/octet-stream;q=0.9,*/*;q=0.1', 'User-Agent': 'zhizhang-InvoiceSync/1.0' },
         });
         if (!response.ok) continue;
         const declaredLength = Number(response.headers.get('content-length') || 0);

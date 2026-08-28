@@ -63,7 +63,7 @@ class InvoiceMailboxService {
 
   async downloadFile(id: number) {
     const session = await getAuthSession();
-    const target = `${RNFS.CachesDirectoryPath}/litenote-invoice-${id}`;
+    const target = `${RNFS.CachesDirectoryPath}/zhizhang-invoice-${id}`;
     const result = await RNFS.downloadFile({
       fromUrl: `${env.getApiBaseUrl().replace(/\/$/, '')}/invoice-mailbox/invoices/${id}/file`,
       toFile: target,
@@ -76,7 +76,7 @@ class InvoiceMailboxService {
   async downloadArchive(params: Record<string, string | number | undefined> = {}) {
     const session = await getAuthSession();
     const query = Object.entries(params).filter(([, value]) => value !== undefined && value !== '').map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`).join('&');
-    const target = `${RNFS.DownloadDirectoryPath}/LiteNote-发票-${new Date().toISOString().slice(0, 10)}.zip`;
+    const target = `${RNFS.DownloadDirectoryPath}/知帐-发票-${new Date().toISOString().slice(0, 10)}.zip`;
     const result = await RNFS.downloadFile({
       fromUrl: `${env.getApiBaseUrl().replace(/\/$/, '')}/invoice-mailbox/invoices/export${query ? `?${query}` : ''}`,
       toFile: target,

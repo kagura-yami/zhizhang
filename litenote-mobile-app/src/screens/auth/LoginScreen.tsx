@@ -354,21 +354,16 @@ const createStyles = (colors: ThemeColors) => ({
       marginBottom: spacing.xxl,
     },
     logoContainer: {
-      width: 80,
-      height: 80,
-      borderRadius: borderRadius.card,
-      borderWidth: borderWidth.thick,
-      borderColor: colors.stroke,
-      backgroundColor: colors.accent,
+      // Logo 素材自带透明背景，避免再叠加黄色底和黑色边框。
+      width: 96,
+      height: 96,
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: spacing.lg,
-      ...shadow.medium,
     },
     logoImage: {
       width: '100%',
       height: '100%',
-      borderRadius: borderRadius.small,
     },
     title: {
       fontSize: 32,

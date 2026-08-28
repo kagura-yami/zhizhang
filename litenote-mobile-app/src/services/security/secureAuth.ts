@@ -5,9 +5,9 @@
 import * as Keychain from 'react-native-keychain';
 import type { User } from '../../types/user';
 
-const AUTH_SERVICE = 'com.litenote.auth.session';
-const BIOMETRIC_SERVICE = 'com.litenote.auth.biometric';
-const BIOMETRIC_LOGIN_SERVICE = 'com.litenote.auth.biometric.login';
+const AUTH_SERVICE = 'com.zhizhang.auth.session';
+const BIOMETRIC_SERVICE = 'com.zhizhang.auth.biometric';
+const BIOMETRIC_LOGIN_SERVICE = 'com.zhizhang.auth.biometric.login';
 
 export interface SecureAuthSession {
   token: string;
