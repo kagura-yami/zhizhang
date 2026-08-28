@@ -6,8 +6,8 @@
 
 ## 当前版本
 
-- Android：`0.0.59`
-- APK：[下载最新版](https://note.kagurayami.top/downloads/app-latest.apk) · [0.0.59](https://note.kagurayami.top/downloads/app-v0.0.59.apk)
+- Android：`0.0.60`
+- APK：[下载最新版](https://note.kagurayami.top/downloads/app-latest.apk) · [0.0.60](https://note.kagurayami.top/downloads/app-v0.0.60.apk)
 - 生产 API：`https://note.kagurayami.top/`
 - API 文档：`https://note.kagurayami.top/api-docs`
 

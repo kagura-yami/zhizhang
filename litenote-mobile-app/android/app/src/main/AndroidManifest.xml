@@ -102,6 +102,19 @@
           </intent-filter>
       </receiver>
 
+      <!-- 桌面账务总览组件 -->
+      <receiver
+          android:name=".widget.FinanceOverviewWidget"
+          android:exported="false">
+          <intent-filter>
+              <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+              <action android:name="com.litenote.widget.ACTION_REFRESH" />
+          </intent-filter>
+          <meta-data
+              android:name="android.appwidget.provider"
+              android:resource="@xml/finance_overview_widget_info" />
+      </receiver>
+
       <!-- FileProvider 用于安装 APK -->
       <provider
           android:name="androidx.core.content.FileProvider"
