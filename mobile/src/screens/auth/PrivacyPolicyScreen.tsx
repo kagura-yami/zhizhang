@@ -89,7 +89,7 @@ export default function PrivacyPolicyScreen() {
           <Text style={styles.sectionTitle}>八、联系我们</Text>
           <Text style={styles.paragraph}>
             如您对本隐私政策有任何疑问或建议，请通过以下方式联系我们：{'\n'}
-            邮箱：请通过知帐项目主页联系我们
+            邮箱：请通过知账项目主页联系我们
           </Text>
         </View>
 

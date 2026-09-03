@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, StreamableFile, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Put, Query, StreamableFile, Res } from '@nestjs/common';
 import { createReadStream } from 'fs';
 import type { Response } from 'express';
 import { InvoiceMailboxService } from './invoice-mailbox.service';
@@ -70,6 +70,16 @@ export class InvoiceMailboxController {
   @Get('invoices/:id')
   async invoice(@CurrentUser('id') userId: string, @Param('id', ParseIntPipe) id: number) {
     return { success: true, data: await this.service.getInvoice(userId, id) };
+  }
+
+  @Patch('invoices/:id')
+  async updateInvoice(@CurrentUser('id') userId: string, @Param('id', ParseIntPipe) id: number, @Body() body: any) {
+    return { success: true, message: '发票信息已更新', data: await this.service.updateInvoice(userId, id, body || {}) };
+  }
+
+  @Delete('invoices')
+  async deleteInvoices(@CurrentUser('id') userId: string, @Body('ids') ids: number[]) {
+    return { success: true, message: '发票已删除', data: await this.service.deleteInvoices(userId, ids) };
   }
 
   @Get('invoices/:id/file')

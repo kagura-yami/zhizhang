@@ -61,6 +61,14 @@ class InvoiceMailboxService {
     return httpService.get(`/invoice-mailbox/invoices/${id}`);
   }
 
+  async updateInvoice(id: number, data: Partial<Pick<InvoiceDocument, 'buyer' | 'seller' | 'invoiceCategory' | 'invoiceNumber' | 'amount' | 'invoiceDate'>>): Promise<ApiResponse<InvoiceDocument>> {
+    return httpService.patch(`/invoice-mailbox/invoices/${id}`, data);
+  }
+
+  async deleteInvoices(ids: number[]): Promise<ApiResponse<{ deleted: number }>> {
+    return httpService.delete('/invoice-mailbox/invoices', { data: { ids } });
+  }
+
   async downloadFile(id: number) {
     const session = await getAuthSession();
     const target = `${RNFS.CachesDirectoryPath}/zhizhang-invoice-${id}`;
@@ -76,7 +84,7 @@ class InvoiceMailboxService {
   async downloadArchive(params: Record<string, string | number | undefined> = {}) {
     const session = await getAuthSession();
     const query = Object.entries(params).filter(([, value]) => value !== undefined && value !== '').map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`).join('&');
-    const target = `${RNFS.DownloadDirectoryPath}/知帐-发票-${new Date().toISOString().slice(0, 10)}.zip`;
+    const target = `${RNFS.DownloadDirectoryPath}/知账-发票-${new Date().toISOString().slice(0, 10)}.zip`;
     const result = await RNFS.downloadFile({
       fromUrl: `${env.getApiBaseUrl().replace(/\/$/, '')}/invoice-mailbox/invoices/export${query ? `?${query}` : ''}`,
       toFile: target,

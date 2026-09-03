@@ -7,6 +7,10 @@ import android.content.Intent
 import android.service.notification.NotificationListenerService
 import android.util.Log
 import com.zhizhang.update.UpdateCheckScheduler
+import com.zhizhang.shortcut.EdgeGestureService
+import androidx.core.content.ContextCompat
+import android.os.Build
+import android.provider.Settings
 
 /**
  * 开机完成广播接收器
@@ -32,6 +36,11 @@ class BootCompletedReceiver : BroadcastReceiver() {
             NotificationListenerService.requestRebind(
                 ComponentName(context, PaymentNotificationService::class.java)
             )
+            val shortcutPrefs = context.getSharedPreferences("voice_shortcut", Context.MODE_PRIVATE)
+            val triggerMode = shortcutPrefs.getString("trigger_mode", if (shortcutPrefs.getBoolean("edge_enabled", false)) "edge" else "widget")
+            if (triggerMode == "edge" && (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(context))) {
+                runCatching { ContextCompat.startForegroundService(context, Intent(context, EdgeGestureService::class.java)) }
+            }
         }
     }
 }

@@ -9,6 +9,7 @@ import {
   Max,
   IsNotEmpty,
   IsIn,
+  IsBoolean,
   MaxLength,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
@@ -102,6 +103,28 @@ export class CreateBillDto {
   @IsOptional()
   @IsNumber({}, { message: '分类ID必须是数字' })
   categoryId?: number;
+
+  @ApiProperty({ description: '关联原账单ID（退款收入可选）', required: false })
+  @IsOptional()
+  @IsNumber({}, { message: '关联账单ID必须是数字' })
+  relatedBillId?: number;
+
+  @ApiProperty({ description: '是否为退款收入（自动记账内部标记）', required: false })
+  @IsOptional()
+  @IsBoolean({ message: '退款标记必须是布尔值' })
+  isRefund?: boolean;
+
+  @ApiProperty({ description: '自动记账事件幂等键，防止网络重试重复创建', required: false })
+  @IsOptional()
+  @IsString({ message: '自动记账幂等键必须是字符串' })
+  @MaxLength(128, { message: '自动记账幂等键长度不能超过128个字符' })
+  dedupeKey?: string;
+
+  @ApiProperty({ description: '自动记账结构化辅助字段', required: false })
+  @IsOptional()
+  @IsString({ message: '自动记账辅助字段必须是字符串' })
+  @MaxLength(500, { message: '自动记账辅助字段长度不能超过500个字符' })
+  dedupeMeta?: string;
 }
 
 // 内部使用的完整DTO，包含userId
@@ -166,6 +189,11 @@ export class UpdateBillDto {
   @IsOptional()
   @IsNumber({}, { message: '分类ID必须是数字' })
   categoryId?: number;
+
+  @ApiProperty({ description: '关联原账单ID（退款收入可选）', required: false })
+  @IsOptional()
+  @IsNumber({}, { message: '关联账单ID必须是数字' })
+  relatedBillId?: number;
 }
 
 export class BillQueryDto {

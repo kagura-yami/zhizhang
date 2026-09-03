@@ -204,7 +204,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         </TouchableOpacity>
 
         <View style={styles.versionInfo}>
-          <Text style={styles.copyrightText}>© 2026 知帐</Text>
+          <Text style={styles.copyrightText}>© 2026 知账</Text>
         </View>
       </ScrollView>
     </View>

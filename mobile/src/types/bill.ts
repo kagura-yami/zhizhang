@@ -21,6 +21,8 @@ export interface BillData {
   createdAt: string;
   updatedAt: string;
   category?: CategoryData;
+  relatedBillId?: number;
+  relatedBill?: Pick<BillData, 'id' | 'amount' | 'type' | 'description' | 'date' | 'time'>;
 }
 
 export interface CreateBillDto {

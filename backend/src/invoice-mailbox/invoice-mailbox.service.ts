@@ -11,7 +11,7 @@ import { SaveInvoiceMailboxDto } from './dto/invoice-mailbox.dto';
 import { ImapFlow } from 'imapflow';
 import { simpleParser, ParsedMail, Attachment } from 'mailparser';
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from 'crypto';
-import { mkdir, writeFile } from 'fs/promises';
+import { mkdir, unlink, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join, resolve, sep } from 'path';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -45,6 +45,21 @@ type MailboxSyncResult = {
   inProgress?: boolean;
 };
 
+type MailboxSyncProgress = {
+  phase: 'starting' | 'scanning' | 'completed' | 'error';
+  scanned: number;
+  total: number;
+  imported: number;
+  matched: number;
+  candidateMessages: number;
+  pdfAttachments: number;
+  linkCandidates: number;
+  linkedPdfAttachments: number;
+  startedAt: string;
+  updatedAt: string;
+  error?: string;
+};
+
 const PROVIDER_PRESETS: Record<string, { host: string; port: number; secure: boolean }> = {
   qq: { host: 'imap.qq.com', port: 993, secure: true },
   '163': { host: 'imap.163.com', port: 993, secure: true },
@@ -56,6 +71,7 @@ const PROVIDER_PRESETS: Record<string, { host: string; port: number; secure: boo
 export class InvoiceMailboxService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(InvoiceMailboxService.name);
   private readonly activeSyncs = new Set<string>();
+  private readonly syncProgress = new Map<string, MailboxSyncProgress>();
   private readonly usedOAuthStates = new Set<string>();
   private syncTimer?: NodeJS.Timeout;
 
@@ -212,6 +228,7 @@ export class InvoiceMailboxService implements OnModuleInit, OnModuleDestroy {
     if (this.activeSyncs.has(key)) {
       return { imported: 0, matched: 0, skipped: 0, scanned: 0, candidateMessages: 0, pdfAttachments: 0, linkCandidates: 0, linkedPdfAttachments: 0, fullScan: true, inProgress: true, mailbox: await this.getMailbox(userId) };
     }
+    this.startSyncProgress(key);
     void this.syncOne(mailbox, true).catch((error) => this.logger.warn(`手动同步失败 mailbox=${mailbox.id}: ${error?.message || '未知错误'}`));
     await this.prisma.invoiceMailbox.update({ where: { id: mailbox.id }, data: { status: 'syncing', lastError: null } });
     return { imported: 0, matched: 0, skipped: 0, scanned: 0, candidateMessages: 0, pdfAttachments: 0, linkCandidates: 0, linkedPdfAttachments: 0, fullScan: true, inProgress: true, mailbox: await this.getMailbox(userId) };
@@ -221,6 +238,53 @@ export class InvoiceMailboxService implements OnModuleInit, OnModuleDestroy {
     const invoice = await this.prisma.invoice.findFirst({ where: { id, userId } });
     if (!invoice) throw new NotFoundException('发票不存在');
     return { ...invoice, amount: invoice.amount?.toNumber() ?? null };
+  }
+
+  async updateInvoice(userId: string, id: number, payload: { buyer?: string; seller?: string; invoiceCategory?: string; invoiceNumber?: string; amount?: number | string | null; invoiceDate?: string | null }) {
+    const existing = await this.prisma.invoice.findFirst({ where: { id, userId } });
+    if (!existing) throw new NotFoundException('发票不存在');
+    const data: any = {};
+    if (payload.buyer !== undefined) {
+      data.buyer = String(payload.buyer || '').trim() || null;
+      // 发票抬头始终跟随购买方，避免编辑后再次出现购销方混淆。
+      data.invoiceCategory = data.buyer || '未识别抬头';
+    }
+    if (payload.seller !== undefined) data.seller = String(payload.seller || '').trim() || null;
+    if (payload.invoiceCategory !== undefined && payload.buyer === undefined) data.invoiceCategory = String(payload.invoiceCategory || '').trim() || '未识别抬头';
+    if (payload.invoiceNumber !== undefined) data.invoiceNumber = String(payload.invoiceNumber || '').trim() || null;
+    if (payload.amount !== undefined) {
+      if (payload.amount === null || payload.amount === '') data.amount = null;
+      else {
+        const amount = Number(payload.amount);
+        if (!Number.isFinite(amount) || amount < 0 || amount >= 100_000_000_000) throw new BadRequestException('金额格式不正确');
+        data.amount = new Decimal(amount);
+      }
+    }
+    if (payload.invoiceDate !== undefined) {
+      if (!payload.invoiceDate) data.invoiceDate = null;
+      else {
+        const invoiceDate = new Date(payload.invoiceDate);
+        if (Number.isNaN(invoiceDate.getTime())) throw new BadRequestException('开票日期格式不正确');
+        data.invoiceDate = invoiceDate;
+      }
+    }
+    const updated = await this.prisma.invoice.update({ where: { id }, data });
+    return { ...updated, amount: updated.amount?.toNumber() ?? null };
+  }
+
+  async deleteInvoices(userId: string, ids: number[]) {
+    const normalizedIds = Array.from(new Set((ids || []).map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0)));
+    if (!normalizedIds.length) throw new BadRequestException('请选择要删除的发票');
+    const invoices = await this.prisma.invoice.findMany({ where: { userId, id: { in: normalizedIds } }, select: { id: true, storagePath: true } });
+    if (!invoices.length) throw new NotFoundException('未找到要删除的发票');
+    await this.prisma.invoice.deleteMany({ where: { userId, id: { in: invoices.map((invoice) => invoice.id) } } });
+    const root = resolve(process.cwd(), 'uploads', 'invoices');
+    await Promise.all(invoices.map(async (invoice) => {
+      const filePath = resolve(process.cwd(), invoice.storagePath);
+      if (filePath === root || !filePath.startsWith(`${root}${sep}`)) return;
+      await unlink(filePath).catch(() => undefined);
+    }));
+    return { deleted: invoices.length };
   }
 
   async listInvoices(userId: string, query: Partial<InvoiceMailboxQueryDto> = {}) {
@@ -301,7 +365,7 @@ export class InvoiceMailboxService implements OnModuleInit, OnModuleDestroy {
     ].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','))].join('\n');
     archive.append(`\uFEFF${csv}`, { name: '发票清单.csv' });
     void archive.finalize();
-    return { stream, fileName: `知帐-发票-${new Date().toISOString().slice(0, 10)}.zip` };
+    return { stream, fileName: `知账-发票-${new Date().toISOString().slice(0, 10)}.zip` };
   }
 
   private async listInvoiceRecords(userId: string, query: Partial<InvoiceMailboxQueryDto>, ids?: number[], limit = 100) {
@@ -342,32 +406,50 @@ export class InvoiceMailboxService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async reprocessLegacyInvoices() {
-    const invoices = await this.prisma.invoice.findMany({
-      where: { contentText: null, fileName: { endsWith: '.pdf', mode: 'insensitive' } },
-      orderBy: { createdAt: 'asc' },
-      take: 100,
-    });
-    for (const invoice of invoices) {
-      try {
-        const filePath = resolve(process.cwd(), invoice.storagePath);
-        if (!existsSync(filePath)) continue;
-        const content = await import('fs/promises').then(({ readFile }) => readFile(filePath));
-        const text = await this.extractAttachmentText(content, invoice.fileName);
-        if (!text) continue;
-        const sourceText = `${invoice.subject || ''}\n${invoice.fileName}\n${text}`;
-        const buyer = this.extractField(sourceText, ['购买方信息名称', '购买方名称', '购方信息名称', '购方名称', '购买方', '购方', 'Buyer']);
-        const seller = this.extractField(sourceText, ['销售方名称', '销方名称', '销售方', '销方', 'Seller']);
-        await this.prisma.invoice.update({ where: { id: invoice.id }, data: {
-          contentText: text.slice(0, 200_000), buyer: invoice.buyer || buyer,
-          seller: invoice.seller || seller, invoiceCategory: invoice.invoiceCategory || buyer || invoice.buyer || '未识别抬头',
-          invoiceNumber: invoice.invoiceNumber || this.extractInvoiceNumber(sourceText),
-          amount: invoice.amount || this.extractAmount(sourceText),
-          invoiceDate: invoice.invoiceDate || this.extractDate(sourceText),
-        } });
-      } catch (error: any) {
-        this.logger.warn(`旧发票重新解析失败 invoice=${invoice.id}：${error?.message || '未知错误'}`);
+    let cursor = 0;
+    let processed = 0;
+    while (true) {
+      const invoices = await this.prisma.invoice.findMany({
+        where: { id: { gt: cursor }, OR: [
+          { fileName: { endsWith: '.pdf', mode: 'insensitive' } },
+          { fileName: { endsWith: '.ofd', mode: 'insensitive' } },
+          { fileName: { endsWith: '.xml', mode: 'insensitive' } },
+        ] },
+        orderBy: { id: 'asc' },
+        take: 100,
+      });
+      if (!invoices.length) break;
+      for (const invoice of invoices) {
+        cursor = invoice.id;
+        try {
+          const filePath = resolve(process.cwd(), invoice.storagePath);
+          if (!existsSync(filePath)) continue;
+          const content = await import('fs/promises').then(({ readFile }) => readFile(filePath));
+          const text = await this.extractAttachmentText(content, invoice.fileName);
+          if (!text) continue;
+          const sourceText = `${invoice.subject || ''}\n${invoice.fileName}\n${text}`;
+          const { buyer, seller } = this.extractInvoiceParties(sourceText);
+          const invoiceNumber = this.extractInvoiceNumber(sourceText);
+          const amount = this.extractAmount(sourceText);
+          const invoiceDate = this.extractDate(sourceText);
+          await this.prisma.invoice.update({ where: { id: invoice.id }, data: {
+            contentText: text.slice(0, 200_000),
+            // 发票抬头按业务定义取购买方（我方）名称，不能用销售方兜底。
+            buyer: buyer || null,
+            seller: seller || null,
+            invoiceCategory: buyer || '未识别抬头',
+            invoiceNumber: invoiceNumber || invoice.invoiceNumber,
+            amount: amount === null ? invoice.amount : new Decimal(amount),
+            invoiceDate: invoiceDate || invoice.invoiceDate,
+          } });
+          processed += 1;
+        } catch (error: any) {
+          this.logger.warn(`旧发票重新解析失败 invoice=${invoice.id}：${error?.message || '未知错误'}`);
+        }
       }
+      if (invoices.length < 100) break;
     }
+    this.logger.log(`旧发票重新解析完成，共更新 ${processed} 张`);
   }
 
   private async syncOne(mailbox: any, fullScan = false): Promise<MailboxSyncResult> {
@@ -377,6 +459,8 @@ export class InvoiceMailboxService implements OnModuleInit, OnModuleDestroy {
     const key = String(mailbox.id);
     if (this.activeSyncs.has(key)) return { imported: 0, matched: 0, skipped: 0, scanned: 0, candidateMessages: 0, pdfAttachments: 0, linkCandidates: 0, linkedPdfAttachments: 0, fullScan, inProgress: true };
     this.activeSyncs.add(key);
+    this.startSyncProgress(key);
+    this.startSyncProgress(key);
     let imported = 0;
     let matched = 0;
     let skipped = 0;
@@ -417,10 +501,12 @@ export class InvoiceMailboxService implements OnModuleInit, OnModuleDestroy {
                 : { since: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) });
             const foundUids = await client.search(query, { uid: true });
             const uids = fullScan ? (foundUids || []) : (foundUids || []).slice(-100);
+            this.updateSyncProgress(key, { phase: 'scanning', total: (this.syncProgress.get(key)?.total || 0) + uids.length });
             for (const uid of uids) {
               const message = await client.fetchOne(uid, { source: true, envelope: true, internalDate: true }, { uid: true });
               if (!message || !message.source) continue;
               scanned += 1;
+              this.updateSyncProgress(key, { scanned, imported, matched, candidateMessages, pdfAttachments, linkCandidates, linkedPdfAttachments });
               lastUid = Math.max(lastUid, uid);
               if (message.source.length > 20 * 1024 * 1024) {
                 skipped += 1;
@@ -436,6 +522,7 @@ export class InvoiceMailboxService implements OnModuleInit, OnModuleDestroy {
                   if (result === 'imported') imported += 1;
                   else if (result === 'matched') { imported += 1; matched += 1; }
                   else skipped += 1;
+                  this.updateSyncProgress(key, { scanned, imported, matched, candidateMessages, pdfAttachments, linkCandidates, linkedPdfAttachments });
                 }
               }
               const linked = await this.fetchLinkedInvoiceAttachments(parsed);
@@ -446,6 +533,7 @@ export class InvoiceMailboxService implements OnModuleInit, OnModuleDestroy {
                 if (result === 'imported') imported += 1;
                 else if (result === 'matched') { imported += 1; matched += 1; }
                 else skipped += 1;
+                this.updateSyncProgress(key, { scanned, imported, matched, candidateMessages, pdfAttachments, linkCandidates, linkedPdfAttachments });
               }
             }
           } finally {
@@ -459,8 +547,10 @@ export class InvoiceMailboxService implements OnModuleInit, OnModuleDestroy {
         where: { id: mailbox.id },
         data: { status: 'ready', lastSyncedAt: new Date(), lastUid: String(lastUid), ...(fullScan ? { lastFullScanAt: new Date() } : {}), lastError: null },
       });
+      this.updateSyncProgress(key, { phase: 'completed', scanned, imported, matched, candidateMessages, pdfAttachments, linkCandidates, linkedPdfAttachments });
       return { imported, matched, skipped, scanned, candidateMessages, pdfAttachments, linkCandidates, linkedPdfAttachments, fullScan };
     } catch (error: any) {
+      this.updateSyncProgress(key, { phase: 'error', error: String(error?.message || '邮箱同步失败').slice(0, 500) });
       await this.prisma.invoiceMailbox.update({
         where: { id: mailbox.id },
         data: { status: 'error', lastError: String(error?.message || '邮箱同步失败').slice(0, 500), lastUid: String(lastUid) },
@@ -503,6 +593,7 @@ export class InvoiceMailboxService implements OnModuleInit, OnModuleDestroy {
         ) as { value?: any[]; ['@odata.nextLink']?: string };
         for (const message of page.value || []) {
           scanned += 1;
+          this.updateSyncProgress(key, { phase: 'scanning', scanned, imported, matched, candidateMessages, pdfAttachments, linkCandidates, linkedPdfAttachments, total: Math.max(this.syncProgress.get(key)?.total || 0, scanned) });
           const receivedAt = new Date(message.receivedDateTime || Date.now());
           if (!fullScan && receivedAt < since) {
             reachedSince = true;
@@ -558,6 +649,7 @@ export class InvoiceMailboxService implements OnModuleInit, OnModuleDestroy {
               if (result === 'imported') imported += 1;
               else if (result === 'matched') { imported += 1; matched += 1; }
               else skipped += 1;
+              this.updateSyncProgress(key, { scanned, imported, matched, candidateMessages, pdfAttachments, linkCandidates, linkedPdfAttachments });
             }
           }
           }
@@ -569,6 +661,7 @@ export class InvoiceMailboxService implements OnModuleInit, OnModuleDestroy {
             if (result === 'imported') imported += 1;
             else if (result === 'matched') { imported += 1; matched += 1; }
             else skipped += 1;
+            this.updateSyncProgress(key, { scanned, imported, matched, candidateMessages, pdfAttachments, linkCandidates, linkedPdfAttachments });
           }
         }
         nextUrl = reachedSince ? '' : (page['@odata.nextLink'] || '');
@@ -577,8 +670,10 @@ export class InvoiceMailboxService implements OnModuleInit, OnModuleDestroy {
         where: { id: mailbox.id },
         data: { status: 'ready', lastSyncedAt: newestReceivedAt.getTime() ? newestReceivedAt : new Date(), ...(fullScan ? { lastFullScanAt: new Date() } : {}), lastError: null },
       });
+      this.updateSyncProgress(key, { phase: 'completed', scanned, imported, matched, candidateMessages, pdfAttachments, linkCandidates, linkedPdfAttachments });
       return { imported, matched, skipped, scanned, candidateMessages, pdfAttachments, linkCandidates, linkedPdfAttachments, fullScan };
     } catch (error: any) {
+      this.updateSyncProgress(key, { phase: 'error', error: String(error?.message || '邮箱同步失败').slice(0, 500) });
       await this.prisma.invoiceMailbox.update({ where: { id: mailbox.id }, data: { status: 'error', lastError: String(error?.message || '邮箱同步失败').slice(0, 500) } });
       throw error;
     } finally {
@@ -697,8 +792,7 @@ export class InvoiceMailboxService implements OnModuleInit, OnModuleDestroy {
     const amount = this.extractAmount(sourceText);
     const invoiceDate = this.extractDate(sourceText) || receivedAt;
     const invoiceNumber = this.extractInvoiceNumber(sourceText);
-    const seller = this.extractField(sourceText, ['销售方名称', '销方名称', '销售方', '销方', 'Seller']);
-    const buyer = this.extractField(sourceText, ['购买方信息名称', '购买方名称', '购方信息名称', '购方名称', '购买方', '购方', 'Buyer']);
+    const { buyer, seller } = this.extractInvoiceParties(sourceText);
     const bill = await this.matchBill(mailbox.userId, amount, invoiceDate, seller);
     await this.prisma.invoice.create({
       data: {
@@ -714,6 +808,7 @@ export class InvoiceMailboxService implements OnModuleInit, OnModuleDestroy {
         sender: mail.from?.text?.slice(0, 300),
         seller,
         buyer,
+        // “发票抬头”固定展示购买方（我方）抬头，销售方单独存储。
         invoiceCategory: buyer || '未识别抬头',
         invoiceNumber,
         amount: amount === null ? null : new Decimal(amount),
@@ -822,6 +917,7 @@ export class InvoiceMailboxService implements OnModuleInit, OnModuleDestroy {
   }
 
   private toResponse(mailbox: any) {
+    const syncProgress = this.syncProgress.get(String(mailbox.id));
     return {
       id: mailbox.id,
       email: mailbox.email,
@@ -833,7 +929,23 @@ export class InvoiceMailboxService implements OnModuleInit, OnModuleDestroy {
       lastError: mailbox.lastError,
       invoiceCount: mailbox._count?.invoices ?? 0,
       oauthConnected: mailbox.provider === 'outlook' && !!mailbox.oauthRefreshTokenEncrypted,
+      syncProgress: syncProgress || null,
     };
+  }
+
+  private startSyncProgress(key: string) {
+    const now = new Date().toISOString();
+    this.syncProgress.set(key, {
+      phase: 'starting', scanned: 0, total: 0, imported: 0, matched: 0,
+      candidateMessages: 0, pdfAttachments: 0, linkCandidates: 0, linkedPdfAttachments: 0,
+      startedAt: now, updatedAt: now,
+    });
+  }
+
+  private updateSyncProgress(key: string, patch: Partial<MailboxSyncProgress>) {
+    const current = this.syncProgress.get(key);
+    if (!current) return;
+    this.syncProgress.set(key, { ...current, ...patch, updatedAt: new Date().toISOString() });
   }
 
   private outlookRedirectUri() {
@@ -948,24 +1060,28 @@ export class InvoiceMailboxService implements OnModuleInit, OnModuleDestroy {
   }
 
   private extractAmount(text: string): number | null {
-    const match = text.match(/(?:价税合计|合计金额|发票金额|小写|total|amount)[^0-9]{0,60}(?:¥|￥|人民币|RMB)?\s*([0-9][0-9,]*(?:\.\d{1,2})?)/i)
-      || text.match(/(?:¥|￥|人民币|RMB)\s*([0-9][0-9,]*(?:\.\d{1,2})?)/i);
-    const amount = match ? Number(match[1].replace(/,/g, '')) : NaN;
+    const normalized = String(text || '').replace(/[０-９]/g, (value) => String.fromCharCode(value.charCodeAt(0) - 0xfee0));
+    const amountPattern = '([0-9][0-9,]*(?:\\.\\d{1,2})?)';
+    const match = normalized.match(new RegExp(`(?:价税合计|合计金额|发票金额|小写金额|金额合计|total|amount)[^0-9]{0,80}(?:¥|￥|人民币|RMB)?\\s*${amountPattern}`, 'i'))
+      || normalized.match(new RegExp(`(?:¥|￥|人民币|RMB)\\s*${amountPattern}`, 'i'));
+    const currencyValues = [...normalized.matchAll(/(?:¥|￥|人民币|RMB)\s*([0-9][0-9,]*(?:\.\d{1,2})?)/gi)].map((item) => Number(item[1].replace(/,/g, ''))).filter((value) => Number.isFinite(value));
+    const amount = currencyValues.length ? currencyValues[currencyValues.length - 1] : match ? Number(match[1].replace(/,/g, '')) : NaN;
     // 发票金额列为 Decimal(15,4)，绝对值必须小于 10^11。长保单号、税号等
     // 可能紧跟在标题后面，不能让这类编号被当作金额并导致整次同步返回 500。
     return Number.isFinite(amount) && amount > 0 && amount < 100_000_000_000 ? amount : null;
   }
 
   private extractDate(text: string): Date | null {
-    const match = text.match(/(20\d{2})[年\-/\.](\d{1,2})[月\-/\.](\d{1,2})/);
+    const match = String(text || '').match(/(20\d{2})\s*[年\-/\.]\s*(\d{1,2})\s*[月\-/\.]\s*(\d{1,2})\s*日?/);
     if (!match) return null;
     const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
     return Number.isNaN(date.getTime()) ? null : date;
   }
 
   private extractInvoiceNumber(text: string): string | null {
-    const match = text.match(/(?:发票号码|发票号|invoice\s*(?:no|number)?)[：:\s#]*([0-9A-Z\-]{6,30})/i);
-    return match?.[1]?.slice(0, 100) || null;
+    const match = String(text || '').match(/(?:发\s*票\s*(?:号\s*码|号码|号)|invoice\s*(?:no|number)?)[：:\s#]*([0-9A-Z][0-9A-Z\-\s]{5,34})/i);
+    const standalone = String(text || '').match(/(?:^|\n)\s*([0-9]{16,20})\s*(?=\n|$)/);
+    return match?.[1]?.replace(/\s+/g, '').slice(0, 100) || standalone?.[1] || null;
   }
 
   private extractField(text: string, labels: string[]) {
@@ -976,6 +1092,139 @@ export class InvoiceMailboxService implements OnModuleInit, OnModuleDestroy {
     // 标准数电发票常把“购买方信息/销售方信息”和“名称”拆成两行。
     const section = new RegExp(`(?:${labelPattern})[\\s\\S]{0,100}?名称[：:\\s]*([^\\n,，;；]{2,100})`, 'i').exec(text)?.[1];
     return clean(section);
+  }
+
+  /** 兼容数电票 PDF 文本层的空格、换行和字段连续排列。 */
+  private extractFieldRobust(text: string, labels: string[]) {
+    const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*');
+    const labelPattern = labels.map(escape).join('|');
+    const clean = (value?: string | null) => value
+      ?.replace(/(?:纳税人识别号|统一社会信用代码|地址电话|开户行及账号|税率|税额|金额|价税合计).*$/i, '')
+      .replace(/[：:，,;；|]+$/g, '').replace(/\s+/g, ' ').trim().slice(0, 300) || null;
+    const source = String(text || '');
+    const direct = new RegExp(`(?:${labelPattern})\\s*(?:信息)?\\s*(?:名称)?\\s*[：:]?\\s*([^\\n,，;；|]{2,160})`, 'i').exec(source)?.[1];
+    const directValue = clean(direct);
+    if (directValue && !/(名称|项目名称|销售方信息|购买方信息|统一社会信用代码|纳税人识别号|开户银行|银行账号|地址|电话)/i.test(directValue)) return directValue;
+    const compact = source.replace(/[ \t\r\n]+/g, '');
+    const fallback = new RegExp(`(?:${labelPattern})[^：:]{0,20}[：:]?([^，,;；|]{2,160})`, 'i').exec(compact)?.[1];
+    const fallbackValue = clean(fallback);
+    if (fallbackValue && !/(名称|项目名称|销售方信息|购买方信息|统一社会信用代码|纳税人识别号|开户银行|银行账号|地址|电话)/i.test(fallbackValue)) return fallbackValue;
+    const entities = this.extractEntityCandidates(source);
+    return labels.some((label) => /销售|Seller/i.test(label)) ? entities[0] || null : entities[1] || entities[0] || null;
+  }
+
+  /**
+   * 提取发票购销双方。发票抬头在业务上指购买方（我方），不能把销售方当作抬头。
+   * 部分数电票 PDF 的文本层会把“销售方/购买方”标签集中在前面，名称和税号
+   * 则在后面按列顺序输出，因此在直接字段提取不可靠时按标签顺序映射实体名称。
+   */
+  private extractInvoiceParties(text: string) {
+    const source = String(text || '');
+    const buyerLabels = ['购买方信息名称', '购买方名称', '购方信息名称', '购方名称', '购买方', '购方', 'Buyer'];
+    const sellerLabels = ['销售方信息名称', '销售方名称', '销方信息名称', '销方名称', '销售方', '销方', 'Seller'];
+    const inlineBuyer = this.asUsableParty(this.extractFieldInline(source, buyerLabels));
+    const inlineSeller = this.asUsableParty(this.extractFieldInline(source, sellerLabels));
+    let buyer = inlineBuyer || this.asUsableParty(this.extractFieldRobust(source, buyerLabels));
+    let seller = inlineSeller || this.asUsableParty(this.extractFieldRobust(source, sellerLabels));
+    const entities = this.extractEntityCandidates(source);
+    if (entities.length >= 2) {
+      const order = this.extractPartyLabelOrder(source);
+      const first = entities[0];
+      const second = entities[1];
+      const bothLookLikeCandidates = Boolean(buyer && seller && entities.includes(buyer) && entities.includes(seller));
+      const shouldMapBoth = bothLookLikeCandidates || buyer === seller;
+      if (order === 'seller-first' && shouldMapBoth) {
+        if (!inlineSeller) seller = this.asUsableParty(first);
+        if (!inlineBuyer) buyer = this.asUsableParty(second);
+      } else if (order === 'buyer-first' && shouldMapBoth) {
+        if (!inlineBuyer) buyer = this.asUsableParty(first);
+        if (!inlineSeller) seller = this.asUsableParty(second);
+      } else if (order === 'seller-first') {
+        if (!buyer) buyer = this.asUsableParty(second);
+        if (!seller) seller = this.asUsableParty(first);
+      } else if (order === 'buyer-first') {
+        if (!buyer) buyer = this.asUsableParty(first);
+        if (!seller) seller = this.asUsableParty(second);
+      }
+    }
+    return { buyer: this.asUsableParty(buyer), seller: this.asUsableParty(seller) };
+  }
+
+  /** 只接受与“购方/销方名称”处于同一文本行的值，作为高置信度字段。 */
+  private extractFieldInline(text: string, labels: string[]) {
+    const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '[ \\t]*');
+    const labelPattern = labels.map(escape).join('|');
+    const value = new RegExp(`(?:${labelPattern})[ \\t]*(?:信息)?[ \\t]*(?:名称)?[ \\t]*[：:]?[ \\t]*([^\\n,，;；|]{2,120})`, 'i').exec(String(text || ''))?.[1];
+    return value?.replace(/(?:统一社会信用代码|纳税人识别号|地址电话|开户行及账号|税率|税额|金额|价税合计).*$/i, '').trim() || null;
+  }
+
+  private extractPartyLabelOrder(text: string): 'buyer-first' | 'seller-first' | null {
+    const compact = String(text || '').replace(/\s+/g, '').toLowerCase();
+    const firstPosition = (labels: string[]) => {
+      const positions = labels.map((label) => compact.indexOf(label.replace(/\s+/g, '').toLowerCase())).filter((value) => value >= 0);
+      return positions.length ? Math.min(...positions) : -1;
+    };
+    const buyerPosition = firstPosition(['购买方信息', '购方信息', '购买方', '购方', 'buyer']);
+    const sellerPosition = firstPosition(['销售方信息', '销方信息', '销售方', '销方', 'seller']);
+    if (buyerPosition < 0 || sellerPosition < 0 || buyerPosition === sellerPosition) return null;
+    return buyerPosition < sellerPosition ? 'buyer-first' : 'seller-first';
+  }
+
+  private cleanPartyValue(value?: string | null) {
+    const cleaned = String(value || '')
+      .replace(/^(?:名称|购方(?:信息)?名称|购买方(?:信息)?名称|销方(?:信息)?名称|销售方(?:信息)?名称)[:：]?/i, '')
+      .replace(/[：:，,;；|]+$/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 300);
+    if (!cleaned || /^(?:名称|项目名称|购买方信息|销售方信息|统一社会信用代码|纳税人识别号|开户银行|银行账号|地址|电话)$/i.test(cleaned)) return null;
+    return cleaned;
+  }
+
+  private asUsableParty(value?: string | null) {
+    const cleaned = this.cleanPartyValue(value);
+    if (!cleaned || cleaned.length > 100) return null;
+    // 保险保单、邮件正文等非发票文本可能被误认为名称；企业/个人抬头不会是完整句子。
+    if (/[，。；、！？]/.test(cleaned) || /^(?:地址|购方地址|销方地址|开户银行|银行账号)\s*[:：-]/i.test(cleaned) || /(?:请如实|联系电话|投诉|小程序|APP|方式|事由|保险|保单|发票号码|开票日期|项目名称|规格型号|税率|税额)/i.test(cleaned)) return null;
+    return cleaned;
+  }
+
+  /** 标准发票常把企业名称单独放在统一社会信用代码上一行，从税号邻近关系兜底提取。 */
+  private extractEntityCandidates(text: string) {
+    const source = String(text || '').replace(/\r/g, '');
+    const matches: string[] = [];
+    const lines = source.split('\n').map((line) => line.trim()).filter(Boolean);
+    const isTaxLine = (line: string) => {
+      const compact = line.replace(/[^0-9A-Z]/gi, '');
+      return compact.length >= 15 && compact.length <= 40 && /^[0-9A-Z]+$/i.test(compact);
+    };
+    const isEntityLine = (line: string) => {
+      const value = line.replace(/\s+/g, '').replace(/^(?:名称|购方(?:信息)?名称|购买方(?:信息)?名称|销方(?:信息)?名称|销售方(?:信息)?名称)[:：]?/i, '').trim();
+      if (value.length < 2 || value.length > 100) return null;
+      if (/[0-9¥￥%]/.test(value) || /(?:统一社会信用代码|纳税人识别号|开户银行|银行账号|项目名称|规格型号|电子发票|发票号码|开票日期|开票人|合计|税率|税额|价税合计)/i.test(value)) return null;
+      // 企业名称、个体工商户和个人购买方都可能出现；候选行通常只含名称文本。
+      if (!/[\u4e00-\u9fffA-Za-z]/.test(value)) return null;
+      return value;
+    };
+    for (let index = 0; index < lines.length; index += 1) {
+      if (!isTaxLine(lines[index])) continue;
+      // 名称可能在税号前 1~3 行（两个税号被 PDF 合并时会连续出现两个名称）。
+      const nearby: string[] = [];
+      for (let cursor = index - 1; cursor >= Math.max(0, index - 3); cursor -= 1) {
+        const candidate = isEntityLine(lines[cursor]);
+        if (candidate && !nearby.includes(candidate)) nearby.unshift(candidate);
+      }
+      for (const candidate of nearby) {
+        if (!matches.includes(candidate)) matches.push(candidate);
+      }
+    }
+    // XML 或部分 PDF 会把名称和税号写在同一行，保留原有后缀规则作为补充。
+    const pattern = /([^\n,，;；|]{2,100}(?:有限公司|有限责任公司|公司|个体工商户|事务所|中心|商行|学院))\s*(?=[0-9A-Z]{15,20})/gi;
+    for (const match of source.matchAll(pattern)) {
+      const value = this.cleanPartyValue(match[1]?.replace(/\s+/g, ''));
+      if (value && !matches.includes(value)) matches.push(value);
+    }
+    return matches.slice(0, 4);
   }
 
   private safeFileName(fileName: string) {

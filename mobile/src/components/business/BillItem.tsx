@@ -21,6 +21,7 @@ export interface BillData {
   date: string;
   description?: string;
   icon: string;
+  relatedBill?: { id: number; amount: number; type: 'income' | 'expense'; description?: string };
 }
 
 interface BillItemProps {
@@ -51,12 +52,15 @@ const BillItem: React.FC<BillItemProps> = ({ bill, onPress }) => {
           <Text style={styles.icon}>{bill.icon}</Text>
         </View>
         <View style={styles.billInfo}>
-          <Text style={styles.category}>{bill.category}</Text>
+          <Text style={styles.category}>{bill.relatedBill ? '退款收入' : bill.category}</Text>
           <Text style={styles.date}>{bill.date}</Text>
           {bill.description && (
             <Text style={styles.description} numberOfLines={1}>
               {bill.description}
             </Text>
+          )}
+          {bill.relatedBill && (
+            <Text style={styles.refundLink} numberOfLines={1}>↩ 对应支出 ¥{Number(bill.relatedBill.amount).toFixed(2)}</Text>
           )}
         </View>
       </View>
@@ -126,6 +130,12 @@ const createStyles = (colors: ThemeColors) => ({
       fontSize: 12,
       fontWeight: '500',
       color: colors.textSecondary,
+    },
+    refundLink: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.income,
+      marginTop: 2,
     },
     amountBadge: {
       borderRadius: borderRadius.small,

@@ -98,14 +98,15 @@ class PaymentNotificationService {
    */
   async saveMonitoringConfig(
     monitoredApps: Array<{ packageName: string; appName: string; enabled: boolean }>,
-    filterKeywords: string[]
+    filterKeywords: string[],
+    autoRecordEnabled = true,
   ): Promise<boolean> {
     if (!this.isSupported()) {
       return false;
     }
 
     try {
-      await PaymentNotificationModule.saveMonitoringConfig(monitoredApps, filterKeywords);
+      await PaymentNotificationModule.saveMonitoringConfig(monitoredApps, filterKeywords, autoRecordEnabled);
       return true;
     } catch (error) {
       console.error('Failed to save monitoring config:', error);
@@ -241,6 +242,44 @@ class PaymentNotificationService {
       PaymentNotificationModule.openAppNotificationSettings();
     } catch (error) {
       console.error('Failed to open app notification settings:', error);
+    }
+  }
+
+  async getBatteryOptimizationStatus(): Promise<PermissionStatus> {
+    if (!this.isSupported()) return 'unknown';
+    try {
+      return (await PaymentNotificationModule.getBatteryOptimizationStatus()) as PermissionStatus;
+    } catch (error) {
+      console.error('Failed to get battery optimization status:', error);
+      return 'unknown';
+    }
+  }
+
+  requestBatteryOptimizationPermission(): void {
+    if (!this.isSupported()) return;
+    try {
+      PaymentNotificationModule.requestBatteryOptimizationPermission();
+    } catch (error) {
+      console.error('Failed to request battery optimization permission:', error);
+    }
+  }
+
+  async getInstallPermissionStatus(): Promise<PermissionStatus> {
+    if (!this.isSupported()) return 'unknown';
+    try {
+      return (await PaymentNotificationModule.getInstallPermissionStatus()) as PermissionStatus;
+    } catch (error) {
+      console.error('Failed to get install permission status:', error);
+      return 'unknown';
+    }
+  }
+
+  requestInstallPermission(): void {
+    if (!this.isSupported()) return;
+    try {
+      PaymentNotificationModule.requestInstallPermission();
+    } catch (error) {
+      console.error('Failed to request install permission:', error);
     }
   }
 }

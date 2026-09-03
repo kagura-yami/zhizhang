@@ -35,18 +35,45 @@ class InstallApkModule(reactContext: ReactApplicationContext) : ReactContextBase
         promise.resolve(BuildConfig.VERSION_NAME)
     }
 
+    /**
+     * 校验缓存 APK 是否是完整且属于知账的目标版本。
+     * 只检查文件存在会把中断下载的半包当成可安装包，必须交给系统解析 APK
+     * 元数据后再允许进入安装器。
+     */
+    @ReactMethod
+    fun validateApk(filePath: String, expectedVersion: String, promise: Promise) {
+        try {
+            val file = File(filePath)
+            if (!file.exists() || file.length() < 1024L * 1024L) {
+                promise.resolve(false)
+                return
+            }
+            val packageInfo = reactApplicationContext.packageManager.getPackageArchiveInfo(file.absolutePath, 0)
+            val valid = packageInfo != null &&
+                packageInfo.packageName == BuildConfig.APPLICATION_ID &&
+                (expectedVersion.isBlank() || packageInfo.versionName == expectedVersion)
+            promise.resolve(valid)
+        } catch (error: Exception) {
+            android.util.Log.w("InstallApk", "校验 APK 失败: $filePath", error)
+            promise.resolve(false)
+        }
+    }
+
     /** 发现新版本时发送一次系统通知；同一版本不会重复骚扰用户。 */
     @ReactMethod
-    fun notifyUpdateAvailable(version: String, updateLog: String?, promise: Promise) {
-        promise.resolve(UpdateNotificationHelper.notifyIfNeeded(reactApplicationContext, version, updateLog))
+    fun notifyUpdateAvailable(version: String, updateLog: String?, packageReady: Boolean, promise: Promise) {
+        promise.resolve(UpdateNotificationHelper.notifyIfNeeded(reactApplicationContext, version, updateLog, packageReady))
     }
 
     @ReactMethod
     fun install(filePath: String) {
         try {
             val file = File(filePath)
-            if (!file.exists()) {
-                android.util.Log.e("InstallApk", "APK 文件不存在: $filePath")
+            // 安装入口本身也必须做一次完整校验，不能只依赖 JS 层的检查。
+            // 通知栏、旧页面或第三方调用可能直接触发这个方法；若此时文件仍是
+            // .part 半包，系统安装器会报“解析包错误”，甚至留下损坏缓存。
+            if (!isInstallableApk(file)) {
+                android.util.Log.w("InstallApk", "拒绝安装无效或未完成的 APK: $filePath")
                 return
             }
 
@@ -73,5 +100,15 @@ class InstallApkModule(reactContext: ReactApplicationContext) : ReactContextBase
         } catch (e: Exception) {
             android.util.Log.e("InstallApk", "安装 APK 失败", e)
         }
+    }
+
+    private fun isInstallableApk(file: File): Boolean {
+        if (!file.exists() || !file.isFile || file.name.endsWith(".part") ||
+            file.length() < 1024L * 1024L) {
+            return false
+        }
+        val packageInfo = reactApplicationContext.packageManager
+            .getPackageArchiveInfo(file.absolutePath, 0)
+        return packageInfo != null && packageInfo.packageName == BuildConfig.APPLICATION_ID
     }
 }

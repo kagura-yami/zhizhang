@@ -21,6 +21,7 @@ import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.zhizhang.R
+import com.zhizhang.widget.FinanceOverviewWidget
 
 /**
  * 支付悬浮窗管理器
@@ -123,6 +124,10 @@ class PaymentOverlayManager(private val context: Context) {
     private fun sendBillCreatedBroadcast() {
         val intent = Intent(ACTION_BILL_CREATED)
         androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(context).sendBroadcast(intent)
+        context.sendBroadcast(
+            Intent(context, FinanceOverviewWidget::class.java)
+                .setAction(FinanceOverviewWidget.ACTION_DATA_CHANGED)
+        )
         Log.i(TAG, "账单创建成功广播已发送")
     }
 

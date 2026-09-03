@@ -14,8 +14,10 @@ import {
   Animated,
   Dimensions,
   PanResponder,
+  DeviceEventEmitter,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import { ThemeColors } from '../../theme/colors';
 import { borderRadius, borderWidth, spacing, shadow } from '../../theme/spacing';
@@ -26,7 +28,8 @@ import { useDashboard, useHomeDisplayPreference, useStyles } from '../../hooks';
 import type { HomeMainMetric, HomeSectionId } from '../../hooks/useHomeDisplayPreference';
 import { budgetsService } from '../../services/api/budgets';
 import { financialGoalsService } from '../../services/api/financial-goals';
-import { QUERY_KEYS } from '../../lib/queryClient';
+import { invalidateCache, QUERY_KEYS } from '../../lib/queryClient';
+import { paymentNotificationService } from '../../services/paymentNotification';
 import type { BillData } from '../../types/bill';
 import type { BudgetProgress } from '../../types/budget';
 import type { FinancialGoalProgress } from '../../types/financial-goal';
@@ -244,6 +247,31 @@ export default function DashboardScreen() {
     secondaryMetric,
     homeSections,
   } = useHomeDisplayPreference();
+  const [missingSetupCount, setMissingSetupCount] = useState(0);
+
+  // 首页提示会影响自动记账可靠性的关键设置，点击后统一进入权限配置。
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    // 从通知中心返回时强制刷新，覆盖应用在后台错过原生事件的场景。
+    refetch();
+    const checkRequiredSettings = async () => {
+      try {
+        const [listener, appNotification, battery, configRaw] = await Promise.all([
+          paymentNotificationService.getPermissionStatus(),
+          paymentNotificationService.getAppNotificationPermissionStatus(),
+          paymentNotificationService.getBatteryOptimizationStatus(),
+          AsyncStorage.getItem('appGeneralConfig'),
+        ]);
+        const config = configRaw ? JSON.parse(configRaw) as { autoRecordEnabled?: boolean } : {};
+        const missing = [listener, appNotification, battery].filter(status => status !== 'authorized').length;
+        if (active) setMissingSetupCount(config.autoRecordEnabled === false ? 0 : missing);
+      } catch {
+        if (active) setMissingSetupCount(0);
+      }
+    };
+    void checkRequiredSettings();
+    return () => { active = false; };
+  }, [refetch]));
 
   // 预算进度查询
   const { data: budgetProgressData, refetch: refetchBudgets } = useQuery({
@@ -262,6 +290,19 @@ export default function DashboardScreen() {
       return Array.isArray(res) ? res : (res.data ?? []);
     },
   });
+
+  // 原生自动记账成功后主动刷新首页查询，避免“全部账单”已更新而“近期交易”仍显示旧缓存。
+  useEffect(() => {
+    // 原生模块通过 RCTDeviceEventEmitter 派发事件，使用 DeviceEventEmitter
+    // 可覆盖 Release 环境，并避免 NativeEventEmitter 对模块 addListener 方法的依赖。
+    const subscription = DeviceEventEmitter.addListener('onBillCreated', () => {
+      invalidateCache.bills();
+      refetch();
+      refetchBudgets();
+      refetchGoals();
+    });
+    return () => subscription.remove();
+  }, [refetch, refetchBudgets, refetchGoals]);
 
   // 合并为统一的卡片数据（预算优先，财务目标补充）
   const progressCards: ProgressCardItem[] = useMemo(() => {
@@ -347,22 +388,6 @@ export default function DashboardScreen() {
     const parsed = new Date(`${date}T12:00:00`);
     const isToday = date === `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
     return `${parsed.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}${isToday ? ' 今天' : ''}`;
-  };
-
-  const getAutoSourceLabel = (bill: BillData) => {
-    const legacyDescription = bill.description || '';
-    if (bill.source !== 'notification' && !legacyDescription.startsWith('自动记账')) return '手动记账';
-    const labels: Record<string, string> = {
-      wechat: '微信通知自动记账',
-      alipay: '支付宝通知自动记账',
-      pinduoduo: '拼多多通知自动记账',
-      bank_sms: '银行卡短信自动记账',
-      bank_app: '银行应用自动记账',
-    };
-    if (labels[bill.sourceApp || '']) return labels[bill.sourceApp || ''];
-    if (legacyDescription.includes('微信')) return labels.wechat;
-    if (legacyDescription.includes('支付宝')) return labels.alipay;
-    return bill.source === 'notification' ? '通知自动记账' : '自动记账';
   };
 
   const getCounterparty = (bill: BillData) => {
@@ -496,6 +521,21 @@ export default function DashboardScreen() {
         </View>
       </View>
 
+      {missingSetupCount > 0 && (
+        <TouchableOpacity
+          style={styles.setupReminder}
+          onPress={() => navigation.navigate('GeneralSettings' as never)}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.setupReminderIcon}>⚠️</Text>
+          <View style={styles.setupReminderInfo}>
+            <Text style={styles.setupReminderTitle}>自动记账还需要完成设置</Text>
+            <Text style={styles.setupReminderText}>有 {missingSetupCount} 项关键权限未开启，可能导致通知漏记</Text>
+          </View>
+          <Text style={styles.setupReminderAction}>去设置 →</Text>
+        </TouchableOpacity>
+      )}
+
       {/* ========== Overview Card - 主色块 ========== */}
       <TouchableOpacity style={styles.overviewCard} activeOpacity={0.95}>
         {/* 装饰贴纸 */}
@@ -619,14 +659,11 @@ export default function DashboardScreen() {
                           </Text>
                         </View>
                         <View style={styles.transactionInfo}>
-                          <View style={styles.transactionTitleRow}>
-                            <Text style={styles.transactionTitle} numberOfLines={1}>
-                              {bill.category?.name || (bill.type === 'income' ? '收入' : '支出')}
-                            </Text>
-                            <Text style={styles.sourceBadge}>{getAutoSourceLabel(bill)}</Text>
-                          </View>
+                          <Text style={styles.transactionTitle} numberOfLines={1}>
+                            {bill.category?.name || (bill.type === 'income' ? '收入' : '支出')}
+                          </Text>
                           <Text style={styles.transactionMeta} numberOfLines={1}>
-                            {formatBillTime(bill)} · {bill.paymentChannel || getAutoSourceLabel(bill).replace('通知', '').replace('自动记账', '')} · {getCounterparty(bill)}
+                            {formatBillTime(bill)} · {getCounterparty(bill)}
                           </Text>
                         </View>
                       </View>
@@ -704,6 +741,22 @@ const createStyles = (colors: ThemeColors) => ({
       marginTop: spacing.xs,
       fontFamily: 'Courier',
     },
+    setupReminder: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: -spacing.lg,
+      marginBottom: spacing.lg,
+      padding: spacing.md,
+      backgroundColor: colors.warning + '22',
+      borderWidth: borderWidth.thin,
+      borderColor: colors.warning,
+      borderRadius: borderRadius.small,
+    },
+    setupReminderIcon: { fontSize: 20, marginRight: spacing.sm },
+    setupReminderInfo: { flex: 1, minWidth: 0, marginRight: spacing.sm },
+    setupReminderTitle: { fontSize: 13, fontWeight: '800', color: colors.textPrimary },
+    setupReminderText: { fontSize: 11, fontWeight: '600', color: colors.textSecondary, marginTop: 2 },
+    setupReminderAction: { fontSize: 12, fontWeight: '800', color: colors.primary },
 
     // ===== Overview Card =====
     overviewCard: {
@@ -1056,23 +1109,6 @@ const createStyles = (colors: ThemeColors) => ({
       fontWeight: '700',
       color: colors.textPrimary,
       marginBottom: spacing.xs,
-    },
-    transactionTitleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.xs,
-      marginBottom: spacing.xs,
-    },
-    sourceBadge: {
-      flexShrink: 1,
-      fontSize: 10,
-      fontWeight: '600',
-      color: colors.textTertiary,
-      borderWidth: borderWidth.thin,
-      borderColor: colors.divider,
-      borderRadius: borderRadius.small,
-      paddingHorizontal: spacing.xs,
-      paddingVertical: 1,
     },
     transactionMeta: {
       fontSize: 12,

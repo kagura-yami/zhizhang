@@ -1,3 +1,4 @@
+<!-- 系统会按电量策略调度，组件每 30 分钟自动拉取一次；账单成功事件会额外立即触发同步。 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="250dp"
     android:minHeight="110dp"

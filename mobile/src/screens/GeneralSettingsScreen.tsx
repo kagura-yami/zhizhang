@@ -2,7 +2,7 @@
  * 通用配置屏幕 - Neo-Brutalism 风格
  * 描边配置卡片 + 粗标签 + 糖果色强调
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,11 @@ import {
   FlatList,
   ActivityIndicator,
   Switch,
+  PermissionsAndroid,
+  Platform,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { audioRecorderService } from '../services/audio/audioRecorderService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemeColors } from '../theme/colors';
 import { spacing, borderRadius, borderWidth, shadow } from '../theme';
@@ -45,13 +49,26 @@ interface MonitoredApp {
 interface AppConfig {
   monitoredApps: MonitoredApp[];
   filterKeywords: string[];
+  autoRecordEnabled: boolean;
+  autoUpdateEnabled: boolean;
+  autoDownloadUpdateEnabled: boolean;
   configVersion: number;
 }
 
-const PAYMENT_CONFIG_VERSION = 33;
+interface VoiceInputConfig {
+  enabled: boolean;
+  apiUrl: string;
+  apiKey: string;
+  model: string;
+  protocol: 'zhizhang-json' | 'openai-compatible';
+}
+
+const PAYMENT_CONFIG_VERSION = 34;
 const DEFAULT_MONITORED_APPS: MonitoredApp[] = [
   { id: 'wechat', packageName: 'com.tencent.mm', appName: '微信', enabled: true },
   { id: 'alipay', packageName: 'com.eg.android.AlipayGphone', appName: '支付宝', enabled: true },
+  { id: 'sms', packageName: 'com.android.mms', appName: '短信', enabled: true },
+  { id: 'sms-service', packageName: 'com.android.mms.service', appName: '短信服务', enabled: true },
 ];
 const LEGACY_AUTO_ENABLED_PACKAGES = new Set([
   'com.xunmeng.pinduoduo',
@@ -536,6 +553,9 @@ export default function GeneralSettingsScreen({ navigation: _navigation }: Gener
   const [config, setConfig] = useState<AppConfig>({
     monitoredApps: DEFAULT_MONITORED_APPS.map(app => ({ ...app })),
     filterKeywords: [...DEFAULT_PAYMENT_KEYWORDS],
+    autoRecordEnabled: true,
+    autoUpdateEnabled: true,
+    autoDownloadUpdateEnabled: true,
     configVersion: PAYMENT_CONFIG_VERSION,
   });
 
@@ -546,6 +566,8 @@ export default function GeneralSettingsScreen({ navigation: _navigation }: Gener
   const [editingAiConfig, setEditingAiConfig] = useState<AIModelConfig | null>(null);
   const [savingAiConfig, setSavingAiConfig] = useState(false);
   const [testingConfigId, setTestingConfigId] = useState<number | null>(null);
+  const [voiceConfig, setVoiceConfig] = useState<VoiceInputConfig>({ enabled: true, apiUrl: '', apiKey: '', model: '', protocol: 'zhizhang-json' });
+  const [voiceConfigSaving, setVoiceConfigSaving] = useState(false);
 
   // 其他状态
   const [newAppName, setNewAppName] = useState('');
@@ -558,11 +580,76 @@ export default function GeneralSettingsScreen({ navigation: _navigation }: Gener
   const [loadingApps, setLoadingApps] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  type PermissionKey = 'paymentListener' | 'appNotification' | 'microphone' | 'overlay' | 'battery' | 'install';
+  type PermissionState = 'authorized' | 'denied' | 'unknown';
+  const [permissionStates, setPermissionStates] = useState<Record<PermissionKey, PermissionState>>({
+    paymentListener: 'unknown',
+    appNotification: 'unknown',
+    microphone: 'unknown',
+    overlay: 'unknown',
+    battery: 'unknown',
+    install: 'unknown',
+  });
+
+  const refreshPermissionStates = useCallback(async () => {
+    try {
+      const [paymentListener, appNotification, overlay, battery, install, microphone] = await Promise.all([
+        paymentNotificationService.getPermissionStatus(),
+        paymentNotificationService.getAppNotificationPermissionStatus(),
+        paymentNotificationService.getOverlayPermissionStatus(),
+        paymentNotificationService.getBatteryOptimizationStatus(),
+        paymentNotificationService.getInstallPermissionStatus(),
+        Platform.OS === 'android'
+          ? PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO).then(granted => granted ? 'authorized' : 'denied').catch(() => 'unknown' as PermissionState)
+          : Promise.resolve('unknown' as PermissionState),
+      ]);
+      setPermissionStates({ paymentListener, appNotification, overlay, battery, install, microphone });
+    } catch (error) {
+      console.error('读取权限状态失败:', error);
+    }
+  }, []);
+
+  useFocusEffect(useCallback(() => {
+    refreshPermissionStates().catch(() => undefined);
+  }, [refreshPermissionStates]));
+
+  const requestPermission = async (key: PermissionKey) => {
+    if (key === 'paymentListener') paymentNotificationService.requestPermission();
+    if (key === 'appNotification') paymentNotificationService.requestAppNotificationPermission();
+    if (key === 'overlay') paymentNotificationService.requestOverlayPermission();
+    if (key === 'battery') paymentNotificationService.requestBatteryOptimizationPermission();
+    if (key === 'install') paymentNotificationService.requestInstallPermission();
+    if (key === 'microphone') await audioRecorderService.requestPermission();
+    setTimeout(() => { refreshPermissionStates().catch(() => undefined); }, 800);
+  };
+
+  const permissionItems: Array<{ key: PermissionKey; icon: string; title: string; description: string }> = [
+    { key: 'paymentListener', icon: '🔔', title: '支付通知监听', description: '读取微信、支付宝等支付通知，自动生成账单' },
+    { key: 'appNotification', icon: '📣', title: '应用通知', description: '显示自动记账成功、版本更新等提醒' },
+    { key: 'microphone', icon: '🎙️', title: '麦克风', description: '使用语音记账和语音识别功能' },
+    { key: 'overlay', icon: '🪟', title: '悬浮窗', description: '在支付完成后显示快捷记账提示' },
+    { key: 'battery', icon: '🔋', title: '后台运行', description: '减少系统清理，确保支付通知监听持续工作' },
+    { key: 'install', icon: '📦', title: '安装更新', description: '允许应用直接安装下载的版本更新包' },
+  ];
+
   // 加载配置
   useEffect(() => {
     loadConfig();
     loadAiConfigs();
+    AsyncStorage.getItem('voiceInputConfig').then(raw => {
+      if (raw) setVoiceConfig(current => ({ ...current, ...JSON.parse(raw) }));
+    }).catch(() => undefined);
   }, []);
+
+  const saveVoiceConfig = async (next: VoiceInputConfig) => {
+    setVoiceConfig(next);
+    setVoiceConfigSaving(true);
+    try {
+      await AsyncStorage.setItem('voiceInputConfig', JSON.stringify(next));
+    } finally {
+      setVoiceConfigSaving(false);
+    }
+  };
 
   const loadConfig = async () => {
     try {
@@ -586,18 +673,23 @@ export default function GeneralSettingsScreen({ navigation: _navigation }: Gener
           filterKeywords: Array.isArray(parsed.filterKeywords) && parsed.filterKeywords.length > 0
             ? parsed.filterKeywords
             : [...DEFAULT_PAYMENT_KEYWORDS],
+          autoRecordEnabled: parsed.autoRecordEnabled !== false,
+          autoUpdateEnabled: parsed.autoUpdateEnabled !== false,
+          autoDownloadUpdateEnabled: parsed.autoDownloadUpdateEnabled !== false,
           configVersion: PAYMENT_CONFIG_VERSION,
         };
         setConfig(normalizedConfig);
         await AsyncStorage.setItem('appGeneralConfig', JSON.stringify(normalizedConfig));
         await paymentNotificationService.saveMonitoringConfig(
           normalizedConfig.monitoredApps,
-          normalizedConfig.filterKeywords
+          normalizedConfig.filterKeywords,
+          normalizedConfig.autoRecordEnabled,
         );
       } else {
         await paymentNotificationService.saveMonitoringConfig(
           DEFAULT_MONITORED_APPS,
-          DEFAULT_PAYMENT_KEYWORDS
+          DEFAULT_PAYMENT_KEYWORDS,
+          true,
         );
       }
     } catch (error) {
@@ -624,7 +716,8 @@ export default function GeneralSettingsScreen({ navigation: _navigation }: Gener
       await AsyncStorage.setItem('appGeneralConfig', JSON.stringify(config));
       await paymentNotificationService.saveMonitoringConfig(
         config.monitoredApps,
-        config.filterKeywords
+        config.filterKeywords,
+        config.autoRecordEnabled,
       );
       console.log('配置已保存');
     } catch (error) {
@@ -780,7 +873,8 @@ export default function GeneralSettingsScreen({ navigation: _navigation }: Gener
       await AsyncStorage.setItem('appGeneralConfig', JSON.stringify(configToSave));
       await paymentNotificationService.saveMonitoringConfig(
         configToSave.monitoredApps,
-        configToSave.filterKeywords
+        configToSave.filterKeywords,
+        configToSave.autoRecordEnabled,
       );
       console.log('配置已自动保存');
     } catch (error) {
@@ -822,6 +916,56 @@ export default function GeneralSettingsScreen({ navigation: _navigation }: Gener
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* 权限总览 */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>🔐 应用权限</Text>
+          <Text style={styles.permissionIntro}>集中管理知账所需的系统权限。点击“去开启”即可跳转到对应设置。</Text>
+          {permissionItems.map(item => {
+            const status = permissionStates[item.key];
+            const authorized = status === 'authorized';
+            return (
+              <View key={item.key} style={styles.permissionItem}>
+                <Text style={styles.permissionIcon}>{item.icon}</Text>
+                <View style={styles.permissionInfo}>
+                  <Text style={styles.permissionTitle}>{item.title}</Text>
+                  <Text style={styles.permissionDescription}>{item.description}</Text>
+                  <Text style={[styles.permissionStatus, authorized ? styles.permissionStatusOk : styles.permissionStatusWarn]}>
+                    {authorized ? '已开启' : status === 'unknown' ? '暂无法确认' : '未开启'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.permissionAction, authorized && styles.permissionActionDone]}
+                  onPress={() => { requestPermission(item.key).catch(() => undefined); }}
+                  disabled={authorized}
+                >
+                  <Text style={[styles.permissionActionText, authorized && styles.permissionActionTextDone]}>
+                    {authorized ? '✓' : '去开启'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })}
+        </View>
+
+        {/* 语音输入与快捷入口 */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>🎙️ 语音输入</Text>
+          <Text style={styles.permissionIntro}>组件按钮和左边缘手势会打开 AI 语音记账，可直接执行账本增删改查。</Text>
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}><Text style={styles.label}>启用语音输入</Text><Text style={styles.description}>关闭后仍可使用文字 AI 助手</Text></View>
+            <Switch value={voiceConfig.enabled} onValueChange={enabled => saveVoiceConfig({ ...voiceConfig, enabled })} trackColor={{ false: styles._colors.divider, true: styles._colors.primary }} thumbColor="#FFFFFF" />
+          </View>
+          <Text style={styles.addFormTitle}>自定义语音 API（可选）</Text>
+          <TextInput style={styles.input} value={voiceConfig.apiUrl} onChangeText={apiUrl => setVoiceConfig(v => ({ ...v, apiUrl }))} placeholder="接口地址，如 https://example.com/asr" placeholderTextColor={styles._colors.textTertiary} autoCapitalize="none" autoCorrect={false} />
+          <TextInput style={[styles.input, styles.inputMargin]} value={voiceConfig.apiKey} onChangeText={apiKey => setVoiceConfig(v => ({ ...v, apiKey }))} placeholder="API Key（仅保存在本机）" placeholderTextColor={styles._colors.textTertiary} secureTextEntry autoCapitalize="none" autoCorrect={false} />
+          <TextInput style={[styles.input, styles.inputMargin]} value={voiceConfig.model} onChangeText={model => setVoiceConfig(v => ({ ...v, model }))} placeholder="模型名称（可选）" placeholderTextColor={styles._colors.textTertiary} autoCapitalize="none" autoCorrect={false} />
+          <View style={styles.keywordForm}>
+            {([['zhizhang-json', '知账 JSON'], ['openai-compatible', 'OpenAI 兼容']] as const).map(([value, label]) => <TouchableOpacity key={value} style={[styles.option, voiceConfig.protocol === value && styles.optionActive]} onPress={() => setVoiceConfig(v => ({ ...v, protocol: value }))}><Text style={[styles.optionText, voiceConfig.protocol === value && styles.optionTextActive]}>{label}</Text></TouchableOpacity>)}
+          </View>
+          <TouchableOpacity style={styles.addButton} disabled={voiceConfigSaving} onPress={() => saveVoiceConfig(voiceConfig)}><Text style={styles.addButtonText}>{voiceConfigSaving ? '保存中…' : '保存语音 API'}</Text></TouchableOpacity>
+          <Text style={[styles.description, { marginTop: spacing.md }]}>快捷呼出方式请在“应用设置 → 语音与快捷入口”中选择，启用后不会显示常驻悬浮按钮。</Text>
+        </View>
+
         {/* AI 模型配置 */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>🤖 AI 模型配置</Text>
@@ -898,6 +1042,23 @@ export default function GeneralSettingsScreen({ navigation: _navigation }: Gener
         {/* 监听应用配置 */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>📱 监听应用配置</Text>
+
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.label}>自动记账</Text>
+              <Text style={styles.description}>识别支付通知后自动创建账单；关闭后仅保留权限，不会自动入账</Text>
+            </View>
+            <Switch
+              value={config.autoRecordEnabled}
+              onValueChange={enabled => {
+                const nextConfig = { ...config, autoRecordEnabled: enabled };
+                setConfig(nextConfig);
+                saveConfigToStorage(nextConfig);
+              }}
+              trackColor={{ false: styles._colors.divider, true: styles._colors.primary }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
 
           {config.monitoredApps.map((app) => (
             <View key={app.id} style={styles.appItem}>
@@ -1099,6 +1260,68 @@ const createStyles = (colors: ThemeColors) => ({
       color: colors.textPrimary,
       marginBottom: spacing.md,
     },
+    permissionIntro: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      lineHeight: 18,
+      marginBottom: spacing.sm,
+    },
+    permissionItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: spacing.sm,
+      borderTopWidth: borderWidth.thin,
+      borderTopColor: colors.divider,
+    },
+    permissionIcon: {
+      width: 34,
+      fontSize: 22,
+      textAlign: 'center',
+      marginRight: spacing.sm,
+    },
+    permissionInfo: {
+      flex: 1,
+      minWidth: 0,
+      marginRight: spacing.sm,
+    },
+    permissionTitle: {
+      fontSize: 14,
+      fontWeight: '800',
+      color: colors.textPrimary,
+    },
+    permissionDescription: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      lineHeight: 16,
+      marginTop: 2,
+    },
+    permissionStatus: {
+      fontSize: 11,
+      fontWeight: '800',
+      marginTop: 3,
+    },
+    permissionStatusOk: { color: colors.success },
+    permissionStatusWarn: { color: colors.warning },
+    permissionAction: {
+      minWidth: 58,
+      minHeight: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: spacing.sm,
+      borderRadius: borderRadius.small,
+      borderWidth: borderWidth.thin,
+      borderColor: colors.primary,
+      backgroundColor: colors.background,
+    },
+    permissionActionDone: {
+      minWidth: 36,
+      borderColor: colors.success,
+      backgroundColor: colors.success + '18',
+    },
+    permissionActionText: { color: colors.primary, fontSize: 12, fontWeight: '800' },
+    permissionActionTextDone: { color: colors.success, fontSize: 18 },
     settingRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -1108,6 +1331,17 @@ const createStyles = (colors: ThemeColors) => ({
     settingInfo: {
       flex: 1,
       marginRight: spacing.md,
+    },
+    label: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: colors.textPrimary,
+    },
+    description: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      marginTop: 3,
     },
     settingTitle: {
       fontSize: 15,
@@ -1403,6 +1637,29 @@ const createStyles = (colors: ThemeColors) => ({
     keywordForm: {
       flexDirection: 'row',
       gap: spacing.sm,
+    },
+    option: {
+      flex: 1,
+      minHeight: 42,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: borderWidth.thin,
+      borderColor: colors.stroke,
+      borderRadius: borderRadius.small,
+      backgroundColor: colors.surface,
+    },
+    optionActive: {
+      backgroundColor: colors.primaryLight,
+      borderColor: colors.primary,
+    },
+    optionText: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    optionTextActive: {
+      color: colors.primary,
+      fontWeight: '800',
     },
     keywordInput: {
       flex: 1,

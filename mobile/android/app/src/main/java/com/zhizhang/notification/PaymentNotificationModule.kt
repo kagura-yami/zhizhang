@@ -12,6 +12,7 @@ import android.provider.OpenableColumns
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.PowerManager
 import android.os.Handler
 import android.os.Looper
 import android.media.MediaExtractor
@@ -248,6 +249,73 @@ class PaymentNotificationModule(
             }
         } catch (e: Exception) {
             Log.e(TAG, "打开悬浮窗权限设置页面失败", e)
+        }
+    }
+
+    /** 获取后台运行（忽略电池优化）状态。 */
+    @ReactMethod
+    fun getBatteryOptimizationStatus(promise: Promise) {
+        try {
+            val isIgnoring = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val powerManager = reactContext.getSystemService(Context.POWER_SERVICE) as PowerManager
+                powerManager.isIgnoringBatteryOptimizations(reactContext.packageName)
+            } else true
+            promise.resolve(if (isIgnoring) PERMISSION_AUTHORIZED else PERMISSION_DENIED)
+        } catch (e: Exception) {
+            Log.e(TAG, "检查电池优化状态失败", e)
+            promise.resolve(PERMISSION_UNKNOWN)
+        }
+    }
+
+    /** 打开系统设置，允许应用不受电池优化限制。 */
+    @ReactMethod
+    fun requestBatteryOptimizationPermission() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                    data = android.net.Uri.parse("package:${reactContext.packageName}")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                reactContext.startActivity(intent)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "打开电池优化设置失败，尝试通用设置", e)
+            try {
+                reactContext.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                })
+            } catch (ignored: Exception) {
+                Log.e(TAG, "打开电池优化设置失败", ignored)
+            }
+        }
+    }
+
+    /** 获取安装未知应用权限状态。 */
+    @ReactMethod
+    fun getInstallPermissionStatus(promise: Promise) {
+        try {
+            val allowed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                reactContext.packageManager.canRequestPackageInstalls()
+            } else true
+            promise.resolve(if (allowed) PERMISSION_AUTHORIZED else PERMISSION_DENIED)
+        } catch (e: Exception) {
+            Log.e(TAG, "检查安装权限失败", e)
+            promise.resolve(PERMISSION_UNKNOWN)
+        }
+    }
+
+    /** 打开本应用的“安装未知应用”设置。 */
+    @ReactMethod
+    fun requestInstallPermission() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                reactContext.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                    data = android.net.Uri.parse("package:${reactContext.packageName}")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                })
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "打开安装权限设置失败", e)
         }
     }
 
@@ -589,7 +657,7 @@ class PaymentNotificationModule(
      * @param promise Promise 对象
      */
     @ReactMethod
-    fun saveMonitoringConfig(monitoredApps: ReadableArray, filterKeywords: ReadableArray, promise: Promise) {
+    fun saveMonitoringConfig(monitoredApps: ReadableArray, filterKeywords: ReadableArray, autoRecordEnabled: Boolean, promise: Promise) {
         try {
             val prefs = reactContext.getSharedPreferences("payment_notification_config", Context.MODE_PRIVATE)
             val editor = prefs.edit()
@@ -613,10 +681,11 @@ class PaymentNotificationModule(
                 keywordsJson.put(filterKeywords.getString(i))
             }
             editor.putString("filter_keywords", keywordsJson.toString())
+            editor.putBoolean("auto_record_enabled", autoRecordEnabled)
 
             editor.apply()
             promise.resolve(true)
-            Log.i(TAG, "配置已保存: ${appsJson.length()} 个应用, ${keywordsJson.length()} 个关键词")
+            Log.i(TAG, "配置已保存: ${appsJson.length()} 个应用, ${keywordsJson.length()} 个关键词, 自动记账=$autoRecordEnabled")
         } catch (e: Exception) {
             Log.e(TAG, "保存配置失败", e)
             promise.reject("ERROR", "保存配置失败", e)

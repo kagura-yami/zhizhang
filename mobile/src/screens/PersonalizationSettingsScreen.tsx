@@ -1,14 +1,15 @@
 /** 个性化设置：集中管理主题、首页展示偏好和自动记账提醒。 */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Modal, PanResponder, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { BellRing, ChartNoAxesCombined, GripVertical, List, Music2, Palette, Plus, X } from 'lucide-react-native';
+import { BellRing, ChartNoAxesCombined, GripVertical, List, Music2, Palette, Plus, X, Smartphone } from 'lucide-react-native';
 import { useAlert, useTheme } from '../providers';
 import { useHomeDisplayPreference, useStyles } from '../hooks';
 import type { HomeMainMetric, HomeSectionId, HomeSecondaryMetric } from '../hooks/useHomeDisplayPreference';
 import { paymentNotificationService } from '../services/paymentNotification';
-import type { BillNotificationSettings, NotificationSoundItem, PermissionStatus } from '../services/paymentNotification/types';
+import type { BillNotificationSettings, NotificationSoundItem } from '../services/paymentNotification/types';
 import { ThemeColors } from '../theme/colors';
 import { borderRadius, borderWidth, spacing } from '../theme';
+import { widgetSettingsService, type WidgetSettings } from '../services/widgetSettings';
 
 const THEME_OPTIONS = [
   { value: 'light', label: '浅色' },
@@ -194,22 +195,27 @@ export default function PersonalizationSettingsScreen() {
     enabled: true,
     sound: 'default',
   });
-  const [notificationPermission, setNotificationPermission] = useState<PermissionStatus>('unknown');
   const [soundLibrary, setSoundLibrary] = useState<NotificationSoundItem[]>([]);
   const [previewingSoundId, setPreviewingSoundId] = useState<string | null>(null);
   const [editingSound, setEditingSound] = useState<NotificationSoundItem | null>(null);
   const [editStartSeconds, setEditStartSeconds] = useState('0');
   const [editEndSeconds, setEditEndSeconds] = useState('0');
+  const [widgetSettings, setWidgetSettings] = useState<WidgetSettings>({ theme: 'light', accent: 'blue', showBalance: true, showMonthly: true, compact: false });
 
   const loadSettings = async () => {
-    const [settings, permission, sounds] = await Promise.all([
+    const [settings, sounds, widget] = await Promise.all([
       paymentNotificationService.getBillNotificationSettings(),
-      paymentNotificationService.getAppNotificationPermissionStatus(),
       paymentNotificationService.getBillNotificationSounds(),
+      widgetSettingsService.get(),
     ]);
     setNotificationSettings(settings);
-    setNotificationPermission(permission);
     setSoundLibrary(sounds);
+    setWidgetSettings(widget);
+  };
+
+  const saveWidgetSettings = async (next: WidgetSettings) => {
+    setWidgetSettings(next);
+    if (!await widgetSettingsService.save(next)) alert('桌面组件', '设置保存失败，请稍后重试');
   };
 
   useEffect(() => {
@@ -276,15 +282,35 @@ export default function PersonalizationSettingsScreen() {
     }
   };
 
-  const requestNotificationPermission = () => {
-    paymentNotificationService.requestAppNotificationPermission();
-    setTimeout(() => {
-      paymentNotificationService.getAppNotificationPermissionStatus().then(setNotificationPermission);
-    }, 800);
-  };
-
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.card}>
+        <View style={styles.titleRow}>
+          <Smartphone size={21} color={styles._colors.primary} />
+          <Text style={styles.cardTitle}>桌面组件</Text>
+        </View>
+        <Text style={styles.description}>在桌面长按知账组件即可添加；这里的设置会立即刷新已有组件。</Text>
+        <Text style={[styles.label, styles.subsectionLabel]}>组件主题</Text>
+        <View style={styles.optionsRow}>
+          {([['light', '浅色'], ['dark', '深色'], ['auto', '跟随系统']] as const).map(([value, label]) => (
+            <TouchableOpacity key={value} style={[styles.option, widgetSettings.theme === value && styles.optionActive]} onPress={() => saveWidgetSettings({ ...widgetSettings, theme: value })}>
+              <Text style={[styles.optionText, widgetSettings.theme === value && styles.optionTextActive]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <Text style={[styles.label, styles.subsectionLabel]}>强调色</Text>
+        <View style={styles.optionsRow}>
+          {([['blue', '知账蓝'], ['green', '清新绿'], ['purple', '雅致紫']] as const).map(([value, label]) => (
+            <TouchableOpacity key={value} style={[styles.option, widgetSettings.accent === value && styles.optionActive]} onPress={() => saveWidgetSettings({ ...widgetSettings, accent: value })}>
+              <Text style={[styles.optionText, widgetSettings.accent === value && styles.optionTextActive]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={[styles.settingRow, styles.subsectionLabel]}><View style={styles.settingInfo}><Text style={styles.label}>显示今日结余</Text><Text style={styles.description}>保留组件最醒目的核心金额</Text></View><Switch value={widgetSettings.showBalance} onValueChange={showBalance => saveWidgetSettings({ ...widgetSettings, showBalance })} trackColor={{ false: styles._colors.divider, true: styles._colors.primary }} thumbColor="#FFFFFF" /></View>
+        <View style={styles.settingRow}><View style={styles.settingInfo}><Text style={styles.label}>显示本月收支</Text><Text style={styles.description}>显示收入和支出两项摘要</Text></View><Switch value={widgetSettings.showMonthly} onValueChange={showMonthly => saveWidgetSettings({ ...widgetSettings, showMonthly })} trackColor={{ false: styles._colors.divider, true: styles._colors.primary }} thumbColor="#FFFFFF" /></View>
+        <View style={styles.settingRow}><View style={styles.settingInfo}><Text style={styles.label}>紧凑布局</Text><Text style={styles.description}>隐藏更新时间，适合较小桌面空间</Text></View><Switch value={widgetSettings.compact} onValueChange={compact => saveWidgetSettings({ ...widgetSettings, compact })} trackColor={{ false: styles._colors.divider, true: styles._colors.primary }} thumbColor="#FFFFFF" /></View>
+      </View>
+
       <View style={styles.card}>
         <View style={styles.titleRow}>
           <Palette size={21} color={styles._colors.primary} />
@@ -437,14 +463,7 @@ export default function PersonalizationSettingsScreen() {
             })}
           </View>
         )}
-        <View style={styles.permissionRow}>
-          <Text style={styles.description}>系统通知权限：{notificationPermission === 'authorized' ? '已允许' : '未允许'}</Text>
-          {notificationPermission !== 'authorized' && (
-            <TouchableOpacity style={styles.permissionButton} onPress={requestNotificationPermission}>
-              <Text style={styles.permissionButtonText}>去开启</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        <Text style={[styles.description, styles.permissionHint]}>系统通知权限请前往“通用配置 → 应用权限”统一管理。</Text>
       </View>
 
       <Modal visible={!!editingSound} transparent animationType="fade" onRequestClose={() => setEditingSound(null)}>
@@ -528,9 +547,7 @@ const createStyles = (colors: ThemeColors) => ({
     soundItemMeta: { marginTop: 2, fontSize: 11, fontWeight: '600', color: colors.textSecondary },
     soundAction: { borderWidth: borderWidth.thin, borderColor: colors.stroke, borderRadius: borderRadius.small, paddingVertical: spacing.xs, paddingHorizontal: spacing.sm },
     soundActionText: { color: colors.primary, fontSize: 12, fontWeight: '800' },
-    permissionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md },
-    permissionButton: { borderWidth: borderWidth.thin, borderColor: colors.primary, borderRadius: borderRadius.small, paddingVertical: spacing.xs, paddingHorizontal: spacing.sm },
-    permissionButtonText: { color: colors.primary, fontSize: 13, fontWeight: '800' },
+    permissionHint: { marginTop: spacing.md },
     modalBackdrop: { flex: 1, justifyContent: 'center', padding: spacing.lg, backgroundColor: 'rgba(0,0,0,0.45)' },
     editorCard: { backgroundColor: colors.surface, borderRadius: borderRadius.card, padding: spacing.lg, borderWidth: borderWidth.thin, borderColor: colors.stroke },
     editorTitle: { fontSize: 17, fontWeight: '800', color: colors.textPrimary, marginBottom: spacing.xs },

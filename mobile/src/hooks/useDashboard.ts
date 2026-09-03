@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { billsService } from '../services';
 import { CACHE_TIME, QUERY_KEYS, GC_TIME } from '../lib/queryClient';
 import type { BillData, BillStatistics } from '../types/bill';
+import { formatDate } from '../utils/date';
 
 interface DashboardData {
   statistics: BillStatistics | null;
@@ -26,10 +27,9 @@ async function fetchDashboardData(month: string): Promise<DashboardData> {
   const startOfMonth = new Date(year, monthNum - 1, 1);
   const endOfMonth = new Date(year, monthNum, 0);
 
-  const todayStr = today < endOfMonth
-    ? today.toISOString().split('T')[0]
-    : endOfMonth.toISOString().split('T')[0];
-  const monthStartStr = startOfMonth.toISOString().split('T')[0];
+  // 日期筛选使用设备本地日历日期，不能用 toISOString（中国时区凌晨会回退到前一天）。
+  const todayStr = today < endOfMonth ? formatDate(today) : formatDate(endOfMonth);
+  const monthStartStr = formatDate(startOfMonth);
 
   // 并行获取统计数据和最近账单
   const [statsResponse, billsResponse] = await Promise.all([

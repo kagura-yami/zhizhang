@@ -117,6 +117,7 @@ model Bill {
   receiptUrl  String?   @map("receipt_url") @db.Text                             // 收据图片URL，可选
   source      String    @default("manual") @db.VarChar(20)                       // 来源：manual/voice/ocr/text/notification
   sourceApp   String?   @map("source_app") @db.VarChar(50)                       // 自动记账来源应用：wechat/alipay/bank_sms 等
+  relatedBillId Int?    @map("related_bill_id")                                  // 退款收入对应的原支出账单
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)   // 创建时间
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)        // 更新时间
 
@@ -125,12 +126,15 @@ model Bill {
   category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull) // 关联分类，删除分类时设为null
   account     Account?  @relation(fields: [accountId], references: [id], onDelete: SetNull)  // 关联账户，删除账户时设为null
   invoices    Invoice[] // 由收票邮箱匹配到该账单的发票
+  relatedBill Bill?     @relation("BillRefund", fields: [relatedBillId], references: [id], onDelete: SetNull)
+  refunds     Bill[]    @relation("BillRefund")
 
   @@index([userId, date])    // 复合索引：用户ID + 日期，用于按日期查询用户账单
   @@index([userId, type])    // 复合索引：用户ID + 类型，用于按类型统计
   @@index([categoryId])      // 索引：分类ID
   @@index([accountId])       // 索引：账户ID
   @@index([source])          // 索引：来源
+  @@index([relatedBillId])   // 索引：退款关联的原支出
   @@map("bills")
   @@schema("public")
 }

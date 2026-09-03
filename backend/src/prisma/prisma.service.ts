@@ -27,6 +27,8 @@ export class PrismaService
           { name: '工资', type: 'income', icon: '💰', color: '#4CAF50', isDefault: true, sortOrder: 1 },
           { name: '奖金', type: 'income', icon: '🎁', color: '#8BC34A', isDefault: true, sortOrder: 2 },
           { name: '投资', type: 'income', icon: '📈', color: '#009688', isDefault: true, sortOrder: 3 },
+          { name: '退款', type: 'income', icon: '↩️', color: '#2E9B72', isDefault: true, sortOrder: 4 },
+          { name: '其他收入', type: 'income', icon: '💵', color: '#43A047', isDefault: true, sortOrder: 5 },
 
           // 支出分类（包含自动记账兜底分类）
           { name: '餐饮', type: 'expense', icon: '🍽️', color: '#FF5722', isDefault: true, sortOrder: 1 },

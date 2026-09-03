@@ -1,90 +1,200 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@drawable/widget_background"
+    android:background="@android:color/transparent"
     android:clickable="true"
     android:focusable="true">
 
-    <LinearLayout
+    <ImageView
+        android:id="@+id/widget_surface"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="知帐总览"
-            android:textColor="#1D4ED8"
-            android:textSize="15sp"
-            android:textStyle="bold" />
-        <ImageButton
-            android:id="@+id/widget_refresh"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="@drawable/widget_refresh_background"
-            android:contentDescription="刷新总览"
-            android:src="@android:drawable/ic_popup_sync"
-            android:tint="#1D4ED8" />
-    </LinearLayout>
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_background" />
 
-    <TextView
+    <ImageView
+        android:id="@+id/widget_decorations"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="今日结余"
-        android:textColor="#64748B"
-        android:textSize="12sp" />
-    <TextView
-        android:id="@+id/widget_balance"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:maxLines="1"
-        android:text="点击刷新"
-        android:textColor="#1B845B"
-        android:textSize="27sp"
-        android:textStyle="bold" />
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_bg_art" />
+
+    <ImageView
+        android:id="@+id/widget_ledger_art"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:layout_gravity="right|center_vertical"
+        android:alpha="0.2"
+        android:contentDescription="@null"
+        android:scaleType="fitCenter"
+        android:src="@drawable/widget_ledger_art" />
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:orientation="horizontal">
-        <TextView
-            android:id="@+id/widget_month_income"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
-            android:background="@drawable/widget_metric_background"
-            android:maxLines="1"
-            android:text="本月收入 —"
-            android:textColor="#1B845B"
-            android:textSize="11sp" />
-        <TextView
-            android:id="@+id/widget_month_expense"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
-            android:layout_weight="1"
-            android:background="@drawable/widget_metric_background"
-            android:maxLines="1"
-            android:text="本月支出 —"
-            android:textColor="#C64843"
-            android:textSize="11sp" />
-    </LinearLayout>
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="10dp">
 
-    <TextView
-        android:id="@+id/widget_status"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="7dp"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:text="点击刷新"
-        android:textColor="#94A3B8"
-        android:textSize="10sp" />
-</LinearLayout>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="22dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/widget_header_hint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:text="收支概览"
+                android:textColor="#63739A"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_status"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:gravity="center_vertical|end"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:text="更新"
+                android:textColor="#7A88A3"
+                android:textSize="8sp" />
+
+            <ImageButton
+                android:id="@+id/widget_voice_button"
+                android:layout_width="30dp"
+                android:layout_height="24dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/widget_voice_button_background"
+                android:padding="4dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/widget_voice_icon"
+                android:contentDescription="按住说话，打开语音记账"
+                android:clickable="true"
+                android:focusable="true" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:id="@+id/widget_balance_group"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:id="@+id/widget_balance_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:includeFontPadding="false"
+                    android:text="今日结余  ·  CNY"
+                    android:textColor="#7180A0"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:id="@+id/widget_balance"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:includeFontPadding="false"
+                    android:maxLines="1"
+                    android:text="点击刷新"
+                    android:textColor="#18294E"
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/widget_logo"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="知账角色"
+                android:scaleType="fitCenter"
+                android:src="@drawable/widget_mascot_art_v2" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/widget_monthly_metrics"
+            android:layout_width="match_parent"
+            android:layout_height="30dp"
+            android:orientation="horizontal"
+            android:baselineAligned="false">
+            <LinearLayout
+                android:id="@+id/widget_metric_expense"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="3dp"
+                android:layout_weight="1"
+                android:background="@drawable/widget_metric_expense_background"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="7dp"
+                android:paddingEnd="4dp">
+                <ImageView
+                    android:layout_width="17dp"
+                    android:layout_height="17dp"
+                    android:contentDescription="支出"
+                    android:src="@drawable/widget_expense_icon" />
+                <TextView
+                    android:id="@+id/widget_month_expense"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="5dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:includeFontPadding="false"
+                    android:maxLines="1"
+                    android:text="本月支出 —"
+                    android:textColor="#7B3E45"
+                    android:textSize="9sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+            <LinearLayout
+                android:id="@+id/widget_metric_income"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="3dp"
+                android:layout_weight="1"
+                android:background="@drawable/widget_metric_income_background"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="7dp"
+                android:paddingEnd="4dp">
+                <ImageView
+                    android:layout_width="17dp"
+                    android:layout_height="17dp"
+                    android:contentDescription="收入"
+                    android:src="@drawable/widget_income_icon" />
+                <TextView
+                    android:id="@+id/widget_month_income"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="5dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:includeFontPadding="false"
+                    android:maxLines="1"
+                    android:text="本月收入 —"
+                    android:textColor="#236B5E"
+                    android:textSize="9sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

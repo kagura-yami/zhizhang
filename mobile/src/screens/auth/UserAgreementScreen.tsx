@@ -68,7 +68,7 @@ export default function UserAgreementScreen() {
           <Text style={styles.sectionTitle}>八、联系我们</Text>
           <Text style={styles.paragraph}>
             如您对本协议有任何疑问，请通过以下方式联系我们：{'\n'}
-            邮箱：请通过知帐项目主页联系我们
+            邮箱：请通过知账项目主页联系我们
           </Text>
         </View>
 

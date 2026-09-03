@@ -1,6 +1,8 @@
 # OS
 .DS_Store
 Thumbs.db
+# Windows NUL device (created by accidental `> NUL` redirection)
+NUL
 
 # IDE
 .vscode/
@@ -17,5 +19,17 @@ node_modules/
 # Environment (root level)
 .env.local
 
-# 本地内测群机器人，不纳入知帐主仓库
+# 本地内测群机器人，不纳入知账主仓库
 Bot/
+# 第三方 QQ 机器人 AstrBot（部署配置 + 运行时数据，不入库）
+AstrBot/
+# 独立宣传网站（部署目录，不纳入源码提交）
+website/
+
+# 本地视觉验收产物
+output/playwright/
+.playwright-cli/
+# 本地 ASR 依赖与模型权重
+tools/local-asr/.venv/
+tools/local-asr/models/
+tools/local-asr/__pycache__/

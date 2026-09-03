@@ -44,10 +44,10 @@ const providerHelp: Record<InvoiceMailboxProvider, {
   },
   outlook: {
     title: 'Outlook 官方授权方式',
-    steps: ['点击下方按钮并登录 Outlook 网页版', '在 Microsoft 授权页同意读取邮件权限', '授权完成后返回知帐，应用会自动读取收件箱中的发票附件'],
+    steps: ['点击下方按钮并登录 Outlook 网页版', '在 Microsoft 授权页同意读取邮件权限', '授权完成后返回知账，应用会自动读取收件箱中的发票附件'],
     url: 'https://login.microsoftonline.com/',
     buttonLabel: '打开 Microsoft 登录页',
-    notice: '知帐使用 Microsoft Graph 读取发票邮件，无需手动开启 IMAP，也不需要填写邮箱密码或授权码。',
+    notice: '知账使用 Microsoft Graph 读取发票邮件，无需手动开启 IMAP，也不需要填写邮箱密码或授权码。',
   },
   gmail: {
     title: 'Gmail应用专用密码获取方式',
@@ -78,26 +78,35 @@ export default function InvoiceMailboxScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<InvoiceMailbox['syncProgress']>(null);
   const [helpVisible, setHelpVisible] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const mailboxResponse = await invoiceMailboxService.getMailbox();
       if (mailboxResponse.success && mailboxResponse.data) {
         setMailbox(mailboxResponse.data);
         setEmail(mailboxResponse.data.email);
         setProvider(mailboxResponse.data.provider);
+        setSyncProgress(mailboxResponse.data.syncProgress || null);
       }
     } catch (error: any) {
-      alert('加载失败', error?.message || '发票邮箱信息加载失败，请重试');
+      if (!silent) alert('加载失败', error?.message || '发票邮箱信息加载失败，请重试');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [alert]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // 从其他页面返回时如果服务端仍在扫描，继续静默刷新进度，避免用户只能重新点击扫描。
+  useEffect(() => {
+    if (syncing || mailbox?.status !== 'syncing') return;
+    const timer = setInterval(() => { void load(true); }, 2000);
+    return () => clearInterval(timer);
+  }, [load, mailbox?.status, syncing]);
 
   useEffect(() => {
     const handleOAuthUrl = (url: string) => {
@@ -112,7 +121,7 @@ export default function InvoiceMailboxScreen() {
         if (callbackEmail) setEmail(callbackEmail);
         setCredential('');
         void load();
-      alert('Outlook 登录成功', '邮箱已完成授权，知帐会自动回扫全部含“发票”的邮件并整理 PDF 附件。');
+      alert('Outlook 登录成功', '邮箱已完成授权，知账会自动回扫全部含“发票”的邮件并整理 PDF 附件。');
       } else {
         alert('Outlook 登录未完成', callbackMessage || '授权已取消，请重试。');
       }
@@ -157,21 +166,37 @@ export default function InvoiceMailboxScreen() {
       const result = await invoiceMailboxService.sync();
       if (!result.success) throw new Error(result.message || '同步失败');
       const data = result.data;
-      await load();
-      const linkedPdf = data?.linkedPdfAttachments || 0;
-      const availablePdf = (data?.pdfAttachments || 0) + linkedPdf;
-      if (data?.inProgress) {
-        alert('正在扫描', '邮箱正在后台扫描，请稍后在发票中心查看整理结果。');
-      } else if (!data?.candidateMessages) {
-        alert('扫描完成', `已检查 ${data?.scanned || 0} 封邮件，没有找到包含“发票”关键词的邮件。`);
-      } else if (!availablePdf && (data?.linkCandidates || 0)) {
-        alert('扫描完成', `找到 ${data.candidateMessages} 封发票邮件和 ${data.linkCandidates} 个下载链接，但链接没有返回可读取的 PDF（可能需要在邮箱网页中登录后下载）。`);
+      setMailbox(data?.mailbox || null);
+      setSyncProgress(data?.mailbox?.syncProgress || null);
+      // 全量扫描由服务端后台执行；静默轮询状态，不切换 loading，避免 ScrollView 被卸载导致滚动回顶部。
+      let latest = data?.mailbox || null;
+      for (let attempt = 0; attempt < 180; attempt += 1) {
+        if (latest?.status !== 'syncing') break;
+        await new Promise<void>((resolve) => { setTimeout(resolve, 2000); });
+        const current = await invoiceMailboxService.getMailbox();
+        if (!current.success || !current.data) break;
+        latest = current.data;
+        setMailbox(latest);
+        setSyncProgress(latest.syncProgress || null);
+      }
+      await load(true);
+      const progress = latest?.syncProgress || data?.mailbox?.syncProgress;
+      const linkedPdf = progress?.linkedPdfAttachments || 0;
+      const availablePdf = (progress?.pdfAttachments || 0) + linkedPdf;
+      if (latest?.status === 'syncing') {
+        alert('同步仍在进行', '扫描任务仍在后台运行，你可以继续使用知账；返回本页可查看进度。');
+      } else if (latest?.status === 'error' || progress?.phase === 'error') {
+        alert('同步失败', latest?.lastError || progress?.error || '邮箱同步失败，请稍后重试');
+      } else if (!progress?.candidateMessages) {
+        alert('扫描完成', `已检查 ${progress?.scanned || 0} 封邮件，没有找到包含“发票”关键词的邮件。`);
+      } else if (!availablePdf && (progress?.linkCandidates || 0)) {
+        alert('扫描完成', `找到 ${progress.candidateMessages} 封发票邮件和 ${progress.linkCandidates} 个下载链接，但链接没有返回可读取的 PDF。`);
       } else if (!availablePdf) {
-        alert('扫描完成', `找到 ${data.candidateMessages} 封发票邮件，但其中没有可整理的 PDF 附件或下载链接。`);
-      } else if (!data.imported) {
-        alert('扫描完成', `找到 ${data.candidateMessages} 封发票邮件和 ${availablePdf} 个 PDF，均已整理过，没有重复导入。`);
+        alert('扫描完成', `找到 ${progress.candidateMessages} 封发票邮件，但其中没有可整理的 PDF 附件或下载链接。`);
+      } else if (!progress.imported) {
+        alert('扫描完成', `找到 ${progress.candidateMessages} 封发票邮件和 ${availablePdf} 个 PDF，均已整理过，没有重复导入。`);
       } else {
-        alert('同步完成', `扫描 ${data.scanned} 封邮件，发现 ${availablePdf} 个 PDF；新整理 ${data.imported} 张发票，自动关联 ${data.matched} 张账单。`);
+        alert('同步完成', `扫描 ${progress.scanned} 封邮件，发现 ${availablePdf} 个 PDF；新整理 ${progress.imported} 张发票，自动关联 ${progress.matched} 张账单。`);
       }
     } catch (error: any) {
       alert('同步失败', error?.message || '邮箱同步失败，请检查绑定状态');
@@ -210,7 +235,7 @@ export default function InvoiceMailboxScreen() {
         <View style={styles.hero}>
           <View style={styles.heroIcon}><Mail size={28} color={colors.primary} /></View>
           <Text style={styles.title}>自动整理电子发票</Text>
-          <Text style={styles.subtitle}>知帐会扫描绑定邮箱中主题、正文或附件名含“发票”的邮件，自动保存 PDF、提取信息并尝试关联账单。</Text>
+          <Text style={styles.subtitle}>知账会扫描绑定邮箱中主题、正文或附件名含“发票”的邮件，自动保存 PDF、提取信息并尝试关联账单。</Text>
         </View>
 
         <View style={styles.card}>
@@ -228,7 +253,7 @@ export default function InvoiceMailboxScreen() {
           {provider === 'outlook' && (
             <View style={styles.oauthPanel}>
               <Text style={styles.oauthTitle}>推荐使用官方登录</Text>
-              <Text style={styles.oauthDescription}>点击后会打开 Microsoft 登录页，授权完成后自动返回知帐，不需要填写邮箱密码或授权码。</Text>
+              <Text style={styles.oauthDescription}>点击后会打开 Microsoft 登录页，授权完成后自动返回知账，不需要填写邮箱密码或授权码。</Text>
               <TouchableOpacity style={styles.oauthButton} onPress={loginOutlook} disabled={oauthLoading} activeOpacity={0.8} accessibilityRole="button">
                 {oauthLoading ? <ActivityIndicator color="#FFFFFF" /> : <><Mail size={18} color="#FFFFFF" /><Text style={styles.oauthButtonText}>登录 Outlook 并授权邮箱读取</Text></>}
               </TouchableOpacity>
@@ -257,6 +282,16 @@ export default function InvoiceMailboxScreen() {
         {mailbox && (
           <View style={styles.card}>
             <View style={styles.rowHeader}><View><Text style={styles.sectionTitle}>同步状态</Text><Text style={styles.statusText}>{mailbox.status === 'error' ? mailbox.lastError || '同步异常' : mailbox.status === 'syncing' ? '正在同步…' : `已绑定 · ${mailbox.invoiceCount} 张发票`}</Text></View></View>
+            {mailbox.status === 'syncing' && (
+              <View style={styles.progressPanel}>
+                <View style={styles.progressHeader}>
+                  <Text style={styles.progressLabel}>{syncProgress?.phase === 'starting' ? '正在连接邮箱…' : '正在扫描邮件并整理发票…'}</Text>
+                  <Text style={styles.progressValue}>{syncProgress?.scanned || 0}{syncProgress?.total ? ` / ${syncProgress.total}` : ''} 封</Text>
+                </View>
+                <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${Math.max(6, Math.min(100, syncProgress?.total ? ((syncProgress.scanned / syncProgress.total) * 100) : 12))}%` }]} /></View>
+                <Text style={styles.progressHint}>同步在后台进行，完成后会自动更新发票数量；你可以继续停留在当前页面。</Text>
+              </View>
+            )}
             <TouchableOpacity style={styles.secondaryButton} onPress={sync} disabled={syncing} activeOpacity={0.8} accessibilityRole="button">
               {syncing ? <ActivityIndicator color={colors.primary} /> : <><RefreshCw size={18} color={colors.primary} /><Text style={styles.secondaryText}>扫描全邮箱发票</Text></>}
             </TouchableOpacity>
@@ -349,6 +384,13 @@ const createStyles = (colors: any) => StyleSheet.create({
   primaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
   rowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   statusText: { color: colors.textSecondary, fontSize: 13 },
+  progressPanel: { marginTop: spacing.md, padding: spacing.md, borderRadius: borderRadius.small, backgroundColor: colors.primaryLight, borderWidth: borderWidth.thin, borderColor: colors.stroke },
+  progressHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  progressLabel: { flex: 1, color: colors.textPrimary, fontSize: 13, fontWeight: '700' },
+  progressValue: { color: colors.primary, fontSize: 12, fontWeight: '800' },
+  progressTrack: { height: 8, borderRadius: 4, backgroundColor: colors.surface, overflow: 'hidden', marginTop: spacing.sm },
+  progressFill: { height: '100%', borderRadius: 4, backgroundColor: colors.primary },
+  progressHint: { color: colors.textSecondary, fontSize: 11, lineHeight: 17, marginTop: spacing.sm },
   secondaryButton: { minHeight: 48, borderRadius: borderRadius.button, borderWidth: borderWidth.thin, borderColor: colors.primary, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: spacing.xs, marginTop: spacing.md },
   secondaryText: { color: colors.primary, fontSize: 15, fontWeight: '800' },
   removeButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: spacing.xs, marginTop: spacing.sm },

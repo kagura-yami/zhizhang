@@ -52,10 +52,106 @@ export class BillsService {
       source,
       sourceApp,
       categoryId,
+      relatedBillId,
+      isRefund,
+      dedupeKey,
+      dedupeMeta,
     } = createBillDto;
 
     // 确保用户存在，如果不存在则创建
     await this.ensureUserExists(userId);
+
+    // 自动记账请求可能在服务端已成功后因网络超时被客户端重试。
+    // 将幂等键写入 notes，避免为此新增数据库迁移，同时不影响用户手动备注。
+    const dedupeMarker = source === 'notification' && dedupeKey
+      ? `auto-dedupe:${dedupeKey}`
+      : undefined;
+    if (dedupeMarker) {
+      const existing = await this.prisma.bill.findFirst({
+        where: { userId, source: 'notification', notes: { startsWith: dedupeMarker } },
+        include: {
+          category: true,
+          relatedBill: { select: { id: true, amount: true, type: true, description: true, date: true, time: true } },
+        },
+      });
+      if (existing) return existing;
+
+      // 客户端可能在不同设备/不同通知来源上生成不同指纹；
+      // 对最近窗口内具备“同金额+同方向+同商户”或“同卡尾号”的通知再做一次服务端保护。
+      const eventTime = new Date(time || Date.now()).getTime();
+      // 银行通知可能晚到，但正文携带的真实交易时间会早于支付应用通知时间；
+      // 使用对称窗口，不能只查“当前交易时间之前”的记录。
+      const recentWindowStart = new Date(eventTime - 10 * 60 * 1000);
+      const recentWindowEnd = new Date(eventTime + 10 * 60 * 1000);
+      const candidates = await this.prisma.bill.findMany({
+        where: {
+          userId,
+          source: 'notification',
+          type,
+          amount: new Decimal(amount),
+          time: { gte: recentWindowStart, lte: recentWindowEnd },
+        },
+        orderBy: [{ time: 'desc' }, { createdAt: 'desc' }],
+        take: 30,
+        include: { category: true, relatedBill: { select: { id: true, amount: true, type: true, description: true, date: true, time: true } } },
+      });
+      const meta = this.parseDedupeMeta(dedupeMeta);
+      const normalize = (value?: string | null) => (value || '').toLocaleLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+      const duplicate = candidates.find(candidate => {
+        const candidateMeta = this.parseDedupeMeta(candidate.notes);
+        const sameRef = meta.ref && candidateMeta.ref && normalize(meta.ref) === normalize(candidateMeta.ref);
+        const sameNotification = meta.notification && candidateMeta.notification && meta.notification === candidateMeta.notification;
+        const sameCard = meta.card && candidateMeta.card && meta.card === candidateMeta.card;
+        const conflictingBalance = sameCard && meta.balance != null && candidateMeta.balance != null &&
+          Math.abs(meta.balance - candidateMeta.balance) > 0.01;
+        const left = normalize(candidate.counterparty);
+        const right = normalize(counterparty);
+        const sameMerchant = left && right && (left === right || left.includes(right) || right.includes(left));
+        const candidateTime = candidate.time?.getTime() ?? candidate.createdAt.getTime();
+        const sameSourceShortWindow = sourceApp && candidate.sourceApp &&
+          sourceApp === candidate.sourceApp && Math.abs(candidateTime - eventTime) <= 2 * 60 * 1000;
+        const bankPair = ['bank_sms', 'bank_app'].includes(sourceApp || '') &&
+          ['bank_sms', 'bank_app'].includes(candidate.sourceApp || '');
+        const sameMerchantShortWindow = sameMerchant && Math.abs(candidateTime - eventTime) <= 90 * 1000;
+        const isBankSource = (value?: string | null) => ['bank_sms', 'bank_app'].includes(value || '');
+        const isPaymentSource = (value?: string | null) => ['wechat', 'alipay'].includes(value || '');
+        const bankPaymentPair = (isBankSource(sourceApp) && isPaymentSource(candidate.sourceApp)) ||
+          (isPaymentSource(sourceApp) && isBankSource(candidate.sourceApp));
+        const channelGroup = (value?: string | null) => {
+          const normalized = normalize(value);
+          if (normalized.includes('财付通') || normalized.includes('微信')) return 'wechat';
+          if (normalized.includes('支付宝')) return 'alipay';
+          if (normalized.includes('银联') || normalized.includes('云闪付')) return 'unionpay';
+          if (!normalized || normalized === '银行卡' || normalized === '银行支付') return 'generic_bank';
+          return normalized;
+        };
+        const leftChannel = channelGroup(candidate.paymentChannel);
+        const rightChannel = channelGroup(paymentChannel);
+        const channelCompatible = leftChannel === rightChannel || leftChannel === 'generic_bank' || rightChannel === 'generic_bank';
+        const isLowConfidenceMerchant = (value?: string | null) => {
+          const normalized = normalize(value);
+          return !normalized || /^(?:已)?(?:支付|付款|扣款|扣费|实付|消费)(?:成功)?[0-9]+(?:元)?$/u.test(normalized);
+        };
+        const bankPaymentFallback = bankPaymentPair && channelCompatible &&
+          (isLowConfidenceMerchant(candidate.counterparty) || isLowConfidenceMerchant(counterparty)) &&
+          Math.abs(candidateTime - eventTime) <= 2 * 60 * 1000;
+        if (conflictingBalance) return false;
+        return Boolean(sameRef || sameNotification || bankPaymentFallback ||
+          (sameMerchant && (sameCard || sameSourceShortWindow || bankPair || sameMerchantShortWindow)));
+      });
+      if (duplicate) return duplicate;
+    }
+
+    const resolvedRelatedBillId = relatedBillId ?? await this.findRefundSourceBillId({
+      userId,
+      amount,
+      type,
+      source,
+      sourceApp,
+      counterparty,
+      time,
+      isRefund,
+    });
 
     return this.prisma.bill.create({
       data: {
@@ -69,12 +165,64 @@ export class BillsService {
         source: source || 'manual',
         sourceApp,
         categoryId,
+        relatedBillId: resolvedRelatedBillId,
+        notes: dedupeMarker ? [dedupeMarker, dedupeMeta].filter(Boolean).join(';') : undefined,
         userId,
       },
       include: {
         category: true,
+        relatedBill: { select: { id: true, amount: true, type: true, description: true, date: true, time: true } },
       },
     });
+  }
+
+  private parseDedupeMeta(value?: string | null): { ref?: string; card?: string; balance?: number; notification?: string } {
+    if (!value) return {};
+    const ref = value.match(/(?:^|;)ref=([^;]+)/)?.[1];
+    const card = value.match(/(?:^|;)card=([^;]+)/)?.[1];
+    const notification = value.match(/(?:^|;)nk=([^;]+)/)?.[1];
+    const balanceValue = value.match(/(?:^|;)bal=([0-9]+(?:\.[0-9]{1,2})?)/)?.[1];
+    const balance = balanceValue ? Number(balanceValue) : undefined;
+    return { ref, card, balance, notification };
+  }
+
+  /** 为通知产生的退款收入寻找同一用户近期同额原支出，建立可追溯关联。 */
+  private async findRefundSourceBillId(input: {
+    userId: string;
+    amount: number;
+    type: string;
+    source?: string;
+    sourceApp?: string;
+    counterparty?: string;
+    time?: string;
+    isRefund?: boolean;
+  }): Promise<number | undefined> {
+    if (!input.isRefund || input.type !== 'income' || input.source !== 'notification') return undefined;
+    const refundTime = input.time ? new Date(input.time) : new Date();
+    const from = new Date(refundTime.getTime() - 90 * 24 * 60 * 60 * 1000);
+    const candidates = await this.prisma.bill.findMany({
+      where: {
+        userId: input.userId,
+        type: 'expense',
+        amount: new Decimal(input.amount),
+        date: { gte: from, lte: refundTime },
+        source: 'notification',
+        ...(input.sourceApp ? { sourceApp: input.sourceApp } : {}),
+      },
+      orderBy: [{ time: 'desc' }, { createdAt: 'desc' }],
+      take: 20,
+      select: { id: true, counterparty: true, description: true },
+    });
+    if (candidates.length === 0) return undefined;
+    const normalize = (value?: string | null) => (value || '').toLocaleLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+    const counterparty = normalize(input.counterparty);
+    const matched = counterparty
+      ? candidates.find(candidate => {
+          const existing = normalize(candidate.counterparty || candidate.description);
+          return existing && (existing === counterparty || existing.includes(counterparty) || counterparty.includes(existing));
+        })
+      : candidates[0];
+    return matched?.id;
   }
 
   /**
@@ -135,6 +283,7 @@ export class BillsService {
         where,
         include: {
           category: true,
+          relatedBill: { select: { id: true, amount: true, type: true, description: true, date: true, time: true } },
         },
         orderBy: orderBy === 'date'
           ? [
@@ -208,6 +357,7 @@ export class BillsService {
       },
       include: {
         category: true,
+        relatedBill: { select: { id: true, amount: true, type: true, description: true, date: true, time: true } },
       },
     });
 
@@ -251,12 +401,16 @@ export class BillsService {
     if (updateBillDto.categoryId !== undefined) {
       updateData.categoryId = updateBillDto.categoryId;
     }
+    if (updateBillDto.relatedBillId !== undefined) {
+      updateData.relatedBillId = updateBillDto.relatedBillId;
+    }
 
     return this.prisma.bill.update({
       where: { id },
       data: updateData,
       include: {
         category: true,
+        relatedBill: { select: { id: true, amount: true, type: true, description: true, date: true, time: true } },
       },
     });
   }

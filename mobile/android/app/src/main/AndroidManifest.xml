@@ -8,9 +8,12 @@
     <!-- 前台服务权限（用于 Headless JS） -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
     <!-- 唤醒锁权限（用于后台任务） -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- 请求忽略电池优化，确保支付通知监听在后台持续运行 -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!-- 接收开机广播权限（可选，用于开机自启） -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -23,6 +26,7 @@
 
     <!-- 麦克风权限（用于语音录制） -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <!-- MagicOS 等系统会额外限制应用可见性，显式声明常用支付与短信应用 -->
     <queries>
@@ -92,6 +96,36 @@
               android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
               android:value="payment_notification_processing" />
       </service>
+
+      <service
+          android:name=".shortcut.EdgeGestureService"
+          android:exported="false"
+          android:foregroundServiceType="specialUse">
+          <property
+              android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+              android:value="voice_edge_gesture" />
+      </service>
+
+      <!-- 独立语音悬浮层：录音和记账期间不启动主界面 -->
+      <service
+          android:name=".shortcut.VoiceCaptureService"
+          android:exported="false"
+          android:foregroundServiceType="microphone" />
+
+      <receiver
+          android:name=".shortcut.VoiceInputReceiver"
+          android:exported="false" />
+
+      <!-- 通知栏快捷设置中的语音输入入口 -->
+      <service
+          android:name=".shortcut.VoiceInputTileService"
+          android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+          android:exported="true"
+          android:label="知账语音">
+          <intent-filter>
+              <action android:name="android.service.quicksettings.action.QS_TILE" />
+          </intent-filter>
+      </service>
       
       <!-- 开机启动接收器（可选） -->
       <receiver
@@ -105,10 +139,11 @@
       <!-- 桌面账务总览组件 -->
       <receiver
           android:name=".widget.FinanceOverviewWidget"
-          android:exported="false">
+          android:exported="true">
           <intent-filter>
               <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-              <action android:name="com.zhizhang.widget.ACTION_REFRESH" />
+              <action android:name="com.zhizhang.widget.ACTION_CONFIG_CHANGED" />
+              <action android:name="com.zhizhang.widget.ACTION_DATA_CHANGED" />
           </intent-filter>
           <meta-data
               android:name="android.appwidget.provider"

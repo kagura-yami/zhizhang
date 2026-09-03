@@ -857,7 +857,7 @@ const chatSkeletonStyles = StyleSheet.create({
   },
 });
 
-export default function AIChatScreen() {
+export default function AIChatScreen({ autoVoice = false }: { autoVoice?: boolean }) {
   const styles = useStyles(createStyles);
   const { alert, confirm } = useAlert();
   const route = useRoute();
@@ -903,7 +903,26 @@ export default function AIChatScreen() {
   // 语音模式状态
   const [isVoiceMode, setIsVoiceMode] = useState(false); // 是否处于语音输入模式
   const [isRecording, setIsRecording] = useState(false); // 是否正在录音
+  const isRecordingRef = useRef(false);
   const [willCancel, setWillCancel] = useState(false); // 是否将要取消（上滑）
+
+  const activateVoiceMode = async (startImmediately = false) => {
+    const cfg = await storage.getItem<{ enabled?: boolean }>('voiceInputConfig').catch(() => null);
+    if (cfg?.enabled === false) {
+      alert('语音输入已关闭', '请在“我的 → 通用配置 → 语音输入”中重新开启。');
+      return;
+    }
+    setIsVoiceMode(true);
+    // 桌面组件按钮是系统 PendingIntent，无法把按下/松开事件传回应用；
+    // 点击后直接进入“按住说话”态并开始录音，用户在语音条上松开即可完成识别。
+    if (startImmediately) {
+      setTimeout(() => startRecording().catch(() => undefined), 120);
+    }
+  };
+
+  useEffect(() => {
+    if (autoVoice || (route.params as any)?.autoVoice) activateVoiceMode(true).catch(() => setIsVoiceMode(true));
+  }, [autoVoice]);
 
   // 侧边栏状态
   const [sidebarVisible, setSidebarVisible] = useState(false);
@@ -967,6 +986,8 @@ export default function AIChatScreen() {
   const startRecording = async () => {
     try {
       // 先设置 UI 状态，避免松手时 UI 还没反应
+      if (isRecordingRef.current) return;
+      isRecordingRef.current = true;
       setIsRecording(true);
 
       await audioRecorderService.startRecording((progress: RecordingProgress) => {
@@ -979,6 +1000,7 @@ export default function AIChatScreen() {
         });
       });
     } catch (err: any) {
+      isRecordingRef.current = false;
       setIsRecording(false);
       console.error('[Voice] 录音失败:', err);
       alert('录音失败', err.message || '无法开始录音');
@@ -987,6 +1009,7 @@ export default function AIChatScreen() {
 
   // 停止录音并发送
   const stopRecordingAndSend = async () => {
+    isRecordingRef.current = false;
     setIsRecording(false);
     stopWaveAnimation();
 
@@ -1020,7 +1043,7 @@ export default function AIChatScreen() {
       }
 
       // 调用 ASR 转写
-      const response = await aiService.transcribeAudio(result.base64, result.mimeType);
+      const response = await aiService.transcribeAudio(result.base64, result.mimeType, result.filePath);
 
       // 移除识别状态消息
       removeTranscribingMsg();
@@ -1043,6 +1066,7 @@ export default function AIChatScreen() {
 
   // 取消录音
   const cancelRecording = async () => {
+    isRecordingRef.current = false;
     setIsRecording(false);
     setWillCancel(false);
     willCancelRef.current = false;
@@ -1261,7 +1285,7 @@ export default function AIChatScreen() {
         console.log('[Gesture] 按下');
         willCancelRef.current = false;
         gestureHandledRef.current = false;
-        startRecording().catch(() => {});
+        if (!isRecordingRef.current) startRecording().catch(() => {});
       },
       onPanResponderMove: (e: GestureResponderEvent, gestureState: PanResponderGestureState) => {
         // 检测上滑距离

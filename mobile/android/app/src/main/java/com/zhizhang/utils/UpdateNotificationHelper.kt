@@ -24,14 +24,23 @@ object UpdateNotificationHelper {
     private const val CHANNEL_ID = "app_updates"
     private const val PREFS_NAME = "app_update_notifications"
     private const val LAST_NOTIFIED_VERSION = "last_notified_version"
+    private const val LAST_NOTIFIED_READY = "last_notified_package_ready"
 
     @Synchronized
-    fun notifyIfNeeded(context: Context, version: String, updateLog: String?): Boolean {
+    fun notifyIfNeeded(
+        context: Context,
+        version: String,
+        updateLog: String?,
+        packageReady: Boolean = false,
+    ): Boolean {
         if (version.isBlank() || !canPostNotifications(context)) return false
 
         val appContext = context.applicationContext
         val preferences = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        if (preferences.getString(LAST_NOTIFIED_VERSION, null) == version) {
+        val wasNotifiedReady = preferences.getBoolean(LAST_NOTIFIED_READY, false)
+        if (preferences.getString(LAST_NOTIFIED_VERSION, null) == version &&
+            (!packageReady || wasNotifiedReady)
+        ) {
             return true
         }
 
@@ -51,11 +60,21 @@ object UpdateNotificationHelper {
             )
             val detail = updateLog?.trim()?.takeIf { it.isNotEmpty() }
                 ?: "打开应用即可查看更新内容"
+            val contentText = if (packageReady) {
+                "版本 $version 已下载，打开知账即可安装"
+            } else {
+                "版本 $version 已发布，点击查看更新"
+            }
+            val detailText = buildString {
+                append("版本 $version 已发布")
+                if (packageReady) append("，安装包已在后台准备完成")
+                if (detail.isNotBlank()) append("\n").append(detail)
+            }
             val notification = NotificationCompat.Builder(appContext, CHANNEL_ID)
                 .setSmallIcon(com.zhizhang.R.mipmap.ic_launcher)
-                .setContentTitle("知帐有新版本")
-                .setContentText("版本 $version 已发布，点击查看更新")
-                .setStyle(NotificationCompat.BigTextStyle().bigText("版本 $version 已发布\n$detail"))
+                .setContentTitle("知账有新版本")
+                .setContentText(contentText)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(detailText))
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(true)
                 .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
@@ -64,7 +83,10 @@ object UpdateNotificationHelper {
                 .build()
             NotificationManagerCompat.from(appContext)
                 .notify("zhizhang_app_update", version.hashCode(), notification)
-            preferences.edit().putString(LAST_NOTIFIED_VERSION, version).apply()
+            preferences.edit()
+                .putString(LAST_NOTIFIED_VERSION, version)
+                .putBoolean(LAST_NOTIFIED_READY, packageReady)
+                .apply()
             true
         }.onFailure { error ->
             android.util.Log.w(TAG, "发送更新通知失败", error)

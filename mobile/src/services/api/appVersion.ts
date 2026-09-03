@@ -32,7 +32,8 @@ export const appVersionApi = {
     console.log('[AppVersion] 检查更新, 当前版本:', currentVersion);
     const response = await httpService.get<CheckUpdateResponse>(
       '/app-version/check',
-      { params: { currentVersion, platform: 'android' } }
+      // 更新接口禁止缓存；时间戳同时兼容仍会缓存 GET 的系统代理/网关。
+      { params: { currentVersion, platform: 'android', _ts: Date.now() } }
     );
     console.log('[AppVersion] 检查更新响应:', JSON.stringify(response));
     // httpService.get 已经返回 response.data，所以直接访问 .data
@@ -48,7 +49,7 @@ export const appVersionApi = {
     try {
       const response = await httpService.get<AppVersionInfo>(
         '/app-version/latest',
-        { params: { platform: 'android' } }
+        { params: { platform: 'android', _ts: Date.now() } }
       );
       return (response as any).data || response;
     } catch {

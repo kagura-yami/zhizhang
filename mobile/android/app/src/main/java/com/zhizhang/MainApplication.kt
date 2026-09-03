@@ -12,9 +12,12 @@ import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.facebook.react.defaults.DefaultReactNativeHost
 import com.zhizhang.notification.PaymentNotificationPackage
 import com.zhizhang.utils.InstallApkPackage
+import com.zhizhang.widget.WidgetSettingsPackage
 import com.zhizhang.utils.SentryLogger
 import com.zhizhang.auth.AuthTokenPackage
 import com.zhizhang.hotupdate.HotUpdatePackage
+import com.zhizhang.shortcut.VoiceShortcutPackage
+import com.zhizhang.shortcut.WechatLinkPackage
 import com.zhizhang.update.UpdateCheckScheduler
 import com.facebook.react.ReactInstanceManager
 import com.facebook.react.bridge.JSBundleLoader
@@ -86,6 +89,9 @@ class MainApplication : Application(), ReactApplication {
               add(InstallApkPackage())
               add(AuthTokenPackage())
               add(HotUpdatePackage())
+              add(WidgetSettingsPackage())
+              add(VoiceShortcutPackage())
+              add(WechatLinkPackage())
             }
 
         override fun getJSMainModuleName(): String = "index"

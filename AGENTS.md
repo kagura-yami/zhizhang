@@ -1,10 +1,10 @@
-# 知帐项目协作说明
+# 知账项目协作说明
 
 ## 项目边界
 
 - `backend/`：NestJS 10 + Prisma 6 后端，默认监听本机 `3006`。
-- `mobile/`：React Native 0.81 Android 客户端，应用名“知帐”，包名 `com.zhizhang`，JS 注册名 `zhizhang`。
-- `Bot/`：知帐微信机器人内测群助手（企业微信自建应用），独立运行在本机 `3007`，不提交到 GitHub。
+- `mobile/`：React Native 0.81 Android 客户端，应用名“知账”，包名 `com.zhizhang`，JS 注册名 `zhizhang`。
+- `Bot/`：知账微信机器人内测群助手（企业微信自建应用），独立运行在本机 `3007`，不提交到 GitHub。
 - `docs/`：部署、架构和交接文档；`backend/public/downloads/` 与 `backend/uploads/` 是运行数据，不属于 Git 源码。
 
 ## 常用入口

@@ -67,7 +67,7 @@ export function useHotUpdate(options: UseHotUpdateOptions = {}) {
   }, []);
 
   const applyUpdate = useCallback(async () => {
-    if (!state.bundleInfo) return;
+    if (!state.bundleInfo) return false;
 
     const bundle = state.bundleInfo;
     setState(prev => ({
@@ -90,12 +90,14 @@ export function useHotUpdate(options: UseHotUpdateOptions = {}) {
         status: 'done',
         progress: 100,
       }));
+      return true;
     } else {
       setState(prev => ({
         ...prev,
         status: 'error',
         error: '更新失败，请稍后重试',
       }));
+      return false;
     }
   }, [state.bundleInfo]);
 

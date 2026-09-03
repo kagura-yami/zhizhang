@@ -2,7 +2,7 @@
 
 ## Analysis Purpose
 
-梳理知帐的代码边界、运行依赖、持久化数据与访问链路，并记录本机 Docker + 阿里云 ECS FRP 的实际部署方式。
+梳理知账的代码边界、运行依赖、持久化数据与访问链路，并记录本机 Docker + 阿里云 ECS FRP 的实际部署方式。
 
 ## Codebase Structure
 
@@ -106,6 +106,6 @@ cd D:\Dev\Projects\Zhizhang\backend
 - 生产 API 配置保存在被 Git 忽略的 `mobile/.env.production`，当前地址为 `https://note.kagurayami.top/`。
 - release 包禁止明文 HTTP，合并后的 Manifest 中 `usesCleartextTraffic=false`。
 - release 签名文件为 `mobile/android/app/zhizhang-release.keystore`，密码配置为 `mobile/android/keystore.properties`；两者均被 Git 忽略。
-- 必须将签名文件和密码配置加密备份到项目目录之外。当前包名为 `com.zhizhang`，签名丢失后无法覆盖升级已安装的知帐。
+- 必须将签名文件和密码配置加密备份到项目目录之外。当前包名为 `com.zhizhang`，签名丢失后无法覆盖升级已安装的知账。
 - 发布接口为本地 `POST http://127.0.0.1:3006/app-version/upload`；上传成功后，版本信息可从 `https://note.kagurayami.top/app-version/latest?platform=android` 查询。
 - Outlook OAuth2 变量只配置在服务器 `.env`：`OUTLOOK_OAUTH_CLIENT_ID`、`OUTLOOK_OAUTH_CLIENT_SECRET`、`OUTLOOK_OAUTH_REDIRECT_URI`；真实值不得写入 Git。回调地址为 `https://note.kagurayami.top/invoice-mailbox/oauth/outlook/callback`。个人 Microsoft 账号使用 Microsoft Graph `Mail.Read` 委托权限读取发票邮件。

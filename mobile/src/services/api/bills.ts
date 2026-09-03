@@ -10,6 +10,7 @@ import type {
   BillStatistics 
 } from '../../types/bill';
 import type { ApiResponse, PaginatedResponse } from '../../types/api';
+import { widgetSettingsService } from '../widgetSettings';
 
 // 账单列表响应类型别名
 type BillListResponse = PaginatedResponse<BillData>;
@@ -19,7 +20,9 @@ class BillsService {
    * 创建账单
    */
   async createBill(data: CreateBillDto): Promise<ApiResponse<BillData>> {
-    return httpService.post('/bills', data);
+    const response = await httpService.post('/bills', data);
+    if (response.success) void widgetSettingsService.refresh();
+    return response;
   }
 
   /**
@@ -42,14 +45,18 @@ class BillsService {
    * 更新账单
    */
   async updateBill(id: number, data: UpdateBillDto): Promise<ApiResponse<BillData>> {
-    return httpService.patch(`/bills/${id}`, data);
+    const response = await httpService.patch(`/bills/${id}`, data);
+    if (response.success) void widgetSettingsService.refresh();
+    return response;
   }
 
   /**
    * 删除账单
    */
   async deleteBill(id: number): Promise<ApiResponse> {
-    return httpService.delete(`/bills/${id}`);
+    const response = await httpService.delete(`/bills/${id}`);
+    if (response.success) void widgetSettingsService.refresh();
+    return response;
   }
 
   /**

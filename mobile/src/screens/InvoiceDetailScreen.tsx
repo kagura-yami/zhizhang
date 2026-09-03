@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import ReactNativeBlobUtil from 'react-native-blob-util';
-import { ExternalLink, FileText } from 'lucide-react-native';
+import { Check, Edit3, ExternalLink, FileText, X } from 'lucide-react-native';
 import { useAlert, useTheme } from '../providers';
 import { invoiceMailboxService } from '../services/api/invoiceMailbox';
 import type { InvoiceDocument } from '../types/invoice';
@@ -13,13 +13,16 @@ export default function InvoiceDetailScreen({ route }: any) {
   const [invoice, setInvoice] = useState<InvoiceDocument | null>(null);
   const [loading, setLoading] = useState(true);
   const [opening, setOpening] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(Boolean(route?.params?.editMode));
+  const [draft, setDraft] = useState({ buyer: '', seller: '', invoiceNumber: '', amount: '', invoiceDate: '' });
   const styles = createStyles(colors);
 
   useEffect(() => {
     let mounted = true;
     invoiceMailboxService.getInvoice(Number(route?.params?.invoiceId)).then((result) => {
       if (!result.success || !result.data) throw new Error(result.message || '发票加载失败');
-      if (mounted) setInvoice(result.data);
+      if (mounted) { setInvoice(result.data); setDraft({ buyer: result.data.buyer || result.data.invoiceCategory || '', seller: result.data.seller || '', invoiceNumber: result.data.invoiceNumber || '', amount: result.data.amount == null ? '' : String(result.data.amount), invoiceDate: result.data.invoiceDate ? result.data.invoiceDate.slice(0, 10) : '' }); }
     }).catch((error: any) => alert('加载失败', error?.message || '请稍后重试'))
       .finally(() => mounted && setLoading(false));
     return () => { mounted = false; };
@@ -37,6 +40,16 @@ export default function InvoiceDetailScreen({ route }: any) {
     } finally { setOpening(false); }
   };
 
+  const save = async () => {
+    if (!invoice) return;
+    setSaving(true);
+    try {
+      const result = await invoiceMailboxService.updateInvoice(invoice.id, { buyer: draft.buyer, seller: draft.seller, invoiceNumber: draft.invoiceNumber, amount: draft.amount === '' ? null : Number(draft.amount), invoiceDate: draft.invoiceDate || null });
+      if (!result.success || !result.data) throw new Error(result.message || '保存失败');
+      setInvoice(result.data); setEditing(false); alert('保存成功', '发票信息已更新');
+    } catch (error: any) { alert('保存失败', error?.message || '请检查填写内容'); } finally { setSaving(false); }
+  };
+
   if (loading) return <View style={[styles.center, { backgroundColor: colors.background }]}><ActivityIndicator color={colors.primary} /></View>;
   if (!invoice) return <View style={[styles.center, { backgroundColor: colors.background }]}><Text style={styles.muted}>发票不存在或已被删除</Text></View>;
   const rows: Array<[string, string]> = [
@@ -51,8 +64,11 @@ export default function InvoiceDetailScreen({ route }: any) {
   ];
   return <ScrollView style={{ backgroundColor: colors.background }} contentContainerStyle={styles.content}>
     <View style={styles.card}>
-      <View style={styles.titleRow}><FileText size={22} color={colors.primary} /><Text style={styles.title} numberOfLines={2}>{invoice.fileName}</Text></View>
-      {rows.map(([label, value]) => <View style={styles.infoRow} key={label}><Text style={styles.label}>{label}</Text><Text style={styles.value}>{value}</Text></View>)}
+      <View style={styles.titleRow}><FileText size={22} color={colors.primary} /><Text style={styles.title} numberOfLines={2}>{invoice.fileName}</Text><TouchableOpacity style={styles.editToggle} onPress={() => setEditing((value) => !value)} accessibilityRole="button" accessibilityLabel={editing ? '取消编辑' : '编辑发票'}>{editing ? <X size={18} color={colors.textSecondary} /> : <Edit3 size={18} color={colors.primary} />}</TouchableOpacity></View>
+      {editing ? <View style={styles.editForm}>
+        {([['buyer', '发票抬头（购方）'], ['seller', '销售方'], ['invoiceNumber', '发票号码'], ['amount', '金额'], ['invoiceDate', '开票日期 YYYY-MM-DD']] as const).map(([key, label]) => <View style={styles.editRow} key={key}><Text style={styles.label}>{label}</Text><TextInput style={styles.editInput} value={draft[key]} onChangeText={(value) => setDraft((current) => ({ ...current, [key]: value }))} keyboardType={key === 'amount' ? 'decimal-pad' : 'default'} placeholder="未填写" placeholderTextColor={colors.textTertiary} /></View>)}
+        <TouchableOpacity style={styles.saveButton} onPress={save} disabled={saving}><Check size={18} color="#FFFFFF" /><Text style={styles.saveText}>{saving ? '保存中…' : '保存修改'}</Text></TouchableOpacity>
+      </View> : rows.map(([label, value]) => <View style={styles.infoRow} key={label}><Text style={styles.label}>{label}</Text><Text style={styles.value}>{value}</Text></View>)}
     </View>
     <TouchableOpacity style={styles.previewButton} onPress={openAttachment} disabled={opening} accessibilityRole="button">
       <ExternalLink size={18} color="#FFFFFF" /><Text style={styles.previewText}>{opening ? '正在打开…' : '查看原始附件'}</Text>
@@ -67,6 +83,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   card: { backgroundColor: colors.surface, borderWidth: borderWidth.thin, borderColor: colors.stroke, borderRadius: borderRadius.card, padding: spacing.md, ...shadow.small },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingBottom: spacing.sm, borderBottomWidth: borderWidth.thin, borderBottomColor: colors.divider },
   title: { flex: 1, color: colors.textPrimary, fontSize: 16, fontWeight: '800' },
+  editToggle: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: borderRadius.small, backgroundColor: colors.primaryLight },
   infoRow: { flexDirection: 'row', paddingTop: spacing.sm, gap: spacing.sm },
   label: { width: 108, color: colors.textSecondary, fontSize: 12 },
   value: { flex: 1, color: colors.textPrimary, fontSize: 13, fontWeight: '600' },
@@ -75,5 +92,10 @@ const createStyles = (colors: any) => StyleSheet.create({
   sectionTitle: { color: colors.textPrimary, fontSize: 15, fontWeight: '800', marginBottom: spacing.sm },
   extracted: { color: colors.textSecondary, fontSize: 12, lineHeight: 18 },
   hint: { color: colors.textTertiary, fontSize: 12, textAlign: 'center', marginTop: spacing.md },
+  editForm: { paddingTop: spacing.sm },
+  editRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingTop: spacing.sm },
+  editInput: { flex: 1, minHeight: 42, borderWidth: borderWidth.thin, borderColor: colors.divider, borderRadius: borderRadius.input, paddingHorizontal: spacing.sm, color: colors.textPrimary, fontSize: 13 },
+  saveButton: { marginTop: spacing.md, minHeight: 46, borderRadius: borderRadius.button, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: spacing.xs },
+  saveText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
   muted: { color: colors.textSecondary },
 });

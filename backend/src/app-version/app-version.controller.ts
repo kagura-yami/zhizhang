@@ -12,6 +12,7 @@ import {
   UseInterceptors,
   UploadedFile,
   Req,
+  Header,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -49,6 +50,9 @@ export class AppVersionController {
    */
   @ApiOperation({ summary: '检查更新', description: '检查是否有新版本可用' })
   @ApiResponse({ status: 200, description: '检查成功' })
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  @Header('Pragma', 'no-cache')
+  @Header('Expires', '0')
   @Get('check')
   async checkUpdate(
     @Query('currentVersion') currentVersion: string,
@@ -71,6 +75,9 @@ export class AppVersionController {
    */
   @ApiOperation({ summary: '获取最新版本' })
   @ApiResponse({ status: 200, description: '获取成功' })
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  @Header('Pragma', 'no-cache')
+  @Header('Expires', '0')
   @Get('latest')
   async getLatest(@Query('platform') platform?: string) {
     try {

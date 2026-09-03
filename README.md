@@ -1,13 +1,13 @@
-# 知帐
+# 知账
 
-![知帐项目图标](mobile/public/icons/logo.png)
+![知账项目图标](mobile/public/icons/logo.png)
 
-知帐（zhizhang）是一款面向 Android 的智能记账应用，支持手动、语音、拍照、AI 对话和支付通知自动记账，并提供统计图表、预算、财务目标和电子发票中心。
+知账（zhizhang）是一款面向 Android 的智能记账应用，支持手动、语音、拍照、AI 对话和支付通知自动记账，并提供统计图表、预算、财务目标和电子发票中心。
 
 ## 当前版本
 
-- Android：`0.0.64`
-- APK：[下载最新版](https://note.kagurayami.top/downloads/app-latest.apk) · [0.0.64](https://note.kagurayami.top/downloads/app-v0.0.64.apk)
+- Android：`0.0.65`
+- APK：[下载最新版](https://note.kagurayami.top/downloads/app-latest.apk) · [0.0.65](https://note.kagurayami.top/downloads/app-v0.0.65.apk)
 - 生产 API：`https://note.kagurayami.top/`
 - API 文档：`https://note.kagurayami.top/api-docs`
 
@@ -109,7 +109,7 @@ Android App
       └── 阿里云 ECS HTTPS 入口
           └── FRP :7017
               └── 本机 remote-frpc
-                  └── Docker 知帐 API :3006
+                  └── Docker 知账 API :3006
                       └── Docker PostgreSQL
 ```
 

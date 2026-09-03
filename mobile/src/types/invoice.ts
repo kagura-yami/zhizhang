@@ -11,6 +11,22 @@ export interface InvoiceMailbox {
   lastError?: string | null;
   invoiceCount: number;
   oauthConnected?: boolean;
+  syncProgress?: InvoiceSyncProgress | null;
+}
+
+export interface InvoiceSyncProgress {
+  phase: 'starting' | 'scanning' | 'completed' | 'error' | string;
+  scanned: number;
+  total: number;
+  imported: number;
+  matched: number;
+  candidateMessages: number;
+  pdfAttachments: number;
+  linkCandidates: number;
+  linkedPdfAttachments: number;
+  startedAt?: string;
+  updatedAt?: string;
+  error?: string;
 }
 
 export interface InvoiceDocument {

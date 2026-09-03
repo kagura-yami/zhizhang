@@ -1,6 +1,6 @@
 {
   "name": "zhizhang",
-  "version": "0.0.64",
+  "version": "0.0.133",
   "private": true,
   "scripts": {
     "android": "react-native run-android",
@@ -19,7 +19,7 @@
     "build:dev": "cd android && gradlew assembleDebug",
     "build:prod": "cd android && gradlew assembleRelease",
     "clean": "react-native clean-project-auto",
-    "postinstall": "npx react-native-asset",
+    "postinstall": "node scripts/patch-rnfs.js && npx react-native-asset",
     "release": "node scripts/release.js patch",
     "release:patch": "node scripts/release.js patch",
     "release:minor": "node scripts/release.js minor",
@@ -32,7 +32,7 @@
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/datetimepicker": "^8.4.4",
-    "@react-native/gradle-plugin": "^0.81.1",
+    "@react-native/gradle-plugin": "0.81.4",
     "@react-native/new-app-screen": "0.81.4",
     "@react-navigation/bottom-tabs": "^7.4.7",
     "@react-navigation/native": "^7.1.17",
@@ -40,7 +40,6 @@
     "@sentry/react-native": "^7.10.0",
     "@tanstack/react-query": "^5.90.19",
     "axios": "^1.12.2",
-    "zhizhang": "file:..",
     "lucide-react-native": "^0.563.0",
     "mobx": "^6.15.0",
     "mobx-react-lite": "^4.1.1",

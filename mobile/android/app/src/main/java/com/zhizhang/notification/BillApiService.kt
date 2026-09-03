@@ -69,7 +69,12 @@ class BillApiService(private val context: Context) {
      * @param callback 回调函数，参数为分类列表，失败时为 null
      */
     fun getExpenseCategories(callback: (List<CategoryData>?) -> Unit) {
-        val url = "${getBaseUrl()}/categories?type=expense"
+        getCategories("expense", callback)
+    }
+
+    /** 获取指定类型的分类列表，供收入和支出自动记账共用。 */
+    fun getCategories(type: String, callback: (List<CategoryData>?) -> Unit) {
+        val url = "${getBaseUrl()}/categories?type=$type"
         Log.i(TAG, "【获取分类】URL: $url")
 
         val request = buildAuthenticatedRequest(url)
@@ -132,9 +137,13 @@ class BillApiService(private val context: Context) {
         amount: Double,
         categoryId: Int?,
         description: String?,
+        type: String = "expense",
         paymentChannel: String? = null,
         counterparty: String? = null,
         sourceApp: String? = null,
+        isRefund: Boolean = false,
+        dedupeKey: String? = null,
+        dedupeMeta: String? = null,
         occurredAt: Long = System.currentTimeMillis(),
         callback: (Boolean, String?) -> Unit
     ) {
@@ -148,7 +157,7 @@ class BillApiService(private val context: Context) {
 
         val requestBody = CreateBillRequest(
             amount = amount,
-            type = "expense",
+            type = type,
             categoryId = categoryId,
             description = description,
             date = dateFormat.format(eventDate),
@@ -156,7 +165,10 @@ class BillApiService(private val context: Context) {
             paymentChannel = paymentChannel,
             counterparty = counterparty,
             source = "notification",
-            sourceApp = sourceApp
+            sourceApp = sourceApp,
+            isRefund = isRefund,
+            dedupeKey = dedupeKey,
+            dedupeMeta = dedupeMeta
         )
 
         val jsonBody = gson.toJson(requestBody)

@@ -178,7 +178,7 @@ export default function LoginScreen() {
             <View style={styles.logoContainer}>
               <Image source={require('../../../public/icons/logo.png')} style={styles.logoImage} />
             </View>
-            <Text style={styles.title}>知帐</Text>
+            <Text style={styles.title}>知账</Text>
             <Text style={styles.subtitle}>你的生活理财助手</Text>
           </View>
 

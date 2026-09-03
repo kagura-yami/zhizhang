@@ -7,6 +7,7 @@ import { storage } from '../../utils/storage';
 import { STORAGE_KEYS } from '../../constants/app';
 import env from '../../config/env';
 import { getAuthSession } from '../security';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ApiResponse } from '../../types/api';
 import type {
   AIModelConfig,
@@ -141,7 +142,35 @@ class AIService {
   async transcribeAudio(
     audioBase64: string,
     mimeType?: string,
+    filePath?: string,
   ): Promise<ApiResponse<{ text: string }>> {
+    // 用户配置了自定义语音接口时优先直连，不影响默认知账接口。
+    try {
+      const raw = await AsyncStorage.getItem('voiceInputConfig');
+      const cfg = raw ? JSON.parse(raw) as { enabled?: boolean; apiUrl?: string; apiKey?: string; model?: string; protocol?: string } : null;
+      if (cfg?.enabled && cfg.apiUrl?.trim()) {
+        const headers: Record<string, string> = {};
+        if (cfg.apiKey?.trim()) headers.Authorization = `Bearer ${cfg.apiKey.trim()}`;
+        let request: any;
+        if (cfg.protocol === 'openai-compatible' && filePath) {
+          const form = new FormData();
+          form.append('file', { uri: filePath, type: mimeType || 'audio/mp4', name: 'voice.m4a' } as any);
+          if (cfg.model?.trim()) form.append('model', cfg.model.trim());
+          request = { method: 'POST', headers, body: form };
+        } else {
+          headers['Content-Type'] = 'application/json';
+          request = { method: 'POST', headers, body: JSON.stringify({ audioBase64, mimeType: mimeType || 'audio/mp4', model: cfg.model?.trim() || undefined }) };
+        }
+        const response = await fetch(cfg.apiUrl.trim(), request);
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload?.message || payload?.error || `语音接口请求失败（${response.status}）`);
+        const text = payload?.text || payload?.data?.text || payload?.result?.text || payload?.transcript;
+        if (!text) throw new Error('语音接口未返回 text 字段');
+        return { success: true, data: { text: String(text) } };
+      }
+    } catch (error: any) {
+      return { success: false, message: error?.message || '自定义语音接口调用失败' } as ApiResponse<{ text: string }>;
+    }
     return httpService.post('/ai/asr/transcribe', { audioBase64, mimeType }, { timeout: 30000 });
   }
 

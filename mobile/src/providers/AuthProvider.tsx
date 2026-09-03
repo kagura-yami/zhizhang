@@ -74,30 +74,42 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         if (session) {
-          logger.info(TAG, '发现已保存的登录状态，正在验证...');
+          logger.info(TAG, '发现已保存的登录状态，先使用本地会话进入应用，再后台验证...');
 
-          // 验证 token 是否有效
-          try {
-            const response = await authService.getProfile();
+          // 不再阻塞首屏等待 profile 网络请求；网络慢时用户仍可立即查看本地页面，
+          // 后台验证成功后更新资料，只有明确收到 401 才清除会话。
+          await setNativeToken(session.token);
+          setState({
+            isLoggedIn: true,
+            isLoading: false,
+            user: session.user,
+            token: session.token,
+          });
+
+          void authService.getProfile().then(async response => {
             if (response.success && response.data) {
-              logger.info(TAG, '登录状态验证成功');
-              // 同步 Token 到原生层（供 Android 悬浮窗使用）
-              await setNativeToken(session.token);
-              setState({
-                isLoggedIn: true,
-                isLoading: false,
-                user: response.data,
-                token: session.token,
-              });
+              await saveAuthSession(session.token, response.data);
+              setState(prev => ({ ...prev, user: response.data! }));
+              logger.info(TAG, '后台登录状态验证成功');
               return;
             }
-          } catch (error) {
-            logger.warn(TAG, 'Token 验证失败，清除登录状态');
+            if (response.code === 401) {
+              throw Object.assign(new Error('登录状态已失效'), { code: 401 });
+            }
+          }).catch(async error => {
+            const status = error?.code ?? error?.response?.status;
+            if (status !== 401) {
+              logger.warn(TAG, '后台验证暂时失败，保留本地会话等待下次重试');
+              return;
+            }
             await clearAuthSession();
             await storage.removeItem(STORAGE_KEYS.USER_TOKEN);
             await storage.removeItem(STORAGE_KEYS.USER_INFO);
             await clearNativeToken();
-          }
+            setState({ isLoggedIn: false, isLoading: false, user: null, token: null });
+            logger.warn(TAG, '登录状态已失效，已退出登录');
+          });
+          return;
         }
 
         logger.info(TAG, '未找到有效的登录状态');

@@ -11,9 +11,20 @@ export class AsrService {
    * 将音频 base64 作为 input_audio 内容块发送
    */
   async transcribe(audioBase64: string, mimeType: string = 'audio/mp4'): Promise<string> {
+    const localUrl = process.env.ASR_LOCAL_URL?.trim();
     const apiUrl = process.env.ASR_API_URL;
     const apiKey = process.env.ASR_API_KEY;
     const model = process.env.ASR_MODEL || 'qwen3-asr-flash';
+
+    if (localUrl) {
+      try {
+        return await this.transcribeLocal(localUrl, audioBase64, mimeType);
+      } catch (error: any) {
+        // 本地服务暂时不可用时，若仍配置了外部服务则自动兜底，避免语音记账中断。
+        if (!apiUrl || !apiKey) throw error;
+        this.logger.warn(`[本地 ASR 不可用] ${error?.message || error}，切换外部 ASR`);
+      }
+    }
 
     if (!apiUrl || !apiKey) {
       throw new Error('ASR 服务未配置，请设置 ASR_API_URL 和 ASR_API_KEY 环境变量');
@@ -77,5 +88,44 @@ export class AsrService {
       (usage ? ` | tokens: ${usage.total_tokens ?? '-'}` : ''),
     );
     return text;
+  }
+
+  /**
+   * 调用本机常驻的 faster-whisper 服务。
+   * 服务只监听本机地址，使用 JSON 传输 Base64，避免后端容器内还要安装音频编解码依赖。
+   */
+  private async transcribeLocal(localUrl: string, audioBase64: string, mimeType: string): Promise<string> {
+    const startTime = Date.now();
+    const buffer = Buffer.from(audioBase64, 'base64');
+    this.logger.log(`[本地 ASR 开始] 音频大小: ${(buffer.length / 1024).toFixed(1)}KB, MIME: ${mimeType}`);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), Number(process.env.ASR_TIMEOUT_MS || 120000));
+    try {
+      const response = await fetch(localUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audioBase64, mimeType }),
+        signal: controller.signal,
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        this.logger.error(`[本地 ASR 失败] ${response.status} 耗时: ${Date.now() - startTime}ms`);
+        throw new Error(payload?.detail || payload?.message || `本地语音识别服务返回错误: ${response.status}`);
+      }
+      const text = payload?.text || payload?.data?.text || payload?.result?.text;
+      if (!text || typeof text !== 'string') {
+        throw new Error('本地语音识别未返回结果');
+      }
+      this.logger.log(`[本地 ASR 完成] 耗时: ${Date.now() - startTime}ms | 结果: "${text.substring(0, 80)}${text.length > 80 ? '...' : ''}"`);
+      return text.trim();
+    } catch (error: any) {
+      if (error?.name === 'AbortError') {
+        throw new Error('本地语音识别超时，请稍后重试');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 }

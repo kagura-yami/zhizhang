@@ -33,5 +33,8 @@ data class CreateBillRequest(
     val paymentChannel: String?,
     val counterparty: String?,
     val source: String,
-    val sourceApp: String?
+    val sourceApp: String?,
+    val isRefund: Boolean = false,
+    val dedupeKey: String? = null,
+    val dedupeMeta: String? = null
 )

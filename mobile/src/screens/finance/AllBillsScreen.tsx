@@ -354,6 +354,7 @@ const AllBillsScreen: React.FC = () => {
                           type: bill.type,
                           date: `${occurredAt.toLocaleDateString('zh-CN')} ${occurredAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })}`,
                           description: bill.description,
+                          relatedBill: bill.relatedBill,
                           icon: bill.category?.icon || '📝',
                         }}
                         onPress={() => navigation.navigate('BillDetail', { billId: bill.id })}

@@ -29,18 +29,25 @@ class PaymentNotificationService : NotificationListenerService() {
         private const val KEY_MONITORED_APPS = "monitored_apps"
         private const val KEY_FILTER_KEYWORDS = "filter_keywords"
         private const val KEY_CONFIG_VERSION = "config_version"
-        private const val CURRENT_CONFIG_VERSION = 33
+        private const val KEY_AUTO_RECORD_ENABLED = "auto_record_enabled"
+        private const val CURRENT_CONFIG_VERSION = 35
 
         const val ACTION_PAYMENT_DETECTED = "com.zhizhang.PAYMENT_DETECTED"
         const val EXTRA_PAYMENT_DATA = "payment_data"
 
         private val DEFAULT_PAYMENT_KEYWORDS = listOf(
-            "支付成功", "付款成功", "扣款成功", "交易成功", "已支付", "消费", "支出"
+            "支付成功", "付款成功", "扣款成功", "交易成功", "已支付", "消费", "支出",
+            "付款码支付", "付款码付款", "自动扣款", "自动扣费", "免密支付", "免密扣款"
         )
 
         private val DEFAULT_APP_NAMES = mapOf(
             PaymentNotificationParser.WECHAT_PACKAGE to "微信",
-            PaymentNotificationParser.ALIPAY_PACKAGE to "支付宝"
+            PaymentNotificationParser.ALIPAY_PACKAGE to "支付宝",
+            "com.hihonor.mms" to "短信",
+            "com.android.mms" to "短信",
+            "com.android.mms.service" to "短信服务",
+            "com.google.android.apps.messaging" to "Google 信息",
+            PaymentNotificationParser.ICBC_PACKAGE to "中国工商银行"
         )
 
         private val LEGACY_AUTO_ENABLED_PACKAGES =
@@ -55,7 +62,7 @@ class PaymentNotificationService : NotificationListenerService() {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private val configChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == KEY_MONITORED_APPS || key == KEY_FILTER_KEYWORDS) {
+        if (key == KEY_MONITORED_APPS || key == KEY_FILTER_KEYWORDS || key == KEY_AUTO_RECORD_ENABLED) {
             loadMonitoringConfig()
         }
     }
@@ -63,7 +70,12 @@ class PaymentNotificationService : NotificationListenerService() {
     private val heartbeatRunnable = object : Runnable {
         override fun run() {
             Log.i(TAG, "Service 心跳 - 监听 ${supportedPackages.size} 个应用")
-            autoBillRecorder.retryPending()
+            if (isAutoRecordEnabled()) {
+                autoBillRecorder.retryPending()
+                // 通知监听服务短暂断开时，onNotificationPosted 可能已经错过；
+                // 对仍停留在通知中心的支付通知做补偿扫描，指纹去重保证不会重复记账。
+                scanActivePaymentNotifications()
+            }
             mainHandler.postDelayed(this, 60_000L)
         }
     }
@@ -87,14 +99,20 @@ class PaymentNotificationService : NotificationListenerService() {
             getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .unregisterOnSharedPreferenceChangeListener(configChangeListener)
         }
+        runCatching { autoBillRecorder.shutdown() }
         Log.i(TAG, "支付通知服务销毁")
         super.onDestroy()
     }
 
     override fun onListenerConnected() {
         super.onListenerConnected()
-        Log.i(TAG, "通知监听服务已连接，自动记账已启用")
-        autoBillRecorder.retryPending()
+        if (isAutoRecordEnabled()) {
+            Log.i(TAG, "通知监听服务已连接，自动记账已启用")
+            autoBillRecorder.retryPending()
+            scanActivePaymentNotifications()
+        } else {
+            Log.i(TAG, "通知监听服务已连接，自动记账已关闭")
+        }
     }
 
     override fun onListenerDisconnected() {
@@ -106,6 +124,14 @@ class PaymentNotificationService : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
+        if (!isAutoRecordEnabled()) {
+            return
+        }
+        processNotification(sbn)
+    }
+
+    /** 处理单条通知，供实时回调和连接/心跳补偿扫描共用。 */
+    private fun processNotification(sbn: StatusBarNotification?) {
         if (sbn == null || sbn.packageName !in supportedPackages) {
             return
         }
@@ -129,7 +155,15 @@ class PaymentNotificationService : NotificationListenerService() {
                 packageName = sbn.packageName,
                 rawContent = content.allContent(),
                 match = match,
-                occurredAt = sbn.postTime.takeIf { it > 0 } ?: System.currentTimeMillis()
+                notificationKey = sbn.key,
+                notificationId = sbn.id,
+                notificationTag = sbn.tag,
+                notificationGroupKey = sbn.groupKey,
+                // 银行正文通常包含“8月31日16:10”这类实际交易时间，优先使用解析结果；
+                // 正文没有时间时才退回通知发布时间。
+                occurredAt = match.occurredAt?.takeIf { it > 0 }
+                    ?: sbn.postTime.takeIf { it > 0 }
+                    ?: System.currentTimeMillis()
             )
             if (queued) {
                 SentryLogger.addBreadcrumb(
@@ -143,6 +177,21 @@ class PaymentNotificationService : NotificationListenerService() {
             SentryLogger.e(TAG, "处理支付通知失败", e)
         }
     }
+
+    /** 扫描当前仍在通知中心的支付通知，补偿监听服务短暂断开造成的漏记。 */
+    private fun scanActivePaymentNotifications() {
+        runCatching {
+            activeNotifications.orEmpty()
+                .filter { it.packageName in supportedPackages }
+                .forEach(::processNotification)
+        }.onFailure { error ->
+            Log.w(TAG, "扫描活动通知失败", error)
+        }
+    }
+
+    private fun isAutoRecordEnabled(): Boolean =
+        getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_AUTO_RECORD_ENABLED, true)
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) = Unit
 

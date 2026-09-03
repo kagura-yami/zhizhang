@@ -27,6 +27,7 @@ import {
 import { DashboardScreen } from '../screens/dashboard';
 import { ReportsScreen } from '../screens/reports';
 import { AIChatScreen, AIChatSessionsScreen } from '../screens/ai';
+import VoiceInputOverlay from '../components/VoiceInputOverlay';
 import { LoginScreen, UserAgreementScreen, PrivacyPolicyScreen, EditProfileScreen } from '../screens/auth';
 import FinancialGoalScreen from '../screens/FinancialGoalScreen';
 import BudgetScreen from '../screens/BudgetScreen';
@@ -35,7 +36,7 @@ import InvoiceCenterScreen from '../screens/InvoiceCenterScreen';
 import InvoiceDetailScreen from '../screens/InvoiceDetailScreen';
 
 import { useTheme, useAuth } from '../providers';
-import { spacing, borderRadius, borderWidth, shadow } from '../theme/spacing';
+import { spacing, borderRadius, borderWidth } from '../theme/spacing';
 import { ThemeColors } from '../theme/colors';
 import '../types/navigation';
 
@@ -269,6 +270,7 @@ function MainNavigator({ navigation }: { navigation: any }) {
         {renderScreen()}
       </View>
       <BottomTabBar activeTab={activeTab} onTabPress={handleTabPress} colors={colors} />
+      <VoiceInputOverlay />
     </SafeAreaView>
   );
 }
