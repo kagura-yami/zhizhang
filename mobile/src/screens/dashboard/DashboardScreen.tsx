@@ -18,20 +18,23 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { useQuery } from '@tanstack/react-query';
 import { ThemeColors } from '../../theme/colors';
 import { borderRadius, borderWidth, spacing, shadow } from '../../theme/spacing';
-import { ProgressBar, BrutalPressable } from '../../components/ui';
+import { BrutalPressable } from '../../components/ui';
 import { HomeCharts } from '../../components/business';
 import { DashboardSkeleton } from '../../components/skeleton';
-import { useDashboard, useHomeDisplayPreference, useStyles } from '../../hooks';
+import { useHomeDisplayPreference, useStyles } from '../../hooks';
+import { useDashboard } from '../../hooks/useDashboard';
+import { useAuth } from '../../providers';
+import { useSocialResource, Action, Status } from '../social/shared';
+import { httpService } from '../../services/http';
+import { currentBusinessDate } from '../../services/api/ledger';
+import LedgerNotice from '../reports/LedgerNotice';
 import type { HomeMainMetric, HomeSectionId } from '../../hooks/useHomeDisplayPreference';
-import { budgetsService } from '../../services/api/budgets';
-import { financialGoalsService } from '../../services/api/financial-goals';
-import { invalidateCache, QUERY_KEYS } from '../../lib/queryClient';
+import { createBudgetApi, LedgerBudgetProgress } from '../../services/api/budgets';
+import { invalidateCache } from '../../lib/queryClient';
 import { paymentNotificationService } from '../../services/paymentNotification';
 import type { BillData } from '../../types/bill';
-import type { BudgetProgress } from '../../types/budget';
 import type { FinancialGoalProgress } from '../../types/financial-goal';
 import { BillFeedbackLabel, useBillFeedbackSummaries } from '../social/billFeedback';
 
@@ -45,7 +48,8 @@ interface ProgressCardItem {
   type: 'budget' | 'goal';
   title: string;
   icon: string;
-  progress: number;
+  progress: number | null;
+  note?: string;
   currentAmount: number;
   totalAmount: number;
   color: string;
@@ -75,9 +79,9 @@ function SwipeableCardStack({
     pan.setValue({ x: 0, y: 0 });
   }, [cards.length]);
 
-  const panResponder = useRef(
+  const panResponder = useMemo(() =>
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, g) =>
         Math.abs(g.dx) > 5 || Math.abs(g.dy) > 5,
       onPanResponderMove: Animated.event(
@@ -112,7 +116,7 @@ function SwipeableCardStack({
         }
       },
     }),
-  ).current;
+  [cards.length, pan]);
 
   if (cards.length === 0) {return null;}
 
@@ -131,7 +135,7 @@ function SwipeableCardStack({
     const isTop = i === 0;
 
     const cardStyle: any = {
-      position: i === 0 && cards.length === 1 ? 'relative' : 'absolute',
+      position: i === 0 ? 'relative' : 'absolute',
       left: 0,
       right: 0,
       top: i * 6,
@@ -146,12 +150,15 @@ function SwipeableCardStack({
       <Animated.View
         key={card.id + '-' + cardIndex}
         style={[styles.progressCard, cardStyle]}
+        accessibilityElementsHidden={!isTop}
+        importantForAccessibility={isTop ? 'auto' : 'no-hide-descendants'}
+        pointerEvents={isTop ? 'auto' : 'none'}
         {...(isTop ? panResponder.panHandlers : {})}
       >
         <View style={styles.progressCardHeader}>
           <View style={styles.budgetTitleRow}>
             <Text style={styles.sectionSticker}>{card.icon}</Text>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={styles.progressCardTitle}>{card.title}</Text>
               <Text style={styles.progressCardType}>
                 {card.type === 'budget' ? '预算' : '目标'}
@@ -160,33 +167,31 @@ function SwipeableCardStack({
           </View>
           <View style={[
             styles.budgetPercentBadge,
-            card.progress >= 100 && card.type === 'goal'
+            (card.progress ?? 0) >= 100 && card.type === 'goal'
               ? { backgroundColor: colors.success }
               : undefined,
           ]}>
             <Text style={[
               styles.budgetPercentText,
-              card.progress >= 100 && card.type === 'goal'
+              (card.progress ?? 0) >= 100 && card.type === 'goal'
                 ? { color: '#FFFFFF' }
                 : undefined,
             ]}>
-              {Math.round(card.progress)}%
+              {card.progress === null ? '无百分比' : `${Math.round(card.progress)}%`}
             </Text>
           </View>
         </View>
-        <View style={styles.progressBarContainer}>
-          <ProgressBar
-            progress={card.progress}
-            color={card.color}
-            backgroundColor={colors.divider}
-            height={16}
-            style={styles.budgetProgressBar}
-          />
-        </View>
+        {card.progress !== null && <View style={styles.progressBarContainer}>
+          <View accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: Math.max(0, Math.min(card.progress, 100)), text: `${card.progress}%` }} style={{ height: 16, backgroundColor: colors.divider }}>
+            <View style={{ width: `${Math.max(0, Math.min(card.progress, 100))}%`, height: 16, backgroundColor: card.color }} />
+          </View>
+        </View>}
         <View style={styles.budgetLabels}>
           <Text style={styles.budgetLabel}>{card.labelLeft}</Text>
           <Text style={styles.budgetLabel}>{card.labelRight}</Text>
         </View>
+        {!!card.note && <Text style={[styles.budgetLabel, { marginTop: 10, lineHeight: 22 }]}>{card.note}</Text>}
+        {isTop && cards.length > 1 && <TouchableOpacity accessibilityRole="button" onPress={() => setTopIndex(i => (i + 1) % cards.length)} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={styles.budgetLabel}>下一张（{topIndex + 1}/{cards.length}） →</Text></TouchableOpacity>}
       </Animated.View>,
     );
   }
@@ -228,6 +233,10 @@ function AnimatedListItem({ children, index }: { children: React.ReactNode; inde
 }
 
 export default function DashboardScreen() {
+  const { token } = useAuth();
+  return <DashboardContent key={token || 'signed-out'} token={token || ''} />;
+}
+function DashboardContent({ token }: { token: string }) {
   const navigation = useNavigation();
   const styles = useStyles(createStyles);
   const {
@@ -235,7 +244,8 @@ export default function DashboardScreen() {
     monthIncome,
     monthExpense,
     monthBalance,
-    statistics,
+    analytics,
+    data, todayFacts, todayBalance, recentTotal, error,
     todayExpense,
     todayIncome,
     isLoading,
@@ -255,8 +265,6 @@ export default function DashboardScreen() {
   // 首页提示会影响自动记账可靠性的关键设置，点击后统一进入权限配置。
   useFocusEffect(useCallback(() => {
     let active = true;
-    // 从通知中心返回时强制刷新，覆盖应用在后台错过原生事件的场景。
-    refetch();
     const checkRequiredSettings = async () => {
       try {
         const [listener, appNotification, battery, configRaw] = await Promise.all([
@@ -276,23 +284,18 @@ export default function DashboardScreen() {
     return () => { active = false; };
   }, [refetch]));
 
-  // 预算进度查询
-  const { data: budgetProgressData, refetch: refetchBudgets } = useQuery({
-    queryKey: QUERY_KEYS.budgetProgress,
-    queryFn: async () => {
-      const res = await budgetsService.getProgress();
-      return Array.isArray(res) ? res : (res.data ?? []);
-    },
-  });
-
-  // 财务目标进度查询
-  const { data: goalProgressData, refetch: refetchGoals } = useQuery({
-    queryKey: QUERY_KEYS.financialGoals,
-    queryFn: async () => {
-      const res = await financialGoalsService.getProgress();
-      return Array.isArray(res) ? res : (res.data ?? []);
-    },
-  });
+  const budgetApi = useMemo(() => createBudgetApi(token), [token]);
+  const budgetResource = useSocialResource(useCallback(() => budgetApi.progress(), [budgetApi]));
+  const budgetProgressData = budgetResource.value;
+  const refetchBudgets = budgetResource.refresh;
+  const goalResource = useSocialResource(useCallback(async () => {
+    const res = await httpService.get<FinancialGoalProgress[]>('/financial-goals/progress', { headers: { Authorization: `Bearer ${token}` } });
+    const rows = Array.isArray(res) ? res : res.data;
+    if (res.success === false || !Array.isArray(rows)) throw new Error(res.message || '财务目标加载失败');
+    return rows as FinancialGoalProgress[];
+  }, [token]));
+  const goalProgressData = goalResource.value;
+  const refetchGoals = goalResource.refresh;
 
   // 原生自动记账成功后主动刷新首页查询，避免“全部账单”已更新而“近期交易”仍显示旧缓存。
   useEffect(() => {
@@ -313,18 +316,20 @@ export default function DashboardScreen() {
 
     // 预算卡片由个性化设置单独控制，不随账单/图表切换。
     if (showBudgetCard) {
-      (budgetProgressData ?? []).forEach((b: BudgetProgress) => {
+      (budgetProgressData ?? []).forEach((b: LedgerBudgetProgress) => {
         cards.push({
           id: `budget-${b.id}`,
           type: 'budget',
           title: b.name,
           icon: '📊',
-          progress: b.progress,
-          currentAmount: b.spent,
+          progress: b.progressPercent === null ? null : Number(b.progressPercent),
+          currentAmount: Number(b.spent),
           totalAmount: Number(b.amount),
-          color: styles._colors.primary,
-          labelLeft: `已用 ¥${b.spent.toLocaleString()}`,
-          labelRight: `剩余 ¥${Math.max(0, b.remaining).toLocaleString()}`,
+          color: b.confirmedOverBudget ? styles._colors.error : b.comparisonStatus !== 'complete' ? styles._colors.textSecondary : b.needsAlert ? styles._colors.warning : styles._colors.success,
+          labelLeft: `已确认消费 ¥${Number(b.spent).toFixed(2)}`,
+          labelRight: `预算 ¥${Number(b.amount).toFixed(2)}`,
+          note: `${b.ledger.startDate} 至 ${b.ledger.endDate}\n退款 ¥${Number(b.refundInflow).toFixed(2)}（不抵减消费）${b.progressPercent === null ? ' · 不计算百分比' : ''}\n${b.comparisonStatus === 'invalid_budget' ? '金额无效，请编辑预算' : b.comparisonStatus === 'incomplete' ? `${b.ledger.counts.needsReview} 笔待核对，进度不完整${b.confirmedOverBudget ? '，已确认消费已超预算' : ''}` : b.isOverBudget ? `超支 ¥${Math.abs(Number(b.remaining)).toFixed(2)}` : `剩余 ¥${Number(b.remaining).toFixed(2)}`}`,
+
         });
       });
     }
@@ -348,18 +353,14 @@ export default function DashboardScreen() {
     return cards;
   }, [budgetProgressData, goalProgressData, showBudgetCard, styles._colors]);
 
-  const currentDate = new Date();
-  const monthName = `${currentDate.getMonth() + 1}月账本`;
-  const yearName = `${currentDate.getFullYear()}`;
+  const businessDate = data?.today ?? currentBusinessDate();
+  const monthName = `${businessDate.month + 1}月账本`;
+  const yearName = `${businessDate.year}`;
 
   const dayGroups = useMemo(() => {
     const groups = new Map<string, BillData[]>();
     recentBills.forEach((bill) => {
-      const sourceDate = bill.time || bill.date || bill.createdAt;
-      const parsed = new Date(sourceDate);
-      const key = Number.isNaN(parsed.getTime())
-        ? bill.date
-        : `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+      const key = bill.date.slice(0, 10);
       const current = groups.get(key) || [];
       current.push(bill);
       groups.set(key, current);
@@ -374,10 +375,9 @@ export default function DashboardScreen() {
           const bTime = new Date(b.time || b.createdAt || b.date).getTime();
           return bTime - aTime;
         }),
-        expense: bills.filter((bill) => bill.type === 'expense').reduce((sum, bill) => sum + Number(bill.amount), 0),
-        income: bills.filter((bill) => bill.type === 'income').reduce((sum, bill) => sum + Number(bill.amount), 0),
+        facts: analytics?.daily.find(d => d.date === date),
       }));
-  }, [recentBills]);
+  }, [recentBills, analytics]);
 
   const formatBillTime = (bill: BillData) => {
     const value = bill.time || bill.createdAt;
@@ -389,7 +389,7 @@ export default function DashboardScreen() {
 
   const formatGroupDate = (date: string) => {
     const parsed = new Date(`${date}T12:00:00`);
-    const isToday = date === `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+    const isToday = date === businessDate.key;
     return `${parsed.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}${isToday ? ' 今天' : ''}`;
   };
 
@@ -425,15 +425,15 @@ export default function DashboardScreen() {
 
   const mainMetricData = useMemo(() => {
     const metrics: Record<HomeMainMetric, { label: string; value: number; hint: string }> = {
-      dailyBalance: { label: '今日结余', value: todayIncome - todayExpense, hint: '今日收入 - 今日支出' },
-      dailyExpense: { label: '今日支出', value: todayExpense, hint: '今天已经记录的支出' },
-      dailyIncome: { label: '今日收入', value: todayIncome, hint: '今天已经记录的收入' },
-      monthlyBalance: { label: '本月结余', value: monthBalance, hint: '本月收入 - 本月支出' },
-      monthlyExpense: { label: '本月支出', value: monthExpense, hint: '本月累计支出' },
-      monthlyIncome: { label: '本月收入', value: monthIncome, hint: '本月累计收入' },
+      dailyBalance: { label: '今日结余', value: todayBalance, hint: '已确认收入 + 退款 − 消费' },
+      dailyExpense: { label: '今日支出', value: todayExpense, hint: '今日已确认消费' },
+      dailyIncome: { label: '今日收入', value: todayIncome, hint: '今日已确认普通收入' },
+      monthlyBalance: { label: '本月结余', value: monthBalance, hint: '已确认收入 + 退款 − 消费' },
+      monthlyExpense: { label: '本月支出', value: monthExpense, hint: '本月已确认消费' },
+      monthlyIncome: { label: '本月收入', value: monthIncome, hint: '本月已确认普通收入' },
     };
     return metrics[mainMetric];
-  }, [mainMetric, monthBalance, monthExpense, monthIncome, todayExpense, todayIncome]);
+  }, [mainMetric, monthBalance, monthExpense, monthIncome, todayExpense, todayIncome, todayBalance]);
 
   const secondaryCards = useMemo(() => {
     const cards: Array<{
@@ -457,7 +457,7 @@ export default function DashboardScreen() {
     } else if (secondaryMetric === 'monthlyBalance') {
       cards.push({ label: '本月结余', value: monthBalance, tone: 'balance', icon: '=', onPress: handleViewAllBills });
     } else if (secondaryMetric === 'dailyBalance') {
-      cards.push({ label: '今日结余', value: todayIncome - todayExpense, tone: 'balance', icon: '=', onPress: handleViewAllBills });
+      cards.push({ label: '今日结余', value: todayBalance, tone: 'balance', icon: '=', onPress: handleViewAllBills });
     }
 
     return cards;
@@ -466,6 +466,7 @@ export default function DashboardScreen() {
     monthExpense,
     monthIncome,
     secondaryMetric,
+    todayBalance,
     todayExpense,
     todayIncome,
   ]);
@@ -539,6 +540,8 @@ export default function DashboardScreen() {
         </TouchableOpacity>
       )}
 
+      <Status loading={false} error={error} refresh={refetch} />
+      {data && <>
       {/* ========== Overview Card - 主色块 ========== */}
       <TouchableOpacity style={styles.overviewCard} activeOpacity={0.95}>
         {/* 装饰贴纸 */}
@@ -575,7 +578,7 @@ export default function DashboardScreen() {
                   </View>
                   <View style={styles.statTextBlock}>
                     <Text style={styles.statLabel}>{card.label}</Text>
-                    <Text style={styles.statValue} numberOfLines={1}>¥ {Math.abs(card.value).toFixed(2)}</Text>
+                    <Text style={styles.statValue} numberOfLines={1}>{card.value < 0 ? '-¥' : '¥'} {Math.abs(card.value).toFixed(2)}</Text>
                   </View>
                 </TouchableOpacity>
               ))}
@@ -584,16 +587,23 @@ export default function DashboardScreen() {
         </View>
       </TouchableOpacity>
 
+      <Text style={styles.transactionMeta}>本月汇总按完整自然月统计，包含已记录的未来日期账单。</Text>
+      <LedgerNotice gridHint={false} summary={analytics?.summary} loading={false} error="" refresh={refetch} />
+      {!!todayFacts && !todayFacts.complete && <Text style={styles.transactionMeta}>今日仍有 {todayFacts.counts.needsReview} 笔待核对，今日金额不完整。</Text>}
+      </>}
+      {showBudgetCard && <Status loading={budgetResource.loading} error={budgetResource.error} refresh={refetchBudgets} />}
+      <Status loading={goalResource.loading} error={goalResource.error} refresh={refetchGoals} />
+      {showBudgetCard && <Action title="管理预算与核对账单" onPress={() => navigation.navigate('Budgets' as never)} />}
       {/* ========== Progress Cards - 预算 & 财务目标 ========== */}
       {progressCards.length > 0 ? (
-        <View style={[styles.carouselWrapper, { minHeight: 160 }]}>
+        <View style={[styles.carouselWrapper, { paddingBottom: 16, marginTop: 12 }]}>
           <SwipeableCardStack
             cards={progressCards}
             styles={styles}
             colors={styles._colors}
           />
         </View>
-      ) : showBudgetCard ? (
+      ) : showBudgetCard && budgetResource.value && goalResource.value ? (
         <TouchableOpacity
           style={styles.progressEmptyCard}
           onPress={() => navigation.navigate('FinancialGoals' as never)}
@@ -606,8 +616,8 @@ export default function DashboardScreen() {
       ) : null}
 
       {/* 下方内容按个性化设置中的顺序渲染，预算/目标卡片始终在它们之前。 */}
-      {homeSections.map((section: HomeSectionId) => section === 'charts' ? (
-        <HomeCharts key="charts" statistics={statistics} />
+      {data && homeSections.map((section: HomeSectionId) => section === 'charts' ? (
+        <HomeCharts key="charts" analytics={analytics!} />
       ) : (
       /* ========== Recent Transactions ========== */
       <View key="bills" style={styles.section}>
@@ -626,6 +636,7 @@ export default function DashboardScreen() {
           </BrutalPressable>
         </View>
 
+        <Text style={styles.transactionMeta}>本月最近 {recentBills.length} / {recentTotal} 条原始记录；按账单日期分组。日汇总涵盖整天已确认账单，退款单列。</Text>
         {!!billFeedback.error && <TouchableOpacity accessibilityRole="button" onPress={billFeedback.refresh} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={styles.transactionMeta}>评账状态暂不可用，点此重试</Text></TouchableOpacity>}
         {dayGroups.length > 0 ? (
           <View style={styles.transactionList}>
@@ -633,16 +644,12 @@ export default function DashboardScreen() {
               <View key={group.date} style={styles.dayGroup}>
                 <View style={styles.dayHeader}>
                   <Text style={styles.dayTitle}>{formatGroupDate(group.date)}</Text>
-                  <View style={styles.dayTotals}>
-                    <Text style={styles.dayExpense}>支 ¥{group.expense.toFixed(2)}</Text>
-                    <Text style={styles.dayIncome}>收 ¥{group.income.toFixed(2)}</Text>
-                    <Text style={[
-                      styles.dayBalance,
-                      { color: group.income - group.expense >= 0 ? styles._colors.success : styles._colors.error },
-                    ]}>
-                      余 {group.income - group.expense >= 0 ? '+' : '-'}¥{Math.abs(group.income - group.expense).toFixed(2)}
-                    </Text>
-                  </View>
+                  {group.facts && <View style={[styles.dayTotals, { flexWrap: 'wrap' }]}>
+                    <Text style={styles.dayExpense}>消费 ¥{Number(group.facts.grossExpense).toFixed(2)}</Text>
+                    <Text style={styles.dayIncome}>收入 ¥{Number(group.facts.ordinaryIncome).toFixed(2)}</Text>
+                    <Text style={styles.dayIncome}>退款 ¥{Number(group.facts.refundInflow).toFixed(2)}</Text>
+                    <Text style={styles.dayBalance}>余 ¥{Number(group.facts.cashSurplus).toFixed(2)}{!group.facts.complete ? ' · 待核对' : ''}</Text>
+                  </View>}
                 </View>
                 {group.bills.map((bill, index) => (
                   <AnimatedListItem key={bill.id} index={groupIndex + index}>
@@ -931,6 +938,8 @@ const createStyles = (colors: ThemeColors) => ({
 
     // Budget card styles (reused for progress cards)
     budgetTitleRow: {
+      flex: 1,
+      marginRight: 8,
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.sm,
@@ -946,7 +955,7 @@ const createStyles = (colors: ThemeColors) => ({
     budgetPercentText: {
       fontSize: 14,
       fontWeight: '800',
-      color: colors.textPrimary,
+      color: '#1A1A1A',
       fontFamily: 'Courier',
     },
     progressBarContainer: {
@@ -959,6 +968,8 @@ const createStyles = (colors: ThemeColors) => ({
     budgetProgressBar: {
     },
     budgetLabels: {
+      flexWrap: 'wrap',
+      gap: 8,
       flexDirection: 'row',
       justifyContent: 'space-between',
     },
@@ -1074,6 +1085,7 @@ const createStyles = (colors: ThemeColors) => ({
       fontFamily: 'Courier',
     },
     dayBalance: {
+      color: colors.textPrimary,
       fontSize: 12,
       fontWeight: '800',
       fontFamily: 'Courier',

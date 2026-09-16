@@ -1,103 +1,20 @@
-/**
- * 首页数据 Hook
- * 使用 React Query 管理首页数据的获取和缓存
- */
-import { useQuery } from '@tanstack/react-query';
-import { billsService } from '../services';
-import { CACHE_TIME, QUERY_KEYS, GC_TIME } from '../lib/queryClient';
-import type { BillData, BillStatistics } from '../types/bill';
-import { formatDate } from '../utils/date';
+import { useCallback } from 'react';
+import { useAuth } from '../providers';
+import { useSocialResource } from '../screens/social/shared';
+import { ledgerCell } from '../services/api/ledger';
+import { fetchDashboardData } from '../services/api/dashboard';
 
-interface DashboardData {
-  statistics: BillStatistics | null;
-  recentBills: BillData[];
-  monthIncome: number;
-  monthExpense: number;
-  monthBalance: number;
-  todayExpense: number;
-  todayIncome: number;
-}
 
-/**
- * 获取首页数据
- */
-async function fetchDashboardData(month: string): Promise<DashboardData> {
-  const today = new Date();
-  const [year, monthNum] = month.split('-').map(Number);
-  const startOfMonth = new Date(year, monthNum - 1, 1);
-  const endOfMonth = new Date(year, monthNum, 0);
-
-  // 日期筛选使用设备本地日历日期，不能用 toISOString（中国时区凌晨会回退到前一天）。
-  const todayStr = today < endOfMonth ? formatDate(today) : formatDate(endOfMonth);
-  const monthStartStr = formatDate(startOfMonth);
-
-  // 并行获取统计数据和最近账单
-  const [statsResponse, billsResponse] = await Promise.all([
-    billsService.getBillStatistics({
-      startDate: monthStartStr,
-      endDate: todayStr,
-    }),
-    billsService.getBills({
-      startDate: monthStartStr,
-      endDate: todayStr,
-      limit: 100,
-      orderBy: 'date',
-      orderDirection: 'desc',
-    }),
-  ]);
-
-  const stats = statsResponse.data;
-  const monthIncome = stats?.totalIncome || 0;
-  const monthExpense = stats?.totalExpense || 0;
-  const todayTrend = stats?.dailyTrends?.find((item) => item.date === todayStr);
-
+export function useDashboard() {
+  const { token } = useAuth();
+  const r = useSocialResource(useCallback(() => fetchDashboardData(token || ''), [token]));
+  const month = r.value ? ledgerCell(r.value.analytics.summary) : null;
+  const day = r.value ? ledgerCell(r.value.todayFacts) : null;
   return {
-    statistics: stats || null,
-    recentBills: billsResponse.data || [],
-    monthIncome,
-    monthExpense,
-    monthBalance: monthIncome - monthExpense,
-    todayExpense: todayTrend?.expense || 0,
-    todayIncome: todayTrend?.income || 0,
-  };
-}
-
-/**
- * 首页数据 Hook
- * @param enabled 是否启用查询（用于按需加载）
- */
-export function useDashboard(enabled: boolean = true) {
-  const currentDate = new Date();
-  const currentMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
-
-  const query = useQuery({
-    queryKey: QUERY_KEYS.dashboard(currentMonth),
-    queryFn: () => fetchDashboardData(currentMonth),
-    enabled,
-    staleTime: CACHE_TIME.DASHBOARD,
-    gcTime: GC_TIME.DEFAULT,
-    // 如果有缓存数据，先显示缓存再后台刷新
-    refetchOnMount: 'always',
-  });
-
-  return {
-    // 数据
-    data: query.data,
-    statistics: query.data?.statistics ?? null,
-    recentBills: query.data?.recentBills ?? [],
-    monthIncome: query.data?.monthIncome ?? 0,
-    monthExpense: query.data?.monthExpense ?? 0,
-    monthBalance: query.data?.monthBalance ?? 0,
-    todayExpense: query.data?.todayExpense ?? 0,
-    todayIncome: query.data?.todayIncome ?? 0,
-
-    // 状态
-    isLoading: query.isLoading,
-    isFetching: query.isFetching,
-    isError: query.isError,
-    error: query.error,
-
-    // 方法
-    refetch: query.refetch,
+    data: r.value, analytics: r.value?.analytics, todayFacts: r.value?.todayFacts,
+    recentBills: r.value?.recentBills ?? [], recentTotal: r.value?.recentTotal ?? 0,
+    monthIncome: month?.income ?? 0, monthExpense: month?.expense ?? 0, monthBalance: month?.balance ?? 0,
+    todayIncome: day?.income ?? 0, todayExpense: day?.expense ?? 0, todayBalance: day?.balance ?? 0,
+    isLoading: r.loading, isFetching: r.loading, error: r.error, refetch: r.refresh,
   };
 }
