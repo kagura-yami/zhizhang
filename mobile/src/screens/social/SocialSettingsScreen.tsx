@@ -135,6 +135,10 @@ export default function SocialSettingsScreen({
             ))}
           </View>
           <Action
+            title="收到的评账"
+            onPress={() => navigation.navigate('SocialReceivedReviews')}
+          />
+          <Action
             title="评账申请"
             onPress={() => navigation.navigate('SocialRequests')}
           />

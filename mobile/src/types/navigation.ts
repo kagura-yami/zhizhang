@@ -27,6 +27,11 @@ declare global {
       SocialPerson: { userId: string };
       SocialGrant: { userId: string; requestVersion?: number };
       SocialRequests: undefined;
+      SocialBills: { userId: string };
+      SocialBillReview: { billId: number };
+      SocialReceivedReviews: undefined;
+      SocialReviewThread: { threadId: number };
+      SocialReviewVersions: { threadId: number; messageId: number };
       GeneralSettings: undefined;
       AppSettings: undefined;
       PersonalizationSettings: undefined;

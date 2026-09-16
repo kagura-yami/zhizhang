@@ -11,6 +11,7 @@ class ReviewsController {
   constructor(private readonly service: ReviewsService) {}
   private result<T>(promise: Promise<T>) { return promise.then(data => ({ success: true, data })); }
   @Put('bills/:id/vote') vote(@CurrentUser('id') user: string, @Param('id', ParseIntPipe) id: number, @Body() dto: VoteDto) { return this.result(this.service.vote(user, id, dto.vote)); }
+  @Get('bills/:id/mine') myVote(@CurrentUser('id') user: string, @Param('id', ParseIntPipe) id: number) { return this.result(this.service.myVote(user, id)); }
   @Get('bills/:id/summary') summary(@CurrentUser('id') user: string, @Param('id', ParseIntPipe) id: number, @Query() q: ReviewPageDto) { return this.result(this.service.ownerSummary(user, id, q)); }
   @Get('mine') mine(@CurrentUser('id') user: string, @Query() q: ReviewPageDto) { return this.result(this.service.mine(user, q)); }
   @Get('threads/:id') detail(@CurrentUser('id') user: string, @Param('id', ParseIntPipe) id: number, @Query() q: ReviewPageDto) { return this.result(this.service.detail(user, id, q)); }

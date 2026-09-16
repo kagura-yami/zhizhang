@@ -55,12 +55,37 @@ export class ReviewsService {
     });
   }
 
+  async myVote(userId: string, billId: number) {
+    const identity = await this.prisma.bill.findUnique({ where: { id: billId }, select: { userId: true } });
+    if (!identity) throw new NotFoundException('账单不存在');
+    return this.prisma.$transaction(async tx => {
+      await this.access.lockUsers(tx, [identity.userId, userId]);
+      const grant = await this.access.grant(tx, identity.userId, userId);
+      const bill = await tx.bill.findFirst({ where: { ...this.access.billWhere(grant), id: billId }, select: minimalBill });
+      if (!bill) throw new ForbiddenException('账单已不在授权范围内');
+      const thread = await tx.billReviewThread.findUnique({ where: { originalBillId_reviewerId: { originalBillId: billId, reviewerId: userId } }, select: { id: true, vote: true } });
+      return { thread, snapshot: reviewSnapshot(bill) };
+    });
+  }
+
   async detail(userId: string, id: number, query: ReviewPageDto) {
     return this.withThread(userId, id, false, async (tx, thread) => {
       const bill = thread.billId ? await tx.bill.findUnique({ where: { id: thread.billId }, select: minimalBill }) : null;
       const messages = await tx.reviewMessage.findMany({ where: { threadId: id }, orderBy: { id: 'asc' }, ...page(query) });
       const main = await tx.reviewMessage.findUnique({ where: { threadId_mainSlot: { threadId: id, mainSlot: 1 } } });
+      let canWrite = Boolean(bill);
+      if (canWrite && userId === thread.ownerId) {
+        try {
+          const grant = await this.access.grant(tx, thread.ownerId, thread.reviewerId);
+          canWrite = Boolean(await tx.bill.findFirst({ where: { ...this.access.billWhere(grant), id: thread.billId }, select: { id: true } }));
+        } catch (error) {
+          if (!(error instanceof ForbiddenException || error instanceof NotFoundException)) throw error;
+          canWrite = false;
+        }
+      }
       return { id, originalBillId: thread.originalBillId, vote: thread.vote,
+        isOwner: userId === thread.ownerId, canWrite, hasMain: Boolean(main),
+        otherPerson: await tx.user.findUnique({ where: { id: userId === thread.ownerId ? thread.reviewerId : thread.ownerId }, select: profile }),
         snapshot: bill ? reviewSnapshot(bill) : thread.snapshot, deleted: !bill,
         billModified: (bill?.updatedAt ?? thread.snapshotUpdatedAt).getTime() !== thread.initialBillUpdatedAt.getTime(),
         mainWithdrawn: Boolean(main?.withdrawn && !main?.hidden), messages: messages.map(visibleReviewMessage) };

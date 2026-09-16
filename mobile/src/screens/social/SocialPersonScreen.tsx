@@ -177,6 +177,15 @@ export default function SocialPersonScreen({
           </View>
           <View style={s.card}>
             <Text style={s.heading}>对方分享给我的账单</Text>
+            {r.value.received?.status === 'active' && (
+              <Action
+                title="查看授权账单"
+                primary
+                onPress={() =>
+                  navigation.navigate('SocialBills', { userId: id })
+                }
+              />
+            )}
             <Text style={s.text}>
               {r.value.received?.status === 'active'
                 ? `${scopes[r.value.received.scope]} · ${

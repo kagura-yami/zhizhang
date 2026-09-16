@@ -39,6 +39,11 @@ import SocialPeopleScreen from '../screens/social/SocialPeopleScreen';
 import SocialPersonScreen from '../screens/social/SocialPersonScreen';
 import SocialGrantScreen from '../screens/social/SocialGrantScreen';
 import SocialRequestsScreen from '../screens/social/SocialRequestsScreen';
+import SocialBillsScreen from '../screens/social/SocialBillsScreen';
+import SocialBillReviewScreen from '../screens/social/SocialBillReviewScreen';
+import SocialReceivedReviewsScreen from '../screens/social/SocialReceivedReviewsScreen';
+import SocialReviewThreadScreen from '../screens/social/SocialReviewThreadScreen';
+import SocialReviewVersionsScreen from '../screens/social/SocialReviewVersionsScreen';
 
 import { useTheme, useAuth } from '../providers';
 import { spacing, borderRadius, borderWidth } from '../theme/spacing';
@@ -360,6 +365,11 @@ export default function AppNavigator() {
             <Stack.Screen name="SocialPerson" component={SocialPersonScreen} options={{ headerShown: true, title: '关系与授权' }} />
             <Stack.Screen name="SocialGrant" component={SocialGrantScreen} options={{ headerShown: true, title: '确认评账授权' }} />
             <Stack.Screen name="SocialRequests" component={SocialRequestsScreen} options={{ headerShown: true, title: '评账申请' }} />
+            <Stack.Screen name="SocialBills" component={SocialBillsScreen} options={{ headerShown: true, title: '授权账单' }} />
+            <Stack.Screen name="SocialBillReview" component={SocialBillReviewScreen} options={{ headerShown: true, title: '我的评价' }} />
+            <Stack.Screen name="SocialReceivedReviews" component={SocialReceivedReviewsScreen} options={{ headerShown: true, title: '收到的评账' }} />
+            <Stack.Screen name="SocialReviewThread" component={SocialReviewThreadScreen} options={{ headerShown: true, title: '私密对话' }} />
+            <Stack.Screen name="SocialReviewVersions" component={SocialReviewVersionsScreen} options={{ headerShown: true, title: '文字版本' }} />
             <Stack.Screen
               name="About"
               component={AboutScreen}

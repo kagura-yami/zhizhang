@@ -2,6 +2,55 @@ import { httpService } from '../http';
 import type { ApiResponse } from '../../types/api';
 
 export const SOCIAL_CONSENT_VERSION = '2026-09-16';
+export type ReviewVote = 'hang' | 'la';
+export interface SharedBill {
+  id?: number;
+  amount: string;
+  type: string;
+  date: string;
+  time: string | null;
+  category: string | null;
+}
+export interface ReviewMessage {
+  id: number;
+  authorId: string;
+  isMain: boolean;
+  body: string | null;
+  withdrawn: boolean;
+  hidden: boolean;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface ReviewDetail {
+  id: number;
+  originalBillId: number;
+  vote: ReviewVote;
+  isOwner: boolean;
+  canWrite: boolean;
+  hasMain: boolean;
+  otherPerson: SocialPerson | null;
+  snapshot: SharedBill;
+  deleted: boolean;
+  billModified: boolean;
+  mainWithdrawn: boolean;
+  messages: ReviewMessage[];
+}
+export interface ReviewVersion {
+  revision: number;
+  body: string;
+  withdrawn: boolean;
+  action: string;
+  createdAt: string;
+}
+export interface ReceivedReview {
+  id: number;
+  originalBillId: number;
+  vote: ReviewVote;
+  snapshot: SharedBill;
+  deletedAt: string | null;
+  reviewer: SocialPerson;
+}
 export interface ReviewRequest {
   ownerId: string;
   applicantId: string;
@@ -70,6 +119,65 @@ export function createSocialApi(token: string) {
   // Bind requests to the session that rendered the controls, including delayed interceptor work.
   const config = { headers: { Authorization: `Bearer ${token}` } };
   return {
+    sharedBills: (id: string, page: number) =>
+      data<{ grantVersion: number; items: SharedBill[] }>(
+        httpService.get(`/social/owners/${id}/bills`, {
+          ...config,
+          params: { page, pageSize: 20 },
+        }),
+      ),
+    myVote: (id: number) =>
+      data<{
+        thread: { id: number; vote: ReviewVote } | null;
+        snapshot: SharedBill;
+      }>(httpService.get(`/reviews/bills/${id}/mine`, config)),
+    vote: (id: number, vote: ReviewVote) =>
+      data<{ threadId: number; vote: ReviewVote }>(
+        httpService.put(`/reviews/bills/${id}/vote`, { vote }, config),
+      ),
+    receivedReviews: (page: number) =>
+      data<ReceivedReview[]>(
+        httpService.get('/reviews/mine', {
+          ...config,
+          params: { page, pageSize: 20 },
+        }),
+      ),
+    review: (id: number, page: number) =>
+      data<ReviewDetail>(
+        httpService.get(`/reviews/threads/${id}`, {
+          ...config,
+          params: { page, pageSize: 20 },
+        }),
+      ),
+    sendReview: (id: number, main: boolean, body: string, clientKey: string) =>
+      data<ReviewMessage>(
+        httpService.post(
+          `/reviews/threads/${id}/${main ? 'main' : 'replies'}`,
+          { body, clientKey },
+          config,
+        ),
+      ),
+    changeReview: (
+      id: number,
+      message: number,
+      expectedRevision: number,
+      action: 'edit' | 'withdraw' | 'restore',
+      body?: string,
+    ) =>
+      data<ReviewMessage>(
+        httpService.patch(
+          `/reviews/threads/${id}/messages/${message}`,
+          { expectedRevision, action, body },
+          config,
+        ),
+      ),
+    reviewVersions: (id: number, message: number, page: number) =>
+      data<ReviewVersion[]>(
+        httpService.get(`/reviews/threads/${id}/messages/${message}/versions`, {
+          ...config,
+          params: { page, pageSize: 20 },
+        }),
+      ),
     requestContext: (id: string) =>
       data<RequestContext>(
         httpService.get(`/social/requests/to/${id}`, config),

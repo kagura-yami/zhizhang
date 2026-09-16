@@ -31,6 +31,10 @@ Module({ imports: [ReviewsModule, BillsModule], providers: [{ provide: APP_GUARD
     for (const u of [b, c]) await call(a, '/social/grants/given/' + u.id, 'PUT', { scope: 'expense', historyStart: '2020-01-01' });
     const bill = await db.bill.create({ data: { userId: a.id, amount: '168', type: 'expense', date: new Date('2026-09-16'), description: 'secret-description', notes: 'secret-raw', counterparty: 'secret-merchant' } });
     const votePath = `/reviews/bills/${bill.id}/vote`;
+    const minePath = `/reviews/bills/${bill.id}/mine`;
+    assert.equal((await call(b, minePath)).data.thread, null);
+    assert.equal(await db.billReviewThread.count({ where: { originalBillId: bill.id } }), 0);
+    assert.equal((await call(d, minePath)).status, 403);
     assert.equal((await call(null, votePath, 'PUT', { vote: 'hang' })).status, 401);
     assert.equal((await call(a, votePath, 'PUT', { vote: 'hang' })).status, 400);
     assert.equal((await call(d, votePath, 'PUT', { vote: 'hang' })).status, 403);
@@ -38,6 +42,8 @@ Module({ imports: [ReviewsModule, BillsModule], providers: [{ provide: APP_GUARD
     assert.equal((await call(b, '/reviews/threads/999999/main', 'POST', msg('先写后投'))).status, 404);
     const bt = (await call(b, votePath, 'PUT', { vote: 'la' })).data.threadId;
     const ct = (await call(c, votePath, 'PUT', { vote: 'hang' })).data.threadId;
+    assert.deepEqual((await call(b, minePath)).data.thread, { id: bt, vote: 'la' });
+    assert.equal((await call(c, minePath)).data.thread.id, ct);
     assert.equal((await call(b, votePath, 'PUT', { vote: 'hang' })).data.threadId, bt);
     assert.equal(await db.socialInboxEvent.count({ where: { userId: a.id } }), 0);
     const bmainBody = msg('B 的私密主评');
@@ -53,6 +59,8 @@ Module({ imports: [ReviewsModule, BillsModule], providers: [{ provide: APP_GUARD
     const summary = (await call(a, `/reviews/bills/${bill.id}/summary`)).data;
     assert.equal(summary.hang, 2); assert.equal(summary.la, 0); assert.equal(summary.threads.length, 2);
     const detail = (await call(b, `/reviews/threads/${bt}`)).data;
+    assert.equal(detail.canWrite, true); assert.equal(detail.isOwner, false); assert.equal(detail.hasMain, true);
+    assert.equal(detail.otherPerson.id, a.id);
     assert(!JSON.stringify(detail).includes('secret-')); assert(!JSON.stringify(detail).includes('C 的'));
     assert(!Object.hasOwn(detail, 'hang')); assert.equal(detail.messages.length, 1);
     const reply = (await call(a, `/reviews/threads/${bt}/replies`, 'POST', msg('A 回复 B'))).data;
@@ -81,6 +89,8 @@ Module({ imports: [ReviewsModule, BillsModule], providers: [{ provide: APP_GUARD
     assert.equal((await call(b, `/reviews/threads/${bt}`)).status, 403);
     assert.equal((await call(b, `/reviews/threads/${bt}/messages/${reply.id}/versions`)).status, 403);
     assert.equal((await call(a, `/reviews/threads/${bt}`)).status, 200);
+    assert.equal((await call(a, `/reviews/threads/${bt}`)).data.canWrite, false);
+    assert.equal((await call(b, minePath)).status, 403);
     assert.equal((await call(a, `/reviews/threads/${bt}/replies`, 'POST', msg('撤权后发言'))).status, 403);
     await call(a, `/bills/${bill.id}`, 'PATCH', { type: 'income', amount: 200 });
     assert.equal((await call(c, `/reviews/threads/${ct}`)).status, 403);
@@ -90,6 +100,7 @@ Module({ imports: [ReviewsModule, BillsModule], providers: [{ provide: APP_GUARD
     assert.equal((await call(a, `/bills/${bill.id}`, 'DELETE')).status, 200);
     assert.equal((await call(c, `/reviews/threads/${ct}`)).status, 403);
     const archived = (await call(a, `/reviews/threads/${ct}`)).data;
+    assert.equal(archived.canWrite, false); assert.equal(archived.isOwner, true);
     assert.equal(archived.deleted, true); assert.equal(archived.snapshot.amount, '200.0000'); assert.equal(archived.messages[0].body, 'C 的私密主评');
     assert.equal((await call(a, `/reviews/threads/${ct}/replies`, 'POST', msg('删除后回复'))).status, 403);
     assert.equal((await call(a, `/reviews/bills/${bill.id}/summary`)).data.hang, 2);
