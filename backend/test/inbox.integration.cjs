@@ -6,6 +6,7 @@ process.env.JWT_SECRET = 'inbox-test-secret';
 const { Module, ValidationPipe } = require('@nestjs/common');
 const { NestFactory, APP_GUARD } = require('@nestjs/core');
 const { JwtService } = require('@nestjs/jwt');
+const { InboxService } = require('../dist/inbox/inbox.service');
 const { InboxModule } = require('../dist/inbox/inbox.module');
 const { BillsModule } = require('../dist/bills/bills.module');
 const { PrismaService } = require('../dist/prisma/prisma.service');
@@ -39,6 +40,25 @@ Module({ imports: [InboxModule, BillsModule], providers: [{ provide: APP_GUARD, 
     const initial = (await call(a, inbox)).data;
     assert.equal(initial.items.length, 1); assert.equal(initial.items[0].unread, true);
     assert.equal(initial.items[0].preview, null);
+    const service = app.get(InboxService), eventId = initial.items[0].id;
+    const resolveEvent = (user, id = eventId) => call(user, `${inbox}/events/${id}`);
+    assert.equal((await resolveEvent(null)).status, 401);
+    assert.equal((await resolveEvent(c)).status, 404);
+    for (const invalid of [0, -1, 2147483648]) assert.equal((await resolveEvent(a, invalid)).status, 404);
+    const resolved = (await resolveEvent(a)).data;
+    assert.equal(resolved.target.threadId, t);
+    assert.equal(resolved.preview, null);
+    assert.equal(await service.systemNotification(c.id, eventId), null);
+    assert.deepEqual(await service.systemNotification(a.id, eventId), {
+      eventId, title: '收到新的评账文字', body: '打开知账查看详情',
+    });
+    await call(a, '/social/preferences', 'PATCH', { notificationPreview: true });
+    assert.equal((await service.systemNotification(a.id, eventId)).body, '第一条私密文字');
+    await call(a, '/social/preferences', 'PATCH', { notifyInteractions: false });
+    assert.equal(await service.systemNotification(a.id, eventId), null);
+    assert.equal((await resolveEvent(a)).status, 200); // Delivery preference does not erase inbox access.
+    await call(a, '/social/preferences', 'PATCH', { notifyInteractions: true, notificationPreview: false });
+    assert.equal((await service.systemNotification(a.id, eventId)).body, '打开知账查看详情');
     assert(!JSON.stringify(initial).includes('第一条私密文字')); assert(!JSON.stringify(initial).includes('不能出现在通知'));
     assert.equal((await call(c, inbox + '/read', 'POST', { receipt: initial.receipt })).status, 403);
     assert.equal((await call(a, inbox + '/read', 'POST', { receipt: 'forged' })).status, 403);
@@ -53,6 +73,10 @@ Module({ imports: [InboxModule, BillsModule], providers: [{ provide: APP_GUARD, 
     assert.equal((await call(a, inbox + '/read', 'POST', { receipt: boundary.receipt })).data.count, 0);
     const page1 = (await call(a, inbox + '?limit=1')).data;
     const page2 = (await call(a, inbox + '?limit=1&after=' + page1.nextAfter)).data;
+    assert.equal(await service.systemNotification(a.id, eventId), null); // Already read, still a valid click.
+    assert.equal((await resolveEvent(a)).status, 200);
+    const newerEventId = page2.items[0].id;
+    assert.equal((await service.systemNotification(a.id, newerEventId)).eventId, newerEventId);
     assert.equal(page1.hasMore, true); assert.equal(page2.hasMore, false);
     assert.notEqual(page1.items[0].id, page2.items[0].id); assert.equal(page2.items[0].unread, true);
     assert.equal((await call(a, inbox + '/read', 'POST', { receipt: initial.receipt })).data.count, 0);
@@ -61,17 +85,25 @@ Module({ imports: [InboxModule, BillsModule], providers: [{ provide: APP_GUARD, 
     const preview = (await call(a, inbox)).data.items;
     assert.equal(preview[0].preview, '第一条私密文字'); assert.equal(preview[0].systemNotificationEnabled, false);
     await call(b, `/reviews/threads/${t}/messages/${newer.id}`, 'PATCH', { action: 'withdraw', expectedRevision: 1 });
+    assert.equal((await resolveEvent(a, newerEventId)).status, 404);
+    assert.equal(await service.systemNotification(a.id, newerEventId), null);
     assert.equal((await call(a, `${inbox}/threads/${t}`)).data.unread, 0);
     assert.equal((await call(a, inbox)).data.items.length, 1);
     await db.reviewMessage.update({ where: { id: main.id }, data: { hidden: true } });
+    assert.equal((await resolveEvent(a)).status, 404);
     const hiddenPage = (await call(a, inbox + '?limit=1')).data;
     assert.equal(hiddenPage.items.length, 0); assert.equal(hiddenPage.hasMore, true); assert(hiddenPage.nextAfter > 0);
     // Hidden main does not prevent replies. Revoking blocks reviewer notification previews and read deep links.
     await call(a, `/reviews/threads/${t}/replies`, 'POST', message('主人给评价者的回复'));
     const bInbox = (await call(b, inbox)).data;
     assert.equal(bInbox.items.filter(i => i.kind === 'review_reply_created').length, 1);
+    const replyEventId = bInbox.items.find(i => i.kind === 'review_reply_created').id;
+    assert.equal((await resolveEvent(b, replyEventId)).status, 200);
+    assert(await service.systemNotification(b.id, replyEventId));
     const bBoundary = (await call(b, `${inbox}/threads/${t}`)).data;
     await call(a, '/social/grants/given/' + b.id, 'DELETE');
+    assert.equal((await resolveEvent(b, replyEventId)).status, 404);
+    assert.equal(await service.systemNotification(b.id, replyEventId), null);
     assert.equal((await call(b, inbox)).data.items.length, 0);
     assert.equal((await call(b, `${inbox}/threads/${t}`)).status, 403);
     assert.equal((await call(b, inbox + '/read', 'POST', { receipt: bBoundary.receipt })).status, 403);
@@ -161,7 +193,10 @@ Module({ imports: [InboxModule, BillsModule], providers: [{ provide: APP_GUARD, 
     assert(newest.items[0].id > older.items[0].id);
     assert.equal((await call(a, inbox + '/read', 'POST', { receipt: newest.items[0].readReceipt })).data.count, 1);
     assert.equal((await call(a, inbox + '?before=0')).status, 400);
-    console.log('PASS inbox: auth, default privacy, opt-in current preview, switches, page cursors, signed user-bound receipts, concurrent unread boundary, idempotency, hidden/withdrawn filtering, revoked deep links');
+    await db.user.update({ where: { id: a.id }, data: { isActive: false } });
+    assert.equal(await service.systemNotification(a.id, eventId), null);
+    await db.user.update({ where: { id: a.id }, data: { isActive: true } });
+    console.log('PASS inbox: event resolution and fresh push projection, auth, default privacy, opt-in current preview, switches, page cursors, signed user-bound receipts, concurrent unread boundary, idempotency, hidden/withdrawn filtering, revoked deep links');
   } finally {
     for (const u of users) await db.user.deleteMany({ where: { id: u.id } });
     await app.close();

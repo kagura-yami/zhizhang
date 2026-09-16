@@ -7,6 +7,7 @@ process.env.NEW_BILL_NOTICE_WORKER_DISABLED = '1';
 const { Module, ValidationPipe } = require('@nestjs/common');
 const { NestFactory, APP_GUARD } = require('@nestjs/core');
 const { JwtService } = require('@nestjs/jwt');
+const { InboxService } = require('../dist/inbox/inbox.service');
 const { InboxModule } = require('../dist/inbox/inbox.module');
 const { BillsModule } = require('../dist/bills/bills.module');
 const { PrismaService } = require('../dist/prisma/prisma.service');
@@ -53,11 +54,21 @@ Module({ imports: [InboxModule, BillsModule], providers: [{ provide: APP_GUARD, 
     let items = await notices(b);
     assert.equal(items.length, 1); assert.equal(items[0].target.count, 2); assert.equal(items[0].preview, null);
     assert(!JSON.stringify(items).includes('不应')); assert.equal(await db.socialInboxEvent.count({ where: { kind: 'review_bills_created' } }), 1);
+    const service = app.get(InboxService), eventId = items[0].id;
+    assert.equal((await service.systemNotification(b.id, eventId)).body, '打开知账查看详情');
+    await call(b, '/social/preferences', 'PATCH', { notifyInteractions: false });
+    assert(await service.systemNotification(b.id, eventId)); // New-bill toggle is independent.
     await call(b, '/social/preferences', 'PATCH', { notifyNewBills: false, notificationPreview: true });
+    assert.equal(await service.systemNotification(b.id, eventId), null);
+    assert.equal((await call(b, '/social/inbox/events/' + eventId)).status, 200);
     assert.equal((await notices(b))[0].systemNotificationEnabled, false);
     await call(a, `/bills/${first.id}`, 'PATCH', { type: 'income' });
     items = await notices(b); assert.equal(items[0].target.count, 1); assert(items[0].preview.includes('30.0000'));
+    await call(b, '/social/preferences', 'PATCH', { notifyNewBills: true });
+    assert((await service.systemNotification(b.id, eventId)).body.includes('30.0000'));
     await call(a, `/bills/${second.id}`, 'DELETE');
+    assert.equal(await service.systemNotification(b.id, eventId), null);
+    assert.equal((await call(b, '/social/inbox/events/' + eventId)).status, 404);
     assert.equal((await notices(b)).length, 0);
     assert.equal(await db.newBillNotice.count(), 1); // Edits/deletes do not enqueue fresh notices.
     const helperBill = await db.createBill({ userId: a.id, amount: 5, type: 'expense', date: new Date(date) });

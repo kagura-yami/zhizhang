@@ -20,6 +20,9 @@ class InboxController {
   @Get() async list(@CurrentUser('id') user: string, @Query() query: InboxQueryDto) {
     return { success: true, data: await this.service.list(user, query) };
   }
+  @Get('events/:id') async event(@CurrentUser('id') user: string, @Param('id', ParseIntPipe) id: number) {
+    return { success: true, data: await this.service.event(user, id) };
+  }
   @Get('threads/:id') async feedback(@CurrentUser('id') user: string, @Param('id', ParseIntPipe) id: number) {
     return { success: true, data: await this.service.feedback(user, id) };
   }
@@ -27,5 +30,5 @@ class InboxController {
     return { success: true, data: await this.service.read(user, body.receipt) };
   }
 }
-@Module({ imports: [PrismaModule, AuthModule, SocialModule, ReviewsModule], controllers: [InboxController], providers: [InboxService, NewBillWorker] })
+@Module({ imports: [PrismaModule, AuthModule, SocialModule, ReviewsModule], controllers: [InboxController], providers: [InboxService, NewBillWorker], exports: [InboxService] })
 export class InboxModule {}

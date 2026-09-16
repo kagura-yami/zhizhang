@@ -93,15 +93,59 @@ export class InboxService {
     return { id: event.id, kind: event.kind, createdAt: event.createdAt, unread: !event.readAt, title, target, preview: body };
   }
 
+  private async participants(userId: string, rows: SocialInboxEvent[]) {
+    const identities = await this.prisma.billReviewThread.findMany({ where: { id: { in: rows.filter(e => interactions.includes(e.kind)).map(e => payloadOf(e).threadId) } }, select: { ownerId: true, reviewerId: true } });
+    return [userId, ...identities.flatMap(t => [t.ownerId, t.reviewerId]), ...rows.flatMap(e => {
+      const p = payloadOf(e); return [p.ownerId, p.applicantId, p.followerId].filter(v => typeof v === 'string' && uuid.test(v));
+    })];
+  }
+
+  private async resolve(userId: string, eventId: number, delivery: boolean) {
+    // IDs originate from untrusted deep links. Invalid and foreign IDs look identical.
+    if (!Number.isInteger(eventId) || eventId < 1 || eventId > 2147483647) return null;
+    const candidate = await this.prisma.socialInboxEvent.findFirst({ where: { id: eventId, userId } });
+    if (!candidate) return null;
+    const ids = await this.participants(userId, [candidate]);
+    try {
+      return await this.prisma.$transaction(async tx => {
+        await this.access.lockUsers(tx, ids);
+        const preference = await this.access.enabled(tx, userId);
+        const event = await tx.socialInboxEvent.findFirst({ where: { id: eventId, userId } });
+        if (!event) return null;
+        const systemNotificationEnabled = event.kind === 'review_bills_created'
+          ? preference.notifyNewBills : preference.notifyInteractions;
+        if (delivery && (event.readAt || !systemNotificationEnabled)) return null;
+        const item = await this.project(tx, userId, event, preference.notificationPreview);
+        return item ? { ...item, systemNotificationEnabled,
+          readReceipt: this.receipt(userId, { scope: 'events', ids: [item.id] }) } : null;
+      });
+    } catch (error) {
+      if (error?.getStatus?.() === 403 || error?.getStatus?.() === 404) return null;
+      throw error; // Infrastructure failures must remain retryable, not look like suppressed events.
+    }
+  }
+
+  /** Resolve after login; never trust a target or a preview cached in a push payload. */
+  async event(userId: string, eventId: number) {
+    const item = await this.resolve(userId, eventId, false);
+    if (!item) throw new NotFoundException('通知不存在或已不可访问');
+    return item;
+  }
+
+  /** Provider-independent projection, not a delivery acknowledgement. Call just before sending. */
+  async systemNotification(userId: string, eventId: number) {
+    const item = await this.resolve(userId, eventId, true);
+    if (!item) return null;
+    // No navigation target, read capability, account IDs or moderation reason leaves this boundary.
+    return { eventId: item.id, title: item.title, body: item.preview ?? '打开知账查看详情' };
+  }
+
   async list(userId: string, query: InboxQueryDto) {
     // Stable forward scan: hidden entries still advance the cursor, so a client can finish scanning.
     const descending = query.before !== undefined;
     const candidates = await this.prisma.socialInboxEvent.findMany({ where: { userId, id: descending ? { lt: query.before } : { gt: query.after } }, orderBy: { id: descending ? 'desc' : 'asc' }, take: query.limit + 1 });
     const rows = candidates.slice(0, query.limit);
-    const identities = await this.prisma.billReviewThread.findMany({ where: { id: { in: rows.filter(e => interactions.includes(e.kind)).map(e => payloadOf(e).threadId) } }, select: { ownerId: true, reviewerId: true } });
-    const ids = [userId, ...identities.flatMap(t => [t.ownerId, t.reviewerId]), ...rows.flatMap(e => {
-      const p = payloadOf(e); return [p.ownerId, p.applicantId, p.followerId].filter(v => typeof v === 'string' && uuid.test(v));
-    })];
+    const ids = await this.participants(userId, rows);
     return this.prisma.$transaction(async tx => {
       await this.access.lockUsers(tx, ids);
       const preference = await this.access.enabled(tx, userId);
