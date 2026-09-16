@@ -4,6 +4,8 @@ const { readFileSync } = require('node:fs');
 const { spawnSync } = require('node:child_process');
 const database = new URL(process.env.DATABASE_URL || 'http://missing');
 if (database.hostname !== '127.0.0.1' || database.port !== '15447' || database.pathname !== '/zhizhang_budget_test') throw Error('Requires isolated budget test DB');
+const container = process.env.BUDGET_TEST_CONTAINER || 'zhizhang-budget-test';
+if (container !== 'zhizhang-budget-test' && !/^zhizhang-regression-[0-9a-f-]+$/.test(container)) throw Error('Requires disposable budget test container');
 const { PrismaClient } = require('@prisma/client');
 const { BudgetsService } = require('../dist/budgets/budgets.service');
 const { BudgetHistoryService } = require('../dist/budgets/budget-history.service');
@@ -13,7 +15,7 @@ const service = new BudgetsService(prisma), history = new BudgetHistoryService(p
   const owner = await prisma.user.create({ data: { username: 'budget-owner', password: 'test-only' } });
   const other = await prisma.user.create({ data: { username: 'budget-other', password: 'test-only' } });
   const baseline = await service.create(owner.id, { name: '既有预算', amount: 123.4567, period: 'monthly' });
-  const migrated = spawnSync('docker', ['exec', '-i', 'zhizhang-budget-test', 'psql', '-U', 'test', '-d', 'zhizhang_budget_test', '-v', 'ON_ERROR_STOP=1'], {
+  const migrated = spawnSync('docker', ['exec', '-i', container, 'psql', '-U', 'test', '-d', 'zhizhang_budget_test', '-v', 'ON_ERROR_STOP=1'], {
     input: readFileSync('prisma/migrations/202609160011_budget_history/migration.sql'), encoding: 'utf8',
   });
   assert.equal(migrated.status, 0, migrated.stderr);

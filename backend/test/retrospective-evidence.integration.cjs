@@ -60,8 +60,9 @@ const users = [];
   assert.equal(result.payload.facts.bills[500].classification, 'ordinary');
   await assert.rejects(service.collect(owner.id, 'day', '2099-01-01'), /已结束/);
   await assert.rejects(service.collect(owner.id, 'year', '2020'), /日或月/);
-  // Simulated historical baseline, since db push intentionally does not install triggers.
-  await db.budgetHistoryLaunch.create({ data: { id: 1, startedAt: new Date('2019-01-01') } });
+  // Control historical coverage on the fully migrated schema (with production triggers).
+  await db.budgetHistoryLaunch.upsert({ where: { id: 1 },
+    create: { id: 1, startedAt: new Date('2019-01-01') }, update: { startedAt: new Date('2019-01-01') } });
   await db.budgetRevision.create({ data: { budgetId: 1, userId: owner.id, recordedAt: new Date('2020-01-01'), action: 'baseline',
     snapshot: { name: '月预算', amount: '10.0000', period: 'monthly', is_active: true, category_id: category.id } } });
   result = await service.collect(owner.id, 'day', '2020-02-10');

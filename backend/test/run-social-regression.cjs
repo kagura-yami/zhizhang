@@ -26,7 +26,7 @@ const suites = [
   ['ledger', 'ledger'], ['cash-history', 'cash_history'], ['budget-progress', 'budget_progress'], ['social', 'social'], ['review-requests', 'social'],
   ['private-reviews', 'reviews'], ['review-write-limits', 'reviews'],
   ['moderation', 'moderation'], ['inbox', 'inbox'], ['new-bill-notices', 'notices'],
-  ['rankings', 'ranking'], ['retrospective-jobs', 'report'],
+  ['rankings', 'ranking'], ['retrospective-evidence', 'evidence'], ['retrospective-jobs', 'report'],
 ];
 (async () => {
   let created = false, temp;
@@ -39,7 +39,8 @@ const suites = [
     await run(process.execPath, ['node_modules/@nestjs/cli/bin/nest.js', 'build']);
     await run('docker', ['run', '--rm', '--name', container, '--label', 'zhizhang.synthetic-regression=true',
       '-e', 'POSTGRES_USER=test', '-e', 'POSTGRES_PASSWORD=test-only', '-e', 'POSTGRES_DB=postgres',
-      '-p', '127.0.0.1:15451:5432', '-p', '127.0.0.1:15449:5432', '-d', 'postgres:16-alpine']);
+      '-p', '127.0.0.1:15451:5432', '-p', '127.0.0.1:15449:5432',
+      '-p', '127.0.0.1:15448:5432', '-p', '127.0.0.1:15447:5432', '-d', 'postgres:16-alpine']);
     created = true;
     let ready = false;
     for (let i = 0; i < 30; i++) {
@@ -56,20 +57,36 @@ const suites = [
       console.log('PASS: isolated recovery rehearsal only; business suites were not run.');
       return;
     }
+    // Exercise migration 011 with an existing budget, rather than only an empty database.
+    const budgetDb = 'zhizhang_budget_test';
+    await sql('postgres', `CREATE DATABASE ${budgetDb};`);
+    await sql(budgetDb, baselineSql);
+    const historyMigration = migrations.findIndex(m => m.startsWith('202609160011_'));
+    if (historyMigration < 0) throw new Error('Budget history migration is missing');
+    for (const migration of migrations.slice(0, historyMigration))
+      await sql(budgetDb, await readFile(join(cwd, 'prisma/migrations', migration, 'migration.sql'), 'utf8'));
+    const budgetUrl = `postgresql://test:test-only@127.0.0.1:15447/${budgetDb}?schema=public`;
+    await run(process.execPath, ['test/budget-history.integration.cjs'], { env: {
+      DATABASE_URL: budgetUrl, BUDGET_TEST_CONTAINER: container,
+    } });
+    for (const migration of migrations.slice(historyMigration + 1))
+      await sql(budgetDb, await readFile(join(cwd, 'prisma/migrations', migration, 'migration.sql'), 'utf8'));
+    await run(process.execPath, [...prisma, 'migrate', 'diff', '--from-url', budgetUrl,
+      '--to-schema-datamodel', 'prisma/schema.prisma', '--exit-code']);
     for (const [suite, suffix] of suites) {
       const db = `zhizhang_${suffix}_test`;
       // Database names are constants above; all operations target our newly created container.
       await sql('postgres', `DROP DATABASE IF EXISTS ${db}; CREATE DATABASE ${db};`);
       await sql(db, baselineSql);
       for (const migration of migrations) await sql(db, await readFile(join(cwd, 'prisma/migrations', migration, 'migration.sql'), 'utf8'));
-      const port = suffix === 'report' ? 15449 : 15451;
+      const port = suffix === 'report' ? 15449 : suffix === 'evidence' ? 15448 : 15451;
       const DATABASE_URL = `postgresql://test:test-only@127.0.0.1:${port}/${db}?schema=public`;
       console.log(`\nVerifying ${suite} against upgraded schema (${migrations.length} migrations)`);
       await run(process.execPath, [...prisma, 'migrate', 'diff', '--from-url', DATABASE_URL, '--to-schema-datamodel', 'prisma/schema.prisma', '--exit-code'], { env: { DATABASE_URL } });
       await run(process.execPath, [`test/${suite}.integration.cjs`], { env: { DATABASE_URL } });
     }
     await run(process.execPath, ['test/retrospective-generator.integration.cjs']);
-    console.log(`PASS: ${suites.length} upgraded-database suites and four-provider HTTP adapter suite. No production services used.`);
+    console.log(`PASS: ${suites.length + 1} database suites (including budget migration) and four-provider HTTP adapter suite. No production services used.`);
   } finally {
     try {
       if (created) await run('docker', ['stop', container]);
