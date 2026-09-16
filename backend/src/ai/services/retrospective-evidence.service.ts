@@ -47,7 +47,11 @@ export class RetrospectiveEvidenceService {
       async (tx) => {
         const owner = await tx.user.findFirst({
           where: { id: userId, isActive: true },
-          select: { socialPreference: { select: { allowAiFeedback: true } } },
+          select: {
+            socialPreference: {
+              select: { allowAiFeedback: true, updatedAt: true },
+            },
+          },
         });
         if (!owner) throw new NotFoundException('用户不存在或已停用');
         const summary = new LedgerAccumulator(userId, start, end);
@@ -66,6 +70,8 @@ export class RetrospectiveEvidenceService {
           kind: 'bill' | 'message' | 'vote';
           id: number;
           version: string;
+          authorId?: string;
+          consentVersion?: string;
         }> = [];
         const categories = new Map<string, LedgerAccumulator>();
         const categoryNames = new Map<string, string | null>();
@@ -166,7 +172,10 @@ export class RetrospectiveEvidenceService {
                   select: {
                     isActive: true,
                     socialPreference: {
-                      select: { allowAiAuthoredFeedback: true },
+                      select: {
+                        allowAiAuthoredFeedback: true,
+                        updatedAt: true,
+                      },
                     },
                   },
                 },
@@ -193,6 +202,9 @@ export class RetrospectiveEvidenceService {
                   kind: 'vote',
                   id: thread.id,
                   version: thread.vote,
+                  authorId: thread.reviewerId,
+                  consentVersion:
+                    thread.reviewer.socialPreference.updatedAt.toISOString(),
                 });
               }
               let lastMessage = 0;
@@ -208,6 +220,11 @@ export class RetrospectiveEvidenceService {
                   select: {
                     id: true,
                     authorId: true,
+                    author: {
+                      select: {
+                        socialPreference: { select: { updatedAt: true } },
+                      },
+                    },
                     body: true,
                     revision: true,
                     mainSlot: true,
@@ -233,6 +250,9 @@ export class RetrospectiveEvidenceService {
                     kind: 'message',
                     id: message.id,
                     version: String(message.revision),
+                    authorId: message.authorId,
+                    consentVersion:
+                      message.author.socialPreference.updatedAt.toISOString(),
                   });
                 }
                 if (messages.length < 500) break;
@@ -362,7 +382,14 @@ export class RetrospectiveEvidenceService {
         return {
           capturedAt: now.toISOString(),
           inputDigest: createHash('sha256')
-            .update(JSON.stringify({ payload, sources }))
+            .update(
+              JSON.stringify({
+                payload,
+                sources,
+                ownerConsentVersion:
+                  owner.socialPreference?.updatedAt.toISOString(),
+              }),
+            )
             .digest('hex'),
           payload,
           sources,

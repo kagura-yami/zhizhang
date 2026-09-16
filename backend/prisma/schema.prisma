@@ -29,6 +29,7 @@ model User {
   accounts       Account[]        // 用户的账户
     budgets        Budget[]         // 用户的预算
     budgetRevisions BudgetRevision[]
+    retrospectiveJobs RetrospectiveJob[]
   financialGoals FinancialGoal[]  // 用户的财务目标
   aiModelConfigs AIModelConfig[]  // 用户的AI模型配置
   chatSessions   ChatSession[]    // 用户的AI聊天会话
@@ -550,6 +551,31 @@ model Budget {
   @@index([userId, period])  // 复合索引：用户ID + 周期
   @@index([categoryId])      // 索引：分类ID
   @@map("budgets")
+  @@schema("public")
+}
+
+model RetrospectiveJob {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  clientKey String @map("client_key") @db.Uuid
+  kind String @db.VarChar(5)
+  period String @db.VarChar(10)
+  configId Int @map("config_id")
+  status String @default("queued") @db.VarChar(20)
+  attempts Int @default(0)
+  leaseToken String? @map("lease_token") @db.Uuid
+  leaseUntil DateTime? @map("lease_until") @db.Timestamptz(6)
+  errorCode String? @map("error_code") @db.VarChar(30)
+  sources Json?
+  result Json?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, clientKey])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([sources], type: Gin)
+  @@map("retrospective_jobs")
   @@schema("public")
 }
 

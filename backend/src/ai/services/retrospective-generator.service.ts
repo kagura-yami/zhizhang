@@ -13,6 +13,7 @@ import {
   QwenAdapter,
 } from '../adapters';
 import { RetrospectiveEvidenceService } from './retrospective-evidence.service';
+import type { RetrospectiveEvidence } from './retrospective-output';
 import {
   RETROSPECTIVE_PROMPT,
   RETROSPECTIVE_PROMPT_VERSION,
@@ -45,6 +46,7 @@ export class RetrospectiveGeneratorService {
     period: string,
     configId?: number,
     signal?: AbortSignal,
+    onEvidence?: (input: RetrospectiveEvidence) => Promise<void>,
   ) {
     const config =
       configId === undefined
@@ -54,6 +56,12 @@ export class RetrospectiveGeneratorService {
     const adapter = this.adapters.get(config.provider);
     if (!adapter) throw new BadRequestException('该模型提供商暂不支持复盘');
     const input = await this.evidence.collect(userId, kind, period);
+    if (onEvidence) {
+      await onEvidence(input);
+      const registered = await this.evidence.collect(userId, kind, period);
+      if (registered.inputDigest !== input.inputDigest)
+        throw new ConflictException('复盘证据授权已变化，请重试');
+    }
     const controller = new AbortController();
     const abort = () => controller.abort();
     signal?.addEventListener('abort', abort, { once: true });
@@ -95,7 +103,8 @@ export class RetrospectiveGeneratorService {
       const report = validateRetrospectiveOutput(response.content, input);
       // No stale authorization/hidden text may be accepted after an in-flight model response.
       const current = await this.evidence.collect(userId, kind, period);
-      if (controller.signal.aborted) throw new BadGatewayException('复盘生成超时或已取消，请重试');
+      if (controller.signal.aborted)
+        throw new BadGatewayException('复盘生成超时或已取消，请重试');
       if (current.inputDigest !== input.inputDigest)
         throw new ConflictException(
           '复盘期间账单、评价或授权已变化，请重新生成',

@@ -20,13 +20,16 @@ import { CategoriesModule } from '../categories/categories.module';
 import { BudgetsModule } from '../budgets/budgets.module';
 import { RetrospectiveEvidenceService } from './services/retrospective-evidence.service';
 import { RetrospectiveGeneratorService } from './services/retrospective-generator.service';
+import { RetrospectiveJobsService } from './services/retrospective-jobs.service';
+import { RetrospectiveController } from './retrospective.controller';
 
 @Module({
   imports: [BillsModule, CategoriesModule, BudgetsModule],
-  controllers: [AIController, AIConfigController, ChatController, AsrController],
+  controllers: [AIController, AIConfigController, ChatController, AsrController, RetrospectiveController],
   providers: [
     RetrospectiveEvidenceService,
     RetrospectiveGeneratorService,
+    RetrospectiveJobsService,
     AIService,
     AIConfigService,
     ChatService,
