@@ -141,7 +141,7 @@ export default function DailyView({
             {selectedDayData && (
               <View style={styles.daySummary}>
                 {selectedDayData.refund > 0 && <Text style={styles.incomeText}>退 +{selectedDayData.refund.toFixed(2)}</Text>}
-                {selectedDayData.pending > 0 && <Text style={styles.expenseText}>{selectedDayData.pending} 笔待确认</Text>}
+                {selectedDayData.pending > 0 && <Text style={styles.expenseText}>{selectedDayData.pending} 笔异常</Text>}
                 {selectedDayData.income > 0 && (
                   <Text style={styles.incomeText}>收 +{selectedDayData.income.toFixed(2)}</Text>
                 )}

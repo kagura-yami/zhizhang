@@ -15,7 +15,7 @@ const explanations: Record<string, string> = {
   not_participating: '你尚未参加排行榜。可先查看规则，再决定是否参与。',
   friends_only: '你选择了仅好友参榜，可切换到好友榜查看自己的名次。',
   no_period_record: '本周期没有你的参榜记录；退出后重新加入不会恢复旧榜。',
-  needs_review: '本周期还有待确认账单，确认完整后才能参与未结束的榜单。',
+  needs_review: '存在无法计算的异常数据，请编辑对应账单。',
   no_valid_entries: '本周期没有有效收支账单。只有转账、调账或误记时不上榜。',
 };
 export default function SocialRankingsScreen({
@@ -136,23 +136,7 @@ export default function SocialRankingsScreen({
                 {explanations[result.mineStatus] || '本周期暂无你的名次。'}
               </Text>
             )}
-            {result.myPendingCount > 0 && (
-              <>
-                <Text style={s.muted}>
-                  待确认 {result.myPendingCount} 笔
-                  {result.closed ? '；现在确认不会改变本期封榜结果。' : ''}
-                </Text>
-                <Action
-                  title="检查本期账务"
-                  onPress={() =>
-                    navigation.navigate(
-                      'LedgerReview',
-                      rankingDates(kind, period),
-                    )
-                  }
-                />
-              </>
-            )}
+
           </View>
           <View style={s.row}>
             <Text style={[s.muted, s.grow]}>

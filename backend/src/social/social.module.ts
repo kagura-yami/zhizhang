@@ -13,6 +13,7 @@ const normalizeId = { transform: (id: string) => id.toLowerCase() };
 class SocialController {
   constructor(private readonly service: SocialService, private readonly requests: ReviewRequestService) {}
   private respond<T>(result: Promise<T>) { return result.then(data => ({ success: true, data })); }
+  @Delete('enable') disable(@CurrentUser('id') id: string) { return this.respond(this.service.disable(id)); }
   @Get('me') me(@CurrentUser('id') id: string) { return this.respond(this.service.preferences(id)); }
   @Get('reviewable-owners') reviewableOwners(@CurrentUser('id') id: string, @Query() dto: SocialPageDto) { return this.respond(this.service.reviewableOwners(id, dto)); }
   @Get('requests/:direction') requestsList(@CurrentUser('id') id: string, @Param('direction') direction: string, @Query() dto: SocialPageDto) { return this.respond(this.requests.list(id, direction, dto)); }

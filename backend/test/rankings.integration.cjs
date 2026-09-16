@@ -44,7 +44,7 @@ Module({ imports: [RankingsModule, LedgerModule, BillsModule], providers: [{ pro
     return b;
   }
   async function enable(u, scope = 'global') {
-    return request('/social/enable', u, 'POST', { consentVersion: '2026-09-16', rankingScope: scope }, 201);
+    return request('/social/enable', u, 'POST', { consentVersion: '2026-09-17', rankingScope: scope }, 201);
   }
   async function prefs(u, data) { return request('/social/preferences', u, 'PATCH', data); }
   async function follow(a, b) { return request(`/social/following/${b.id}`, a, 'PUT'); }
@@ -74,15 +74,15 @@ Module({ imports: [RankingsModule, LedgerModule, BillsModule], providers: [{ pro
     await request(url('day', yesterday), alpha, 'GET', null, 400);
     assert.deepEqual((await request('/rankings/periods?kind=year', alpha)).items, [{ period: keys.year, closed: false }]);
     let result = await request(url(), charlie);
-    assert.equal(result.total, 5);
-    assert.deepEqual(result.items.map(i => i.rank), [1, 1, 3, 4, 5]);
+    assert.equal(result.total, 6);
+    assert.deepEqual(result.items.map(i => i.rank), [1, 2, 2, 4, 5, 6]);
     assert.equal(result.mine.amount, '100.0000');
     assert.equal(result.items.find(i => i.user.id === alpha.id).amount, null);
-    assert.equal(result.items.find(i => i.user.id === zero.id).rank, 4);
+    assert.equal(result.items.find(i => i.user.id === zero.id).rank, 5);
     result = await request(url('year', keys.year, 'global', 1, 2), charlie);
-    assert.equal(result.items.length, 2); assert.equal(result.myPage, 2); assert.equal(result.mine.rank, 3);
-    assert.equal((await request(url(), pending)).mineStatus, 'needs_review');
-    assert.equal((await request(url(), pending)).myPendingCount, 1);
+    assert.equal(result.items.length, 2); assert.equal(result.myPage, 2); assert.equal(result.mine.rank, 4);
+    assert.equal((await request(url(), pending)).mineStatus, 'ranked');
+    assert.equal((await request(url(), pending)).myPendingCount, 0);
     assert.equal((await request(url(), transfer)).mineStatus, 'no_valid_entries');
     assert.equal((await request(url(), friendsOnly)).mineStatus, 'friends_only');
     await prefs(alpha, { showRankingAmount: true });
@@ -93,7 +93,7 @@ Module({ imports: [RankingsModule, LedgerModule, BillsModule], providers: [{ pro
     result = await request(url('year', keys.year, 'friends'), alpha);
     assert.equal(result.total, 3); assert.equal(result.items[0].user.id, friendsOnly.id);
     await request(`/social/blocks/${bravo.id}`, alpha, 'PUT');
-    assert.equal((await request(url(), alpha)).total, 4);
+    assert.equal((await request(url(), alpha)).total, 5);
     assert.equal((await request(url('year', keys.year, 'friends'), alpha)).total, 2);
     await request(`/social/blocks/${bravo.id}`, alpha, 'DELETE');
     assert.equal((await request(url('year', keys.year, 'friends'), alpha)).total, 2, 'unblock must not recreate friendship');
@@ -103,7 +103,7 @@ Module({ imports: [RankingsModule, LedgerModule, BillsModule], providers: [{ pro
     const frozen = await user('frozen');
     const historical = await bill(frozen, '123.4567', 'income', yesterday);
     const oldBill = await bill(frozen, '321', 'income', `${priorYear}-12-30`);
-    await prisma.socialPreference.create({ data: { userId: frozen.id, enabledAt: oldTime, consentVersion: '2026-09-16', rankingScope: 'global' } });
+    await prisma.socialPreference.create({ data: { userId: frozen.id, enabledAt: oldTime, consentVersion: '2026-09-17', rankingScope: 'global' } });
     await prisma.$transaction(async tx => {
       await lockSocialUsers(tx, [frozen.id]);
       await changeRankingParticipation(tx, frozen.id, 'global', oldTime);
@@ -111,7 +111,7 @@ Module({ imports: [RankingsModule, LedgerModule, BillsModule], providers: [{ pro
     await request(`/bills/${historical.id}`, frozen, 'PATCH', { amount: 999 });
     let day = await request(url('day', yesterday), frozen);
     assert.equal(day.mine.amount, '123.4567', 'mutation must freeze pre-change amount even without a worker');
-    assert.equal((await request(url(), frozen)).mineStatus, 'needs_review', 'bill edits invalidate current-period classification');
+    assert.equal((await request(url(), frozen)).mineStatus, 'ranked', 'bill edits automatically update current-period ranking');
     const edited = await prisma.bill.findUnique({ where: { id: historical.id } });
     await request(`/ledger/bills/${historical.id}/classification`, frozen, 'PUT', { expectedUpdatedAt: edited.updatedAt.toISOString(), kind: 'ordinary', currency: 'CNY' });
     assert.equal((await request(url(), frozen)).mine.amount, '999.0000');
@@ -136,11 +136,11 @@ Module({ imports: [RankingsModule, LedgerModule, BillsModule], providers: [{ pro
 
     // All application writers refresh the open-period projection; empty and pending states never leak a stale rank.
     const created = await prisma.createBill({ userId: frozen.id, amount: 10, type: 'income', date: new Date(today) });
-    assert.equal((await request(url(), frozen)).mineStatus, 'needs_review');
+    assert.equal((await request(url(), frozen)).mineStatus, 'ranked');
     await prisma.deleteBill(created.id, frozen.id);
     assert.equal((await request(url(), frozen)).mine.amount, '999.0000');
     await prisma.updateBill(historical.id, { amount: 900 }, frozen.id);
-    assert.equal((await request(url(), frozen)).mineStatus, 'needs_review');
+    assert.equal((await request(url(), frozen)).mineStatus, 'ranked');
     await request(`/bills/${historical.id}`, frozen, 'DELETE');
     assert.equal((await request(url(), frozen)).mineStatus, 'no_valid_entries');
 
@@ -167,18 +167,18 @@ Module({ imports: [RankingsModule, LedgerModule, BillsModule], providers: [{ pro
     assert.equal(await prisma.rankingResult.count({ where: { userId: many.id } }), 0);
     assert.equal((await request(url(), many)).mineStatus, 'not_participating');
     await prefs(many, { rankingScope: 'global' });
-    assert.equal((await request(url(), many)).mineStatus, 'needs_review');
+    assert.equal((await request(url(), many)).mineStatus, 'ranked');
 
     const late = await user('late-confirmation');
     const lateBill = await bill(late, '80', 'income', yesterday, null);
     const yesterdayTime = new Date(`${yesterday}T04:00:00Z`);
-    await prisma.socialPreference.create({ data: { userId: late.id, enabledAt: yesterdayTime, consentVersion: '2026-09-16', rankingScope: 'global' } });
+    await prisma.socialPreference.create({ data: { userId: late.id, enabledAt: yesterdayTime, consentVersion: '2026-09-17', rankingScope: 'global' } });
     await prisma.$transaction(async tx => {
       await lockSocialUsers(tx, [late.id]);
       await changeRankingParticipation(tx, late.id, 'global', yesterdayTime);
     });
     await request(`/ledger/bills/${lateBill.id}/classification`, late, 'PUT', { expectedUpdatedAt: lateBill.updatedAt.toISOString(), kind: 'ordinary', currency: 'CNY' });
-    assert.equal((await request(url('day', yesterday), late)).mineStatus, 'needs_review', 'late classification cannot retroactively enter a closed ranking');
+    assert.equal((await request(url('day', yesterday), late)).mineStatus, 'ranked', 'unclassified bills already participated before the period closed');
     assert.equal((await request(url(), late)).mine.amount, '80.0000');
 
     const cash = await user('cash');
@@ -187,7 +187,21 @@ Module({ imports: [RankingsModule, LedgerModule, BillsModule], providers: [{ pro
     await enable(cash);
     assert.equal((await request(url(), cash)).mine.amount, '-15.0000');
     await request('/bills', cash, 'POST', { amount: 1, type: 'income', date: today }, 201);
-    assert.equal((await request(url(), cash)).mineStatus, 'needs_review', 'HTTP bill creation refreshes the projection');
+    assert.equal((await request(url(), cash)).mineStatus, 'ranked', 'HTTP bill creation refreshes the projection');
+    // The optional community never gates normal ledger totals or needs per-bill confirmation.
+    const ledgerUrl = `/ledger/summary?startDate=${today}&endDate=${today}`;
+    const beforeDisable = await request(ledgerUrl, cash);
+    const savedBillCount = await prisma.bill.count({where:{userId:cash.id}});
+    await request('/social/enable', cash, 'DELETE');
+    assert.equal((await request('/social/me',cash)).enabled,false);
+    assert.equal(await prisma.rankingResult.count({where:{userId:cash.id}}),0);
+    assert.deepEqual(await request(ledgerUrl,cash),beforeDisable);
+    assert.equal(await prisma.bill.count({where:{userId:cash.id}}),savedBillCount);
+    await request(url(),cash,'GET',null,403);
+    const reenabling = await request('/social/enable',cash,'POST',{consentVersion:'2026-09-17'},201);
+    assert.equal(reenabling.rankingScope,'global');
+    assert.equal((await request(url(),cash)).mine.amount,'-14.0000');
+    assert.deepEqual(await request(ledgerUrl,cash),beforeDisable);
     console.log('Rankings integration passed: privacy, ties, zero/negative, pagination, UTC+8 history, pre-write sealing, re-entry, all writers, 503 bills, rollback.');
   } finally {
     await prisma.user.deleteMany({ where: { id: { in: users.map(u => u.id) } } });

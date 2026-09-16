@@ -33,7 +33,7 @@ export class SocialService {
     return this.locked([userId], async tx => {
       const now = new Date();
       const result = await tx.socialPreference.upsert({ where: { userId },
-        create: { userId, consentVersion, enabledAt: now, ...preferences }, update: { consentVersion, ...preferences } });
+        create: { userId, consentVersion, enabledAt: now, rankingScope: 'global', ...preferences }, update: { consentVersion, ...preferences } });
       await changeRankingParticipation(tx, userId, result.rankingScope, now);
       return result;
     });
@@ -46,6 +46,20 @@ export class SocialService {
       const result = await tx.socialPreference.update({ where: { userId }, data: dto });
       await changeRankingParticipation(tx, userId, result.rankingScope, now);
       return result;
+    });
+  }
+
+  async disable(userId: string) {
+    return this.locked([userId], async tx => {
+      await tx.reviewGrant.updateMany({ where: { status: 'active', OR: [{ ownerId: userId }, { reviewerId: userId }] },
+        data: { status: 'revoked', version: { increment: 1 } } });
+      await tx.reviewRequest.updateMany({ where: { status: 'pending', OR: [{ ownerId: userId }, { applicantId: userId }] },
+        data: { status: 'system_cancelled', version: { increment: 1 }, decidedAt: new Date() } });
+      await tx.socialFollow.deleteMany({ where: { OR: [{ followerId: userId }, { followeeId: userId }] } });
+      await changeRankingParticipation(tx, userId, 'none', new Date());
+      // Existing consent-deletion trigger invalidates derived AI reports.
+      await tx.socialPreference.deleteMany({ where: { userId } });
+      return { enabled: false };
     });
   }
 

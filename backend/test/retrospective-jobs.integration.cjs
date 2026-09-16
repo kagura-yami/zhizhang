@@ -50,7 +50,7 @@ const model = http.createServer(async (req, res) => {
     const result = await response.json(); assert.equal(response.status, expected, JSON.stringify(result)); return result.data;
   }
   try {
-    async function user(name) { const u = await db.user.create({ data: { username: `${name}-${randomUUID()}`, password: 'test', socialPreference: { create: { enabledAt: new Date(), consentVersion: '2026-09-16', allowAiFeedback: true, allowAiAuthoredFeedback: true } } } }); users.push(u.id); return u; }
+    async function user(name) { const u = await db.user.create({ data: { username: `${name}-${randomUUID()}`, password: 'test', socialPreference: { create: { enabledAt: new Date(), consentVersion: '2026-09-17', allowAiFeedback: true, allowAiAuthoredFeedback: true } } } }); users.push(u.id); return u; }
     const owner = await user('report-owner'), friend = await user('report-friend');
     const config = await db.aIModelConfig.create({ data: { userId: owner.id, name: 'synthetic', provider: 'openai', model: 'synthetic', apiKey: 'test-only', apiBaseUrl: `http://127.0.0.1:${model.address().port}`, isDefault: true } });
     const bill = await db.bill.create({ data: { userId: owner.id, date: new Date('2020-02-10'), amount: '25.0000', type: 'expense' } });

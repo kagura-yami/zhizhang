@@ -19,7 +19,7 @@ describe('社群权限基础', () => {
     expect((await validate(plainToInstance(SocialPreferencesDto, { allowAiFeedback: null }))).length).toBeGreaterThan(0);
     expect((await validate(plainToInstance(SocialPreferencesDto, { allowAiAuthoredFeedback: null }))).length).toBeGreaterThan(0);
     expect(await validate(plainToInstance(SocialPreferencesDto, { allowAiAuthoredFeedback: false }))).toHaveLength(0);
-    expect(await validate(plainToInstance(EnableSocialDto, { consentVersion: '2026-09-16' }))).toHaveLength(0);
+    expect(await validate(plainToInstance(EnableSocialDto, { consentVersion: '2026-09-17' }))).toHaveLength(0);
   });
   it('历史开关允许 null，但授权版本不允许 null', async () => {
     expect(await validate(plainToInstance(SaveGrantDto, { scope: 'expense', historyStart: null }))).toHaveLength(0);

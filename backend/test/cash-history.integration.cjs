@@ -65,21 +65,21 @@ Module({ imports: [LedgerModule], providers: [{ provide: APP_GUARD, useClass: Jw
     await db.bill.createMany({ data: Array.from({ length: 501 }, () => ({ userId: owner.id, type: 'expense', amount: '1', date: old })) });
     await make('1', 'expense', end, null);
     const partial = (await request(owner)).body.data;
-    assert.equal(partial.summary.counts.total, 510); assert.equal(partial.summary.counts.needsReview, 502);
-    assert.equal(partial.summary.cashSurplus, '870.0002'); assert.equal(partial.opening.counts.needsReview, 501);
-    assert.equal(partial.window.counts.needsReview, 1); assert.equal(partial.window.pendingBillIds.length, 1);
-    assert.equal(partial.monthly[0].counts.needsReview, 0); assert.equal(partial.monthly[0].cumulativeNeedsReview, 501);
-    assert.equal(partial.monthly[0].cumulativeComplete, false); assert.equal(partial.monthly[11].cumulativeNeedsReview, 502);
+    assert.equal(partial.summary.counts.total, 510); assert.equal(partial.summary.counts.needsReview, 0);
+    assert.equal(partial.summary.cashSurplus, '368.0002'); assert.equal(partial.opening.counts.needsReview, 0);
+    assert.equal(partial.window.counts.needsReview, 0); assert.equal(partial.window.pendingBillIds.length, 0);
+    assert.equal(partial.monthly[0].counts.needsReview, 0); assert.equal(partial.monthly[0].cumulativeNeedsReview, 0);
+    assert.equal(partial.monthly[0].cumulativeComplete, true); assert.equal(partial.monthly[11].cumulativeNeedsReview, 0);
     // December used to produce a 24-month client range. Check December and UTC+8 January rollover.
     const edgeYear = end.getUTCFullYear() + 2;
     const december = await service.cashHistory(owner.id, new Date(`${edgeYear}-12-15T00:00:00Z`));
     assert.equal(december.window.startDate, `${edgeYear}-01-01`); assert.equal(december.window.endDate, `${edgeYear}-12-31`);
     const january = await service.cashHistory(owner.id, new Date(`${edgeYear}-12-31T16:00:00Z`));
     assert.equal(january.window.startDate, `${edgeYear}-02-01`); assert.equal(january.window.endDate, `${edgeYear + 1}-01-31`);
-    assert.equal(january.monthly.length, 12); assert.equal(january.summary.cashSurplus, '1647.0002');
+    assert.equal(january.monthly.length, 12); assert.equal(january.summary.cashSurplus, '1145.0002');
     await db.bill.update({ where: { id: expense.id }, data: { updatedAt: new Date(expense.updatedAt.getTime() + 1000) } });
     const stale = (await request(owner)).body.data;
-    assert.equal(stale.summary.cashSurplus, '920.0004'); assert.equal(stale.summary.counts.needsReview, 503);
+    assert.equal(stale.summary.cashSurplus, '368.0002'); assert.equal(stale.summary.counts.needsReview, 0);
     console.log('PASS cash history: auth/isolation, 510 rows, exact reconstructed cumulative values, carried unknown history, zero months, refund periods, future cutoff, December/UTC+8 boundary and stale confirmation');
   } finally { for (const user of users) await db.user.deleteMany({ where: { id: user.id } }); await app.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

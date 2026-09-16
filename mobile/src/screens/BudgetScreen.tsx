@@ -173,15 +173,15 @@ function BudgetContent({ token }: { token: string }) {
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
-          <Text style={styles.summaryNumber} maxFontSizeMultiplier={1.2}>{resource.value ? pendingBudgets : '—'}</Text>
-          <Text style={styles.summaryLabel} numberOfLines={1} maxFontSizeMultiplier={1.15}>待确认</Text>
+          <Text style={styles.summaryNumber} maxFontSizeMultiplier={1.2}>{resource.value ? totalBudgets - overBudgets : '—'}</Text>
+          <Text style={styles.summaryLabel} numberOfLines={1} maxFontSizeMultiplier={1.15}>进行中</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
           <Text style={[styles.summaryNumber, overBudgets > 0 && { color: styles._colors.error }]} maxFontSizeMultiplier={1.2}>
             {resource.value ? overBudgets : '—'}
           </Text>
-          <Text style={styles.summaryLabel} numberOfLines={1} maxFontSizeMultiplier={1.15}>确认已超</Text>
+          <Text style={styles.summaryLabel} numberOfLines={1} maxFontSizeMultiplier={1.15}>已超支</Text>
         </View>
       </View>
 
@@ -192,7 +192,7 @@ function BudgetContent({ token }: { token: string }) {
         refreshControl={<RefreshControl refreshing={isFetching} onRefresh={onRefresh} />}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.ruleText}>按当前预算设置核对本月或本年消费（UTC+8）。退款单列，不抵减消费；内部转账、调账和忽略项不计入。</Text>
+        <Text style={styles.ruleText}>按日常账单自动统计本月或本年支出。</Text>
         <Status loading={isFetching} error={resource.error} refresh={refetch} />
         {!isFetching && resource.value && (budgets.length === 0 ? (
           <View style={[styles.emptyState, compactLayout && styles.emptyStateCompact]}>
@@ -249,7 +249,7 @@ function BudgetContent({ token }: { token: string }) {
               {/* Amounts */}
               <View style={styles.budgetAmounts}>
                 <Text style={styles.budgetAmountSpent}>
-                  已确认消费 ¥{Number(budget.spent).toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                  支出 ¥{Number(budget.spent).toLocaleString(undefined, { maximumFractionDigits: 4 })}
                 </Text>
                 <Text style={styles.budgetAmountTotal}>
                   / 预算 ¥{Number(budget.amount).toLocaleString(undefined, { maximumFractionDigits: 4 })}
@@ -260,7 +260,7 @@ function BudgetContent({ token }: { token: string }) {
               {budget.confirmedOverBudget && (
                 <View style={styles.warningBar}>
                   <Text style={styles.warningText}>
-                    {budget.comparisonStatus === 'complete' ? '超支' : '已确认至少超支'} ¥{Math.abs(Number(budget.remaining)).toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                    {budget.comparisonStatus === 'complete' ? '超支' : '超支'} ¥{Math.abs(Number(budget.remaining)).toLocaleString(undefined, { maximumFractionDigits: 4 })}
                   </Text>
                 </View>
               )}
@@ -268,9 +268,8 @@ function BudgetContent({ token }: { token: string }) {
               <Text style={styles.ruleText}>退款 ¥{Number(budget.refundInflow).toLocaleString(undefined, { maximumFractionDigits: 4 })} · {budget.ledger.startDate} 至 {budget.ledger.endDate}</Text>
               {Number(budget.amount) === 0 && <Text style={styles.ruleText}>零预算：发生消费即超支，不计算百分比。</Text>}
               {budget.comparisonStatus !== 'complete' && <Text style={styles.warningText}>
-                {budget.comparisonStatus === 'invalid_budget' ? '预算金额无效，请编辑修正。' : `${budget.ledger.counts.needsReview} 笔待核对，当前消费和进度不完整，暂不判断最终剩余额度。`}
+                {budget.comparisonStatus === 'invalid_budget' ? '预算金额无效，请编辑修正。' : `${budget.ledger.counts.needsReview} 笔异常，当前消费和进度不完整，暂不判断最终剩余额度。`}
               </Text>}
-              <Action title="核对本周期账单" onPress={() => navigation.navigate('LedgerReview', { startDate: budget.ledger.startDate, endDate: budget.ledger.endDate })} />
               {/* Actions */}
               <View style={styles.budgetActions}>
                 <BrutalPressable

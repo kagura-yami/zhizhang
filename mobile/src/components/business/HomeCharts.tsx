@@ -59,7 +59,7 @@ export default function HomeCharts({ analytics }: HomeChartsProps) {
     if (period === 'monthly') {
       return expenseCategories.length > 0 ? (
         <PieChart data={expenseCategories} size={190} innerRadius={0.58} showLabels showLegend />
-      ) : <Text style={styles.emptyText}>本月暂无已确认消费</Text>;
+      ) : <Text style={styles.emptyText}>本月暂无支出</Text>;
     }
 
     return <AnnualCharts width={chartWidth} />;
@@ -77,7 +77,7 @@ export default function HomeCharts({ analytics }: HomeChartsProps) {
         onSelect={(key) => setPeriod(key as ChartPeriod)}
         style={styles.segmented}
       />
-      <Text style={styles.chartSubtitle}>已确认人民币口径；收入不含退款，待核对账单不计入。</Text>
+      <Text style={styles.chartSubtitle}>收入不含退款，账单保存后自动计入。</Text>
       <View onLayout={e => setChartWidth(e.nativeEvent.layout.width)}>{renderChart()}</View>
     </View>
   );
@@ -93,7 +93,7 @@ function AnnualCharts({ width }: { width: number }) {
       <BarChart width={width} data={yearlyData.map(r => ({ label: String(r.year), value: r.expense }))} height={180} barColor={styles._colors.expense} formatValue={v => `¥${v.toFixed(0)}`} />
       <Text style={styles.chartSubtitle}>年度普通收入</Text>
       <BarChart width={width} data={yearlyData.map(r => ({ label: String(r.year), value: r.income }))} height={180} barColor={styles._colors.income} formatValue={v => `¥${v.toFixed(0)}`} />
-      {yearlyData.map(r => <Text key={r.year} style={styles.chartSubtitle}>{r.year}：退款 ¥{r.refund.toFixed(2)}{r.pending ? ` · ${r.pending} 笔待核对，金额不完整` : ''}</Text>)}
+      {yearlyData.map(r => <Text key={r.year} style={styles.chartSubtitle}>{r.year}：退款 ¥{r.refund.toFixed(2)}{r.pending ? ` · ${r.pending} 笔数据异常` : ''}</Text>)}
     </>}
   </>;
 }

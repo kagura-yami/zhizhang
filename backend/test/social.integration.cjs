@@ -29,8 +29,8 @@ Module({ imports: [SocialModule], providers: [{ provide: APP_GUARD, useClass: Jw
     assert.equal((await call(a, '/users?query=test')).status, 403);
     assert.equal((await call(a, '/enable', 'POST', { consentVersion: 'old' })).status, 400);
     for (const u of [a, b, c]) {
-      const pref = await call(u, '/enable', 'POST', { consentVersion: '2026-09-16' });
-      assert.equal(pref.status, 201); assert.equal(pref.data.rankingScope, 'none'); assert.equal(pref.data.allowAiFeedback, false);
+      const pref = await call(u, '/enable', 'POST', { consentVersion: '2026-09-17' });
+      assert.equal(pref.status, 201); assert.equal(pref.data.rankingScope, 'global'); assert.equal(pref.data.allowAiFeedback, false);
       assert.equal(pref.data.notificationPreview, false); assert.equal(pref.data.showRankingAmount, false);
     }
     assert.equal((await call(a, '/preferences', 'PATCH', { allowAiFeedback: null })).status, 400);
@@ -109,7 +109,7 @@ Module({ imports: [SocialModule], providers: [{ provide: APP_GUARD, useClass: Jw
     assert.equal((await call(b, '/owners/' + a.id + '/bills')).status, 403); // unblock never restores access
     assert.equal((await call(b, '/users/' + a.id)).data.friend, false);
     for (let i = 0; i < 21; i++) {
-      const extra = await db.user.create({ data: { username: `owner-page-${Date.now()}-${i}`, password: 'test-only', socialPreference: { create: { enabledAt: new Date(), consentVersion: '2026-09-16' } } } });
+      const extra = await db.user.create({ data: { username: `owner-page-${Date.now()}-${i}`, password: 'test-only', socialPreference: { create: { enabledAt: new Date(), consentVersion: '2026-09-17' } } } });
       users.push(extra);
       await db.reviewGrant.create({ data: { ownerId: extra.id, reviewerId: b.id, scope: 'expense', activatedAt: new Date() } });
     }
@@ -117,6 +117,14 @@ Module({ imports: [SocialModule], providers: [{ provide: APP_GUARD, useClass: Jw
     const ownerPage2 = (await call(b, '/reviewable-owners?page=2&pageSize=20')).data;
     assert.equal(ownerPage1.total, 21); assert.equal(ownerPage1.items.length, 20); assert.equal(ownerPage2.items.length, 1);
     assert.equal(new Set([...ownerPage1.items, ...ownerPage2.items].map(item => item.owner.id)).size, 21);
+    const billsBeforeDisable = await db.bill.count({where:{userId:b.id}});
+    assert.equal((await call(b,'/enable','DELETE')).status,200);
+    assert.equal((await call(b,'/me')).data.enabled,false);
+    assert.equal((await call(b,'/reviewable-owners')).status,403);
+    assert.equal(await db.reviewGrant.count({where:{reviewerId:b.id,status:'active'}}),0);
+    assert.equal(await db.bill.count({where:{userId:b.id}}),billsBeforeDisable);
+    await call(b,'/enable','POST',{consentVersion:'2026-09-17'});
+    assert.equal((await call(b,'/reviewable-owners')).data.total,0);
     console.log('PASS social integration: explicit consent, default privacy, search projection, mutual following, private lists, grant direction/scope/history, version conflicts, exit, block races and revocation');
   } finally {
     for (const u of users) await db.user.deleteMany({ where: { id: u.id } });

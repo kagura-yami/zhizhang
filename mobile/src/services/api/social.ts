@@ -1,7 +1,7 @@
 import { httpService } from '../http';
 import type { ApiResponse } from '../../types/api';
 
-export const SOCIAL_CONSENT_VERSION = '2026-09-16';
+export const SOCIAL_CONSENT_VERSION = '2026-09-17';
 export const REPORT_DISCLOSURE_VERSION = '2026-09-16';
 export interface BillFeedback {
   billId: number;
@@ -387,6 +387,7 @@ export function createSocialApi(token: string) {
           config,
         ),
       ),
+    disable: () => data(httpService.delete('/social/enable', config)),
     preferences: (values: Partial<SocialPreferences>) =>
       data<SocialPreferences>(
         httpService.patch('/social/preferences', values, config),

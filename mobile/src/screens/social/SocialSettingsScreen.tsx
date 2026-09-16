@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Switch, Text, View } from 'react-native';
+import { DeviceEventEmitter, Switch, Text, View } from 'react-native';
 import {
   SOCIAL_CONSENT_VERSION,
   SocialPreferences,
@@ -62,8 +62,8 @@ export default function SocialSettingsScreen({
             账单仍然私密；只有你明确授权的人能看到收支类型、金额、分类和时间。不同评价者的文字对话相互隔离。
           </Text>
           <Text style={s.text}>
-            默认不参加排行榜、不公开关系名单，也不允许将好友文字用于 AI
-            复盘。授权不涉及银行或支付账户。
+            日常账单会自动参与社群排行榜，无需逐笔确认；默认隐藏具体结余金额。
+            不公开关系名单，也不允许将好友文字用于 AI 复盘。你可以随时关闭社群，普通记账不受影响。
           </Text>
           <Consent
             checked={accepted}
@@ -82,13 +82,20 @@ export default function SocialSettingsScreen({
               status.requiredConsentVersion !== SOCIAL_CONSENT_VERSION
             }
             onPress={() => {
-              void resource.run(api.enable, onEnabled);
+              void resource.run(api.enable, () => { DeviceEventEmitter.emit('communityChanged'); onEnabled?.(); });
             }}
           />
         </View>
       )}
       {status?.enabled && status.preference && (
         <>
+          <View style={s.card}>
+            <View style={s.row}>
+              <Text style={[s.heading, s.grow]}>启用社群</Text>
+              <Switch accessibilityLabel="启用社群" value disabled={resource.busy} onValueChange={() => confirm('关闭社群', '将退出排行榜并撤销评账授权和关注关系。你的账单、收支统计和自动记账继续保留。再次开启需重新授权。', () => { void resource.run(api.disable, () => DeviceEventEmitter.emit('communityChanged')); })} />
+            </View>
+            <Text style={s.muted}>社群是可选扩展，不影响日常记账。</Text>
+          </View>
           <View style={s.card}>
             <Text style={s.heading}>我的用户 ID</Text>
             <Text selectable style={s.small}>
@@ -144,10 +151,6 @@ export default function SocialSettingsScreen({
           <Action
             title="结余排行榜"
             onPress={() => navigation.navigate('SocialRankings')}
-          />
-          <Action
-            title="确认账务口径"
-            onPress={() => navigation.navigate('LedgerReview')}
           />
           <Action
             title="社群消息"

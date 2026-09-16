@@ -58,7 +58,7 @@ function GridCell({
     <TouchableOpacity
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${label}，收入${income.toFixed(2)}，消费${expense.toFixed(2)}，退款${refund.toFixed(2)}，结余${balance.toFixed(2)}，待确认${pending}笔`}
+      accessibilityLabel={`${label}，收入${income.toFixed(2)}，消费${expense.toFixed(2)}，退款${refund.toFixed(2)}，结余${balance.toFixed(2)}，异常${pending}笔`}
       disabled={disabled}
       activeOpacity={0.7}
       style={[

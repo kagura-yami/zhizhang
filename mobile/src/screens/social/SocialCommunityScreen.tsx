@@ -9,6 +9,7 @@ import {
   useSocialApi,
   useSocialResource,
 } from './shared';
+import RetrospectivePanel from '../ai/RetrospectivePanel';
 import SocialSettingsScreen from './SocialSettingsScreen';
 import SocialReviewableOwnersScreen from './SocialReviewableOwnersScreen';
 import SocialReceivedReviewsScreen from './SocialReceivedReviewsScreen';
@@ -24,6 +25,7 @@ export default function SocialCommunityScreen({
   const api = useSocialApi(),
     s = useStyles(stylesFor),
     [tab, setTab] = useState(0);
+  const [showRetrospective, setShowRetrospective] = useState(false);
   const r = useSocialResource(useCallback(() => api.status(), [api]));
   if (!r.value)
     return (
@@ -76,6 +78,8 @@ export default function SocialCommunityScreen({
           ))}
         </View>
       </View>
+      <View style={{ paddingHorizontal: 16 }}><Action title="AI 消费复盘" onPress={() => setShowRetrospective(true)} /></View>
+      {showRetrospective && <RetrospectivePanel navigation={navigation} onClose={() => setShowRetrospective(false)} />}
       {tab === 0 && <SocialReviewableOwnersScreen navigation={navigation} />}
       {tab === 1 && <SocialReceivedReviewsScreen navigation={navigation} />}
       {tab === 2 && <SocialRankingsScreen navigation={navigation} />}

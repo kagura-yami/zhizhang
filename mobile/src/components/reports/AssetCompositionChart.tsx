@@ -13,10 +13,10 @@ export default function AssetCompositionChart({ categories, dateRange, totals, t
   const rows = categories.filter(c => Number(c[field]) > 0);
   return <View style={s.card}>
     <Text style={s.heading}>{title}</Text>
-    <Text style={s.small}>{dateRange} · 仅含已确认人民币记录</Text>
+    <Text style={s.small}>{dateRange} · 仅含人民币账单</Text>
     <SegmentedControl options={[{ key: 'grossExpense', label: '消费' }, { key: 'ordinaryIncome', label: '收入' }, { key: 'refundInflow', label: '退款' }]} selectedKey={kind} onSelect={setKind} />
-    <Text style={s.text}>已确认金额 ¥{Number(totals[field]).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</Text>
-    {rows.length ? <PieChart data={rows.map((r, i) => ({ value: Number(r[field]), label: r.name || '未分类', color: colors[i % colors.length] }))} size={190} innerRadius={0.58} showLabels showLegend /> : <Text style={s.muted}>本范围暂无已确认的此类金额</Text>}
+    <Text style={s.text}>金额 ¥{Number(totals[field]).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</Text>
+    {rows.length ? <PieChart data={rows.map((r, i) => ({ value: Number(r[field]), label: r.name || '未分类', color: colors[i % colors.length] }))} size={190} innerRadius={0.58} showLabels showLegend /> : <Text style={s.muted}>本范围暂无此类记录</Text>}
     {rows.map(r => <Text key={r.categoryId ?? 'uncategorized'} style={s.muted}>{r.name || '未分类'} · ¥{Number(r[field]).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</Text>)}
     <Text style={s.small}>收入不含退款。退款按自身分类展示，不抵减原消费分类。</Text>
   </View>;

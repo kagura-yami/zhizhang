@@ -48,7 +48,7 @@ export default function YearlyView({ onJumpToMonthly }: YearlyViewProps) {
       </View>
 
       <LedgerNotice summary={summaries?.find(s => s.startDate.startsWith(String(selectedYear)))} error={error} loading={isLoading} refresh={refetch} />
-      <Text style={styles.headerTitle}>点击年份查看退款、结余和待确认明细</Text>
+      <Text style={styles.headerTitle}>点击年份查看退款、结余和异常明细</Text>
       {!isLoading && !error && (<YearGrid
         years={yearlyData}
         selectedYear={selectedYear}

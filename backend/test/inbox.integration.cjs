@@ -28,7 +28,7 @@ Module({ imports: [InboxModule, BillsModule], providers: [{ provide: APP_GUARD, 
   try {
     for (let i = 0; i < 3; i++) {
       const u = await db.user.create({ data: { username: 'inbox-' + randomUUID(), password: 'test-only' } });
-      users.push(u); await call(u, '/social/enable', 'POST', { consentVersion: '2026-09-16' });
+      users.push(u); await call(u, '/social/enable', 'POST', { consentVersion: '2026-09-17' });
     }
     const [a, b, c] = users;
     assert.equal((await call(null, inbox)).status, 401);

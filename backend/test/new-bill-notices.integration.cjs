@@ -33,7 +33,7 @@ Module({ imports: [InboxModule, BillsModule], providers: [{ provide: APP_GUARD, 
   try {
     for (let i = 0; i < 3; i++) {
       const u = await db.user.create({ data: { username: 'notice-' + randomUUID(), password: 'test-only' } });
-      users.push(u); await call(u, '/social/enable', 'POST', { consentVersion: '2026-09-16' });
+      users.push(u); await call(u, '/social/enable', 'POST', { consentVersion: '2026-09-17' });
     }
     const [a, b, c] = users;
     await call(a, '/social/grants/given/' + b.id, 'PUT', { scope: 'expense' });
@@ -112,7 +112,7 @@ Module({ imports: [InboxModule, BillsModule], providers: [{ provide: APP_GUARD, 
     const extra = Array.from({ length: 105 }, () => ({ id: randomUUID(), username: 'fanout-' + randomUUID(), password: 'test-only' }));
     await db.user.createMany({ data: extra }); users.push(...extra);
     const activatedAt = new Date(Date.now() - 60000);
-    await db.socialPreference.createMany({ data: extra.map(u => ({ userId: u.id, enabledAt: activatedAt, consentVersion: '2026-09-16' })) });
+    await db.socialPreference.createMany({ data: extra.map(u => ({ userId: u.id, enabledAt: activatedAt, consentVersion: '2026-09-17' })) });
     await db.reviewGrant.createMany({ data: extra.map(u => ({ ownerId: a.id, reviewerId: u.id, activatedAt, scope: 'expense' })) });
     const fanoutBill = (await call(a, '/bills', 'POST', { ...billBody, amount: 51 })).data;
     assert(fanoutBill.id); assert.equal(await db.newBillNoticeItem.count({ where: { billId: fanoutBill.id } }), 107);

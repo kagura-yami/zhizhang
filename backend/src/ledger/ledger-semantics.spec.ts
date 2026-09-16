@@ -35,13 +35,13 @@ describe('复盘与排行榜统一账务口径', () => {
     expect(summarize(entry(1, '0.3', 'income'), entry(2, '0.1'), entry(3, '0.2')).cashSurplus).toBe('0.0000');
     expect(summarize(entry(1, '0.0001')).cashSurplus).toBe('-0.0001');
   });
-  it('未经主人确认的旧账单不被暗中认定为真实收支', () => {
+  it('旧账单无需额外确认即可参与统计', () => {
     const row = entry(1, '123'); row.financialClassification = null;
-    expect(summarize(row)).toMatchObject({ cashSurplus: '0.0000', complete: false, pendingBillIds: [1], counts: { needsReview: 1 } });
+    expect(summarize(row)).toMatchObject({ cashSurplus: '-123.0000', complete: true, pendingBillIds: [], counts: { needsReview: 0 } });
   });
-  it('账单被修改后旧确认自动失效', () => {
+  it('修改账单后继续自动统计', () => {
     const row = entry(1, '123'); row.updatedAt = new Date(updatedAt.getTime() + 1);
-    expect(summarize(row).counts.needsReview).toBe(1);
+    expect(summarize(row).counts.needsReview).toBe(0);
   });
   it.each(['USD', 'USDC', 'MON'])('不把 %s 与人民币加总', currency => {
     const row = entry(1, '123'); row.financialClassification.currency = currency;
@@ -63,10 +63,10 @@ describe('复盘与排行榜统一账务口径', () => {
     expect(summarize()).toMatchObject({ counts: { included: 0 }, effectiveDays: 0 });
     expect(summarize(entry(1, '5', 'income'), entry(2, '5'))).toMatchObject({ counts: { included: 2 }, cashSurplus: '0.0000', effectiveDays: 1 });
   });
-  it('全部条目参与计算，只对待确认 ID 列表截断', () => {
+  it('跨页旧账单无需确认，完整自动计入', () => {
     const rows = Array.from({ length: 501 }, (_, i) => ({ ...entry(i + 1, '1'), financialClassification: null }));
     const r = summarize(...rows);
-    expect(r.counts.needsReview).toBe(501); expect(r.pendingBillIds).toHaveLength(50); expect(r.pendingIdsTruncated).toBe(true);
+    expect(r.counts.needsReview).toBe(0); expect(r.cashSurplus).toBe('-501.0000'); expect(r.pendingBillIds).toHaveLength(0);
   });
 });
 

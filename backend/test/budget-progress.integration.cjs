@@ -58,12 +58,12 @@ Module({ imports: [AuthModule, BudgetsModule], providers: [{ provide: APP_GUARD,
     await db.bill.createMany({ data: Array.from({ length: 501 }, () => ({ userId: owner.id, amount: '1', type: 'expense', date: new Date(today) })) });
     const incomplete = (await request(owner)).body.data;
     const partial = incomplete.find(r => r.id === total.id);
-    assert.equal(partial.ledger.counts.total, 506); assert.equal(partial.ledger.counts.needsReview, 501);
-    assert.equal(partial.isOverBudget, null); assert.equal(partial.confirmedOverBudget, true); assert.equal(partial.needsAlert, true);
+    assert.equal(partial.spent, '611.1235'); assert.equal(partial.ledger.counts.total, 506); assert.equal(partial.ledger.counts.needsReview, 0);
+    assert.equal(partial.isOverBudget, true); assert.equal(partial.confirmedOverBudget, true); assert.equal(partial.needsAlert, true);
     assert.equal(incomplete.find(r => r.id === classified.id).comparisonStatus, 'complete');
     await db.bill.updateMany({ where: { userId: owner.id, categoryId: cat.id }, data: { description: '修改使确认过期', updatedAt: new Date(Date.now() + 1000) } });
     const stale = (await request(owner)).body.data.find(r => r.id === classified.id);
-    assert.equal(stale.comparisonStatus, 'incomplete'); assert.equal(stale.spent, '0.0000');
+    assert.equal(stale.comparisonStatus, 'complete'); assert.equal(stale.spent, '80.1234');
     await service.update(zero.id, owner.id, { isActive: false });
     assert(!(await request(owner)).body.data.some(r => r.id === zero.id));
     // Deterministic UTC+8 boundary: Jan is selected even though the UTC date is December.

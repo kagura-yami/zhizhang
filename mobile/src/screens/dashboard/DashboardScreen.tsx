@@ -36,7 +36,6 @@ import { invalidateCache } from '../../lib/queryClient';
 import { paymentNotificationService } from '../../services/paymentNotification';
 import type { BillData } from '../../types/bill';
 import type { FinancialGoalProgress } from '../../types/financial-goal';
-import { BillFeedbackLabel, useBillFeedbackSummaries } from '../social/billFeedback';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SWIPE_THRESHOLD = 80;
@@ -259,8 +258,6 @@ function DashboardContent({ token }: { token: string }) {
     homeSections,
   } = useHomeDisplayPreference();
   const [missingSetupCount, setMissingSetupCount] = useState(0);
-  const billFeedback = useBillFeedbackSummaries(recentBills.map(bill => bill.id));
-  const feedbackById = useMemo(() => new Map(billFeedback.value?.map(item => [item.billId, item])), [billFeedback.value]);
 
   // 首页提示会影响自动记账可靠性的关键设置，点击后统一进入权限配置。
   useFocusEffect(useCallback(() => {
@@ -326,9 +323,9 @@ function DashboardContent({ token }: { token: string }) {
           currentAmount: Number(b.spent),
           totalAmount: Number(b.amount),
           color: b.confirmedOverBudget ? styles._colors.error : b.comparisonStatus !== 'complete' ? styles._colors.textSecondary : b.needsAlert ? styles._colors.warning : styles._colors.success,
-          labelLeft: `已确认消费 ¥${Number(b.spent).toFixed(2)}`,
+          labelLeft: `支出 ¥${Number(b.spent).toFixed(2)}`,
           labelRight: `预算 ¥${Number(b.amount).toFixed(2)}`,
-          note: `${b.ledger.startDate} 至 ${b.ledger.endDate}\n退款 ¥${Number(b.refundInflow).toFixed(2)}（不抵减消费）${b.progressPercent === null ? ' · 不计算百分比' : ''}\n${b.comparisonStatus === 'invalid_budget' ? '金额无效，请编辑预算' : b.comparisonStatus === 'incomplete' ? `${b.ledger.counts.needsReview} 笔待核对，进度不完整${b.confirmedOverBudget ? '，已确认消费已超预算' : ''}` : b.isOverBudget ? `超支 ¥${Math.abs(Number(b.remaining)).toFixed(2)}` : `剩余 ¥${Number(b.remaining).toFixed(2)}`}`,
+          note: `${b.ledger.startDate} 至 ${b.ledger.endDate}\n退款 ¥${Number(b.refundInflow).toFixed(2)}（不抵减消费）${b.progressPercent === null ? ' · 不计算百分比' : ''}\n${b.comparisonStatus === 'invalid_budget' ? '金额无效，请编辑预算' : b.comparisonStatus === 'incomplete' ? `${b.ledger.counts.needsReview} 笔异常，进度不完整${b.confirmedOverBudget ? '，支出已超预算' : ''}` : b.isOverBudget ? `超支 ¥${Math.abs(Number(b.remaining)).toFixed(2)}` : `剩余 ¥${Number(b.remaining).toFixed(2)}`}`,
 
         });
       });
@@ -400,8 +397,8 @@ function DashboardContent({ token }: { token: string }) {
   };
 
   const onRefresh = useCallback(async () => {
-    await Promise.all([refetch(), refetchBudgets(), refetchGoals(), billFeedback.refresh()]);
-  }, [refetch, refetchBudgets, refetchGoals, billFeedback.refresh]);
+    await Promise.all([refetch(), refetchBudgets(), refetchGoals()]);
+  }, [refetch, refetchBudgets, refetchGoals]);
 
   const handleAddBill = () => {
     navigation.navigate('CreateBill' as never);
@@ -425,12 +422,12 @@ function DashboardContent({ token }: { token: string }) {
 
   const mainMetricData = useMemo(() => {
     const metrics: Record<HomeMainMetric, { label: string; value: number; hint: string }> = {
-      dailyBalance: { label: '今日结余', value: todayBalance, hint: '已确认收入 + 退款 − 消费' },
-      dailyExpense: { label: '今日支出', value: todayExpense, hint: '今日已确认消费' },
-      dailyIncome: { label: '今日收入', value: todayIncome, hint: '今日已确认普通收入' },
-      monthlyBalance: { label: '本月结余', value: monthBalance, hint: '已确认收入 + 退款 − 消费' },
-      monthlyExpense: { label: '本月支出', value: monthExpense, hint: '本月已确认消费' },
-      monthlyIncome: { label: '本月收入', value: monthIncome, hint: '本月已确认普通收入' },
+      dailyBalance: { label: '今日结余', value: todayBalance, hint: '收入 + 退款 − 消费' },
+      dailyExpense: { label: '今日支出', value: todayExpense, hint: '今日支出' },
+      dailyIncome: { label: '今日收入', value: todayIncome, hint: '今日收入' },
+      monthlyBalance: { label: '本月结余', value: monthBalance, hint: '收入 + 退款 − 消费' },
+      monthlyExpense: { label: '本月支出', value: monthExpense, hint: '本月支出' },
+      monthlyIncome: { label: '本月收入', value: monthIncome, hint: '本月收入' },
     };
     return metrics[mainMetric];
   }, [mainMetric, monthBalance, monthExpense, monthIncome, todayExpense, todayIncome, todayBalance]);
@@ -587,13 +584,10 @@ function DashboardContent({ token }: { token: string }) {
         </View>
       </TouchableOpacity>
 
-      <Text style={styles.transactionMeta}>本月汇总按完整自然月统计，包含已记录的未来日期账单。</Text>
-      <LedgerNotice gridHint={false} summary={analytics?.summary} loading={false} error="" refresh={refetch} />
-      {!!todayFacts && !todayFacts.complete && <Text style={styles.transactionMeta}>今日仍有 {todayFacts.counts.needsReview} 笔待核对，今日金额不完整。</Text>}
       </>}
       {showBudgetCard && <Status loading={budgetResource.loading} error={budgetResource.error} refresh={refetchBudgets} />}
       <Status loading={goalResource.loading} error={goalResource.error} refresh={refetchGoals} />
-      {showBudgetCard && <Action title="管理预算与核对账单" onPress={() => navigation.navigate('Budgets' as never)} />}
+      {showBudgetCard && <Action title="管理预算" onPress={() => navigation.navigate('Budgets' as never)} />}
       {/* ========== Progress Cards - 预算 & 财务目标 ========== */}
       {progressCards.length > 0 ? (
         <View style={[styles.carouselWrapper, { paddingBottom: 16, marginTop: 12 }]}>
@@ -636,8 +630,7 @@ function DashboardContent({ token }: { token: string }) {
           </BrutalPressable>
         </View>
 
-        <Text style={styles.transactionMeta}>本月最近 {recentBills.length} / {recentTotal} 条原始记录；按账单日期分组。日汇总涵盖整天已确认账单，退款单列。</Text>
-        {!!billFeedback.error && <TouchableOpacity accessibilityRole="button" onPress={billFeedback.refresh} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={styles.transactionMeta}>评账状态暂不可用，点此重试</Text></TouchableOpacity>}
+        <Text style={styles.transactionMeta}>本月最近 {recentBills.length} / {recentTotal} 笔，按日期分组。</Text>
         {dayGroups.length > 0 ? (
           <View style={styles.transactionList}>
             {dayGroups.map((group, groupIndex) => (
@@ -648,7 +641,7 @@ function DashboardContent({ token }: { token: string }) {
                     <Text style={styles.dayExpense}>消费 ¥{Number(group.facts.grossExpense).toFixed(2)}</Text>
                     <Text style={styles.dayIncome}>收入 ¥{Number(group.facts.ordinaryIncome).toFixed(2)}</Text>
                     <Text style={styles.dayIncome}>退款 ¥{Number(group.facts.refundInflow).toFixed(2)}</Text>
-                    <Text style={styles.dayBalance}>余 ¥{Number(group.facts.cashSurplus).toFixed(2)}{!group.facts.complete ? ' · 待核对' : ''}</Text>
+                    <Text style={styles.dayBalance}>余 ¥{Number(group.facts.cashSurplus).toFixed(2)}{!group.facts.complete ? '' : ''}</Text>
                   </View>}
                 </View>
                 {group.bills.map((bill, index) => (
@@ -676,7 +669,6 @@ function DashboardContent({ token }: { token: string }) {
                           <Text style={styles.transactionMeta} numberOfLines={1}>
                             {formatBillTime(bill)} · {getCounterparty(bill)}
                           </Text>
-                          <BillFeedbackLabel feedback={feedbackById.get(bill.id)} />
                         </View>
                       </View>
                       <View style={[

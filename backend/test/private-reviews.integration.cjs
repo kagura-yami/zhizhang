@@ -25,7 +25,7 @@ Module({ imports: [ReviewsModule, BillsModule], providers: [{ provide: APP_GUARD
   try {
     for (let i = 0; i < 4; i++) {
       const user = await db.user.create({ data: { username: `review-${Date.now()}-${i}`, password: 'test-only', nickname: `测试${i}` } });
-      users.push(user); await call(user, '/social/enable', 'POST', { consentVersion: '2026-09-16' });
+      users.push(user); await call(user, '/social/enable', 'POST', { consentVersion: '2026-09-17' });
     }
     const [a, b, c, d] = users;
     for (const u of [b, c]) await call(a, '/social/grants/given/' + u.id, 'PUT', { scope: 'expense', historyStart: '2020-01-01' });

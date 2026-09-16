@@ -2,13 +2,14 @@
  * 应用导航器 - Neo-Brutalism 风格
  * 粗描边 Tab Bar + 糖果色活跃态 + 方圆角"+"按钮 + 实心阴影
  */
-import React, { useState, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, ActivityIndicator } from 'react-native';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { DeviceEventEmitter, View, StyleSheet, StatusBar, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Sentry from '@sentry/react-native';
-import { Home, BarChart3, MessageCircle, User } from 'lucide-react-native';
+import BottomTabBar from './BottomTabBar';
+import { useSocialApi, useSocialResource } from '../screens/social/shared';
 
 // 导入屏幕组件
 import SettingsScreen from '../screens/SettingsScreen';
@@ -39,8 +40,6 @@ import SocialCommunityScreen from '../screens/social/SocialCommunityScreen';
 import SocialGrantsScreen from '../screens/social/SocialGrantsScreen';
 import SocialRankingsScreen from '../screens/social/SocialRankingsScreen';
 import SocialRankingSettingsScreen from '../screens/social/SocialRankingSettingsScreen';
-import LedgerReviewScreen from '../screens/social/LedgerReviewScreen';
-import LedgerClassificationScreen from '../screens/social/LedgerClassificationScreen';
 import SocialPeopleScreen from '../screens/social/SocialPeopleScreen';
 import SocialPersonScreen from '../screens/social/SocialPersonScreen';
 import SocialGrantScreen from '../screens/social/SocialGrantScreen';
@@ -56,191 +55,25 @@ import SocialInboxScreen from '../screens/social/SocialInboxScreen';
 import SocialBillFeedbackScreen from '../screens/social/SocialBillFeedbackScreen';
 
 import { useTheme, useAuth } from '../providers';
-import { spacing, borderRadius, borderWidth } from '../theme/spacing';
-import { ThemeColors } from '../theme/colors';
+import { borderWidth } from '../theme/spacing';
 import '../types/navigation';
 
 const Stack = createNativeStackNavigator();
-
-// 使用 lucide-react-native 图标 - Neo-Brutalism 加粗描边
-const HomeIcon = ({ color, size = 24 }: { color: string; size?: number }) => (
-  <Home size={size} color={color} strokeWidth={2.5} />
-);
-
-const ChartIcon = ({ color, size = 24 }: { color: string; size?: number }) => (
-  <BarChart3 size={size} color={color} strokeWidth={2.5} />
-);
-
-const ChatIcon = ({ color, size = 24 }: { color: string; size?: number }) => (
-  <MessageCircle size={size} color={color} strokeWidth={2.5} />
-);
-
-const UserIcon = ({ color, size = 24 }: { color: string; size?: number }) => (
-  <User size={size} color={color} strokeWidth={2.5} />
-);
-
-// 底部导航标签配置
-interface TabConfig {
-  key: string;
-  label: string;
-  IconComponent: React.FC<{ color: string; size?: number }>;
-}
-
-const tabs: TabConfig[] = [
-  { key: 'dashboard', label: '首页', IconComponent: HomeIcon },
-  { key: 'reports', label: '统计', IconComponent: ChartIcon },
-  { key: 'add', label: '记账', IconComponent: () => null },
-  { key: 'ai', label: 'AI助手', IconComponent: ChatIcon },
-  { key: 'settings', label: '我的', IconComponent: UserIcon },
-];
-
-// Neo-Brutalism 底部导航栏组件
-interface BottomTabBarProps {
-  activeTab: string;
-  onTabPress: (key: string) => void;
-  colors: ThemeColors;
-}
-
-function BottomTabBar({ activeTab, onTabPress, colors }: BottomTabBarProps) {
-  const dynamicStyles = useMemo(() => StyleSheet.create({
-    container: {
-      flexDirection: 'row',
-      backgroundColor: colors.surface,
-      borderTopWidth: borderWidth.thick,
-      borderTopColor: colors.stroke,
-      paddingBottom: spacing.sm,
-      paddingTop: spacing.sm,
-    },
-    tabLabel: {
-      fontSize: 10,
-      color: colors.textTertiary,
-      fontWeight: '600',
-      marginTop: 3,
-    },
-    tabLabelActive: {
-      color: colors.textPrimary,
-      fontWeight: '700',
-    },
-    // 活跃 tab 的背景块 — 始终保留 border 占位，避免切换时 borderRadius 表现不一致
-    tabIconBlock: {
-      width: 36,
-      height: 36,
-      borderRadius: borderRadius.small,
-      borderWidth: borderWidth.thin,
-      borderColor: 'transparent',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    tabIconBlockActive: {
-      backgroundColor: colors.primaryLight,
-      borderColor: colors.stroke,
-    },
-    // 中央"+"按钮 - Neo-Brutalism 方圆角 + 实心阴影
-    addButtonOuter: {
-      marginTop: -22,
-    },
-    addButtonShadow: {
-      position: 'absolute',
-      width: 52,
-      height: 52,
-      borderRadius: borderRadius.medium,
-      backgroundColor: colors.stroke,
-      top: 3,
-      left: 3,
-    },
-    addButton: {
-      width: 52,
-      height: 52,
-      borderRadius: borderRadius.medium,
-      backgroundColor: colors.accent,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: borderWidth.thick,
-      borderColor: colors.stroke,
-    },
-    addButtonLabel: {
-      fontSize: 10,
-      color: colors.textTertiary,
-      fontWeight: '600',
-      marginTop: 6,
-    },
-  }), [colors]);
-
-  return (
-    <View style={dynamicStyles.container}>
-      {tabs.map((tab) => {
-        const isActive = activeTab === tab.key;
-        const isAddButton = tab.key === 'add';
-
-        if (isAddButton) {
-          return (
-            <TouchableOpacity
-              key={tab.key}
-              onPress={() => onTabPress(tab.key)}
-              style={tabStyles.addButtonContainer}
-              activeOpacity={0.8}
-            >
-              <View style={dynamicStyles.addButtonOuter}>
-                <View style={dynamicStyles.addButtonShadow} />
-                <View style={dynamicStyles.addButton}>
-                  <Text style={tabStyles.addButtonIcon}>+</Text>
-                </View>
-              </View>
-              <Text style={dynamicStyles.addButtonLabel}>{tab.label}</Text>
-            </TouchableOpacity>
-          );
-        }
-
-        const IconComponent = tab.IconComponent;
-        const iconColor = isActive ? colors.primary : colors.textTertiary;
-
-        return (
-          <TouchableOpacity
-            key={tab.key}
-            onPress={() => onTabPress(tab.key)}
-            style={tabStyles.tab}
-            activeOpacity={0.7}
-          >
-            <View style={[
-              dynamicStyles.tabIconBlock,
-              isActive && dynamicStyles.tabIconBlockActive,
-            ]}>
-              <IconComponent color={iconColor} size={22} />
-            </View>
-            <Text style={[dynamicStyles.tabLabel, isActive && dynamicStyles.tabLabelActive]}>
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-}
-
-const tabStyles = StyleSheet.create({
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xs,
-  },
-  addButtonContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-  },
-  addButtonIcon: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#1A1A1A',
-    marginTop: -2,
-  },
-});
 
 // 主导航容器组件
 function MainNavigator({ navigation }: { navigation: any }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const { isDark, colors } = useTheme();
+  const socialApi = useSocialApi();
+  const community = useSocialResource(useCallback(() => socialApi.status(), [socialApi]));
+  const communityEnabled = community.value?.enabled === true;
+  useEffect(() => {
+    const listener = DeviceEventEmitter.addListener('communityChanged', community.refresh);
+    return () => listener.remove();
+  }, [community.refresh]);
+  useEffect(() => {
+    if (community.value?.enabled === false && activeTab === 'community') setActiveTab('dashboard');
+  }, [community.value?.enabled, activeTab]);
 
   const dynamicStyles = useMemo(() => StyleSheet.create({
     container: {
@@ -274,6 +107,8 @@ function MainNavigator({ navigation }: { navigation: any }) {
         return <SettingsScreen navigation={navigation} />;
       case 'ai':
         return <AIChatScreen />;
+      case 'community':
+        return communityEnabled ? <SocialCommunityScreen navigation={navigation} /> : <DashboardScreen />;
       default:
         return <DashboardScreen />;
     }
@@ -289,7 +124,7 @@ function MainNavigator({ navigation }: { navigation: any }) {
       <View style={styles.content}>
         {renderScreen()}
       </View>
-      <BottomTabBar activeTab={activeTab} onTabPress={handleTabPress} colors={colors} />
+      <BottomTabBar activeTab={activeTab} onTabPress={handleTabPress} colors={colors} communityEnabled={communityEnabled} />
       <VoiceInputOverlay />
     </SafeAreaView>
   );
@@ -375,8 +210,6 @@ export default function AppNavigator() {
             <Stack.Screen name="SocialGrants" component={SocialGrantsScreen} options={{ headerShown: true, title: '评账授权' }} />
             <Stack.Screen name="SocialRankings" component={SocialRankingsScreen} options={{ headerShown: true, title: '结余排行榜' }} />
             <Stack.Screen name="SocialRankingSettings" component={SocialRankingSettingsScreen} options={{ headerShown: true, title: '参榜与金额隐私' }} />
-            <Stack.Screen name="LedgerReview" component={LedgerReviewScreen} options={{ headerShown: true, title: '确认账务口径' }} />
-            <Stack.Screen name="LedgerClassification" component={LedgerClassificationScreen} options={{ headerShown: true, title: '确认这笔账' }} />
             <Stack.Screen name="SocialPeople" component={SocialPeopleScreen} options={{ headerShown: true, title: '关系管理' }} />
             <Stack.Screen name="SocialPerson" component={SocialPersonScreen} options={{ headerShown: true, title: '关系与授权' }} />
             <Stack.Screen name="SocialGrant" component={SocialGrantScreen} options={{ headerShown: true, title: '确认评账授权' }} />

@@ -1,6 +1,6 @@
 import { Decimal } from '@prisma/client/runtime/library';
 
-export const LEDGER_RULE_VERSION = '2026-09-16.1';
+export const LEDGER_RULE_VERSION = '2026-09-17.auto';
 export const CLASSIFICATION_KINDS = ['ordinary', 'refund', 'internal_transfer', 'adjustment', 'ignored'] as const;
 export type ClassificationKind = typeof CLASSIFICATION_KINDS[number];
 export interface LedgerEntry {
@@ -11,6 +11,15 @@ export interface LedgerEntry {
   updatedAt: Date;
   financialClassification: { kind: string; currency: string; billUpdatedAt: Date } | null;
   relatedBill: { userId: string; type: string; date: Date } | null;
+}
+
+/** Saved bills participate immediately; legacy explicit overrides remain optional. */
+export function ledgerKind(entry: LedgerEntry, userId: string): ClassificationKind {
+  const c = entry.financialClassification;
+  if (c && c.currency === 'CNY' &&
+      (CLASSIFICATION_KINDS as readonly string[]).includes(c.kind)) return c.kind as ClassificationKind;
+  return entry.type === 'income' && entry.relatedBill?.userId === userId && entry.relatedBill.type === 'expense'
+    ? 'refund' : 'ordinary';
 }
 
 /** Incremental decimal aggregation. No raw bill descriptions are exposed by this projection. */
@@ -29,22 +38,21 @@ export class LedgerAccumulator {
 
   add(entry: LedgerEntry) {
     this.counts.total++;
-    const c = entry.financialClassification;
-    const refundInvalid = c?.kind === 'refund' && (entry.type !== 'income' ||
+    const kind = ledgerKind(entry, this.userId);
+    const refundInvalid = kind === 'refund' && (entry.type !== 'income' ||
       (entry.relatedBill && (entry.relatedBill.userId !== this.userId || entry.relatedBill.type !== 'expense')));
-    if (!c || c.billUpdatedAt.getTime() !== entry.updatedAt.getTime() || c.currency !== 'CNY' ||
-        !(CLASSIFICATION_KINDS as readonly string[]).includes(c.kind) ||
+    if ((entry.financialClassification && entry.financialClassification.currency !== 'CNY') ||
         !['income', 'expense'].includes(entry.type) || !entry.amount.isFinite() || !entry.amount.greaterThan(0) || refundInvalid) {
       this.counts.needsReview++;
       if (this.pendingBillIds.length < 50) this.pendingBillIds.push(entry.id);
       return;
     }
-    if (c.kind === 'internal_transfer') { this.counts.internalTransfer++; return; }
-    if (c.kind === 'adjustment') { this.counts.adjustment++; return; }
-    if (c.kind === 'ignored') { this.counts.ignored++; return; }
+    if (kind === 'internal_transfer') { this.counts.internalTransfer++; return; }
+    if (kind === 'adjustment') { this.counts.adjustment++; return; }
+    if (kind === 'ignored') { this.counts.ignored++; return; }
     this.counts.included++;
     this.days.add(entry.date.toISOString().slice(0, 10));
-    if (c.kind === 'refund') {
+    if (kind === 'refund') {
       this.refunds = this.refunds.plus(entry.amount);
       if (!entry.relatedBill) this.unlinkedRefunds = this.unlinkedRefunds.plus(entry.amount);
       else if (entry.relatedBill.date >= this.start && entry.relatedBill.date <= this.end) {

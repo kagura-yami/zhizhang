@@ -19,8 +19,6 @@ import { invalidateCache } from '../../lib/queryClient';
 import { useStyles } from '../../hooks';
 import { useAlert } from '../../providers';
 import type { BillData } from '../../types/bill';
-import { BillReviewEntry } from '../social/billFeedback';
-import { Action } from '../social/shared';
 
 export default function BillDetailScreen() {
   const navigation = useNavigation();
@@ -193,8 +191,6 @@ export default function BillDetailScreen() {
             </>
           )}
         </View>
-        <BillReviewEntry billId={billId} navigation={navigation} />
-        <Action title="确认账务口径" onPress={() => navigation.navigate('LedgerClassification' as any, { billId })} />
       </ScrollView>
 
       {/* 底部操作按钮 */}

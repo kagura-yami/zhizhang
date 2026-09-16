@@ -8,7 +8,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { BudgetHistoryService } from '../../budgets/budget-history.service';
 import { closedReviewPeriod } from '../../ledger/ledger-period';
-import { LedgerAccumulator } from '../../ledger/ledger-semantics';
+import { LedgerAccumulator, ledgerKind } from '../../ledger/ledger-semantics';
 
 const billSelect = {
   id: true,
@@ -112,7 +112,7 @@ export class RetrospectiveEvidenceService {
               category: row.category?.name ?? null,
               description: row.description,
               classification: result.complete
-                ? row.financialClassification.kind
+                ? ledgerKind(row, userId)
                 : 'needs_review',
               included: result.counts.included === 1,
             });
@@ -370,7 +370,7 @@ export class RetrospectiveEvidenceService {
           votes,
           budgets: budgetEvidence,
           gaps: [
-            ...(!totals.complete ? ['存在待确认账单，汇总不完整'] : []),
+            ...(!totals.complete ? ['部分账单数据异常，汇总可能不完整'] : []),
             ...(!feedback.some((m) => m.role === 'reviewer')
               ? ['暂无获准用于 AI 的有效好友文字反馈']
               : []),

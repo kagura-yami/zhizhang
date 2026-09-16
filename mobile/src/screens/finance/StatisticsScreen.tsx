@@ -35,17 +35,17 @@ function StatisticsContent({ token }: { token: string }) {
       <View style={s.card}>
         <Text style={s.heading}>{facts.startDate} 至 {facts.endDate}</Text>
         <Text style={s.text}>普通收入 ¥{Number(facts.ordinaryIncome).toFixed(2)}{'\n'}消费 ¥{Number(facts.grossExpense).toFixed(2)}{'\n'}退款 ¥{Number(facts.refundInflow).toFixed(2)}{'\n'}结余 ¥{Number(facts.cashSurplus).toFixed(2)}</Text>
-        <Text style={s.muted}>{ratio == null ? !facts.complete ? '消费 / 普通收入：有待核对账单，暂不计算比例' : '消费 / 普通收入：收入为零，比例无定义' : `消费 / 普通收入：${ratio.toFixed(1)}%`}</Text>
+        <Text style={s.muted}>{ratio == null ? !facts.complete ? '消费 / 普通收入：有异常账单，暂不计算比例' : '消费 / 普通收入：收入为零，比例无定义' : `消费 / 普通收入：${ratio.toFixed(1)}%`}</Text>
       </View>
       <LedgerNotice gridHint={false} summary={facts} error="" loading={false} refresh={r.refresh} />
       <AssetCompositionChart title="本周期分类构成" categories={r.value.categories} totals={facts} dateRange={`${facts.startDate} 至 ${facts.endDate}`} />
       <View style={s.card}>
         <Text style={s.heading}>{useDays ? '每日消费趋势' : '月度消费趋势'}</Text>
-        <Text style={s.muted}>仅含当前选择周期内的已确认消费；退款单列，不抵减消费。</Text>
+        <Text style={s.muted}>仅含当前选择周期内的支出；退款单列，不抵减消费。</Text>
         {trend?.some(t => t.value > 0) ? <View onLayout={e => setWidth(e.nativeEvent.layout.width)}>
           <LineChart width={width} data={trend || []} height={200} lineColor={colors.expense} dotColor={colors.expense} formatValue={v => `¥${v.toFixed(0)}`} />
-        </View> : <Text style={s.muted}>本周期暂无已确认消费</Text>}
-        {r.value.monthly.map(m => <Text key={m.month} style={s.muted}>{m.month} · 消费 ¥{Number(m.grossExpense).toFixed(2)} · 退款 ¥{Number(m.refundInflow).toFixed(2)}{!m.complete ? ` · ${m.counts.needsReview} 笔待核对` : ''}</Text>)}
+        </View> : <Text style={s.muted}>本周期暂无支出</Text>}
+        {r.value.monthly.map(m => <Text key={m.month} style={s.muted}>{m.month} · 消费 ¥{Number(m.grossExpense).toFixed(2)} · 退款 ¥{Number(m.refundInflow).toFixed(2)}{!m.complete ? ` · ${m.counts.needsReview} 笔异常` : ''}</Text>)}
       </View>
     </>}
   </ScrollView>;

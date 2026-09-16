@@ -24,7 +24,7 @@ Module({ imports: [ReviewsModule], providers: [{ provide: APP_GUARD, useClass: J
   try {
     for (let i = 0; i < 3; i++) {
       const u = await db.user.create({ data: { username: randomUUID(), password: 'test-only' } }); users.push(u);
-      assert.equal((await call(u, '/social/enable', 'POST', { consentVersion: '2026-09-16' })).status, 201);
+      assert.equal((await call(u, '/social/enable', 'POST', { consentVersion: '2026-09-17' })).status, 201);
     }
     const [owner, ...reviewers] = users, threads = [];
     for (const reviewer of reviewers) {

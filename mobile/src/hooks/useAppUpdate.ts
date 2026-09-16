@@ -101,13 +101,14 @@ export function useAppUpdate(options: UseAppUpdateOptions = {}) {
         await unlinkIfExists(`${filePath}.part`);
         await unlinkIfExists(partialPath);
         // 自动下载完全在后台执行，不更新前台下载进度或弹窗状态。
-        setState(prev => ({ ...prev, downloading: true, progress: silent ? prev.progress : 0, downloadedVersion: null }));
+        setState(prev => ({ ...prev, downloading: true, progress: 0, downloadedVersion: null }));
         const downloadResult = RNFS.downloadFile({
           fromUrl: versionInfo.downloadUrl,
           // 先写入临时文件，完成后再原子移动，避免安装时读到未下载完的 APK。
           toFile: partialPath,
+          connectionTimeout: 15000,
+          readTimeout: 60000,
           progress: (res: { bytesWritten: number; contentLength: number }) => {
-            if (silent) return;
             const progress = res.contentLength > 0 ? Math.round((res.bytesWritten / res.contentLength) * 100) : 0;
             setState(prev => ({ ...prev, progress }));
           },
@@ -127,7 +128,7 @@ export function useAppUpdate(options: UseAppUpdateOptions = {}) {
         setState(prev => ({
           ...prev,
           downloading: false,
-          progress: silent ? prev.progress : 100,
+          progress: 100,
           downloadedVersion: versionInfo.version,
         }));
         return filePath;
@@ -136,6 +137,7 @@ export function useAppUpdate(options: UseAppUpdateOptions = {}) {
         if (!silent) alert('下载失败', error?.message || '下载更新包失败，请稍后重试');
         return null;
       } finally {
+        await unlinkIfExists(partialPath);
         if (downloadPromiseRef.current?.version === versionInfo.version) {
           downloadPromiseRef.current = null;
         }
@@ -189,7 +191,7 @@ export function useAppUpdate(options: UseAppUpdateOptions = {}) {
         latestVersion: result.latestVersion || null,
         updateHistory: result.updates || (result.latestVersion ? [result.latestVersion] : []),
         // 自动下载期间不弹窗，待安装包完整落盘后再提示用户。
-        showModal: !suppressPrompt && result.hasUpdate && !!result.latestVersion && !autoDownloadEnabled,
+        showModal: !suppressPrompt && result.hasUpdate && !!result.latestVersion && (showNoUpdateAlert || !autoDownloadEnabled),
       }));
 
       if (result.hasUpdate && result.latestVersion) {
@@ -198,7 +200,7 @@ export function useAppUpdate(options: UseAppUpdateOptions = {}) {
           : result.latestVersion.updateLog) || '';
         if (autoDownloadEnabled) {
           void (async () => {
-            const filePath = await downloadLatestApk(result.latestVersion!, true);
+            const filePath = await downloadLatestApk(result.latestVersion!, !showNoUpdateAlert);
             const packageReady = !!filePath && await RNFS.exists(filePath);
             // 下载完成后才发送通知，避免用户点进来时安装包尚未准备好。
             const notificationPromise = NativeModules.InstallApk?.notifyUpdateAvailable?.(
@@ -243,14 +245,17 @@ export function useAppUpdate(options: UseAppUpdateOptions = {}) {
     try {
       const { InstallApk } = NativeModules;
       if (InstallApk) {
-        InstallApk.install(filePath);
+        await InstallApk.install(filePath);
+        return true;
       } else {
         await RNFS.scanFile(filePath);
         alert('下载完成', '请在通知栏或文件管理器中点击安装包进行安装');
+        return false;
       }
-    } catch (error) {
+    } catch (error: any) {
       console.log('[useAppUpdate] 安装失败:', error);
-      alert('安装失败', '请手动安装下载的 APK 文件');
+      alert('安装未启动', error?.message || '无法打开系统安装器，请重试或手动安装 APK。');
+      return false;
     }
   }, [alert]);
 
@@ -259,16 +264,15 @@ export function useAppUpdate(options: UseAppUpdateOptions = {}) {
       if (state.downloading) alert('更新准备中', '安装包还没有下载完成，请稍等片刻再点击更新。');
       return false;
     }
-    const filePath = state.downloadedVersion === state.latestVersion.version
-      ? getCachedPath(state.latestVersion.version)
-      : await downloadLatestApk(state.latestVersion);
+    // Revalidate even a previously ready cache; Android may reclaim it at any time.
+    const filePath = await downloadLatestApk(state.latestVersion);
     if (!filePath || !(await isValidCachedApk(state.latestVersion.version, filePath))) {
       alert('更新包不可用', '安装包尚未完整下载，请重新等待后台下载完成。');
       return false;
     }
-    setState(prev => ({ ...prev, showModal: false }));
-    await installApk(filePath);
-    return true;
+    const started = await installApk(filePath);
+    if (started) setState(prev => ({ ...prev, showModal: false }));
+    return started;
   }, [alert, downloadLatestApk, getCachedPath, installApk, isValidCachedApk, state.downloadedVersion, state.downloading, state.latestVersion]);
 
   // 启动时自动检查更新（可通过 autoCheck 参数禁用）

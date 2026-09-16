@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsString, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 
-export const SOCIAL_CONSENT_VERSION = '2026-09-16';
+export const SOCIAL_CONSENT_VERSION = '2026-09-17';
 
 export class SocialPreferencesDto {
   @ValidateIf((_object, value) => value !== undefined) @IsBoolean() allowAiFeedback?: boolean;

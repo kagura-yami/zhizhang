@@ -12,7 +12,7 @@ export default function AssetTrendChart({ monthly }: { monthly: CashHistory['mon
   return <View style={s.card}>
     <Text style={s.heading}>近 12 月累计结余</Text>
     <Text style={s.muted}>按当前账单与确认状态重建，包含更早历史，不是当时保存的余额快照。</Text>
-    {monthly.some(m => !m.cumulativeComplete) && <Text style={s.error}>存在未确认历史，折线仅代表已确认部分。空月份也可能继承历史待核对状态。</Text>}
+    {monthly.some(m => !m.cumulativeComplete) && <Text style={s.error}>存在异常历史数据，折线仅代表已记录部分。空月份也可能继承历史异常状态。</Text>}
     <View onLayout={e => setWidth(e.nativeEvent.layout.width)}>
       <LineChart data={monthly.map(m => ({ label: m.month.slice(5), value: Number(m.cumulativeCashSurplus) }))} width={width} height={210} lineColor={colors.primary} dotColor={colors.primary} formatValue={v => `¥${v.toFixed(0)}`} />
     </View>

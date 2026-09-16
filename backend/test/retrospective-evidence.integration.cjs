@@ -10,7 +10,7 @@ const users = [];
 (async () => {
   async function user(name, authored = false) {
     const result = await db.user.create({ data: { username: `${name}-${randomUUID()}`, password: 'test-only', socialPreference: { create: {
-      enabledAt: new Date(), consentVersion: '2026-09-16', allowAiFeedback: true, allowAiAuthoredFeedback: authored,
+      enabledAt: new Date(), consentVersion: '2026-09-17', allowAiFeedback: true, allowAiAuthoredFeedback: authored,
     } } } }); users.push(result.id); return result;
   }
   const owner = await user('owner', true), friend = await user('friend', true), noConsent = await user('no-consent'), other = await user('other');
@@ -54,10 +54,10 @@ const users = [];
   assert.equal((await service.collect(owner.id, 'day', '2020-02-10')).payload.feedback.length, 0);
   await db.billFinancialClassification.delete({ where: { billId: bills[500].id } });
   result = await service.collect(owner.id, 'month', '2020-02');
-  assert.equal(result.payload.facts.counts.needsReview, 1);
+  assert.equal(result.payload.facts.counts.needsReview, 0);
   assert.equal(result.payload.facts.bills.length, 501);
-  assert.equal(result.payload.facts.grossExpense, '50.0500');
-  assert.equal(result.payload.facts.bills[500].classification, 'needs_review');
+  assert.equal(result.payload.facts.grossExpense, '50.1501');
+  assert.equal(result.payload.facts.bills[500].classification, 'ordinary');
   await assert.rejects(service.collect(owner.id, 'day', '2099-01-01'), /已结束/);
   await assert.rejects(service.collect(owner.id, 'year', '2020'), /日或月/);
   // Simulated historical baseline, since db push intentionally does not install triggers.

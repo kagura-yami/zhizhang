@@ -41,7 +41,7 @@ export default function DailySummaryList({ data, onDayPress }: DailySummaryListP
       >
         <Text style={styles.dateText}>{formatDate(item.date)}</Text>
         <View style={styles.amounts}>
-          <Text style={styles.incomeText}>退 {item.refund.toFixed(2)}{item.pending ? ` · ${item.pending}待确认` : ""}</Text>
+          <Text style={styles.incomeText}>退 {item.refund.toFixed(2)}{item.pending ? ` · ${item.pending}异常` : ""}</Text>
           {item.income > 0 && (
             <Text style={styles.incomeText}>收 +{item.income.toFixed(2)}</Text>
           )}

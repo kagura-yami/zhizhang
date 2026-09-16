@@ -28,7 +28,7 @@ Module({ imports: [ModerationModule, BillsModule], providers: [{ provide: APP_GU
   try {
     for (let i = 0; i < 3; i++) {
       const u = await db.user.create({ data: { username: 'moderation-' + randomUUID(), password: 'test-only', nickname: '测试' + i } });
-      users.push(u); assert.equal((await call(u, '/social/enable', 'POST', { consentVersion: '2026-09-16' })).status, 201);
+      users.push(u); assert.equal((await call(u, '/social/enable', 'POST', { consentVersion: '2026-09-17' })).status, 201);
     }
     const [a, b, c] = users;
     const bill = await db.bill.create({ data: { userId: a.id, amount: '16', type: 'expense', date: new Date('2026-09-16'), notes: '不应披露的账单备注' } });

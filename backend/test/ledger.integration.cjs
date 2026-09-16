@@ -56,10 +56,10 @@ Module({ imports: [LedgerModule], providers: [{ provide: APP_GUARD, useClass: Jw
     const s = (await request(summaryUrl)).body.data;
     assert.equal(s.cashSurplus, '850.0000'); assert.equal(s.counts.total, 5); assert.equal(s.counts.included, 3); assert.equal(s.complete, true);
     assert.equal((await request(summaryUrl, otherToken)).body.data.counts.total, 0);
-    // Legacy bills that were never reviewed are visible as incomplete, not silently guessed.
+    // Legacy bills participate automatically without an additional confirmation workflow.
     await prisma.bill.createMany({ data: Array.from({ length: 501 }, () => ({ amount: '1', type: 'expense', userId: owner.id, date: new Date('2026-09-12') })) });
     const large = (await request(summaryUrl)).body.data;
-    assert.equal(large.counts.total, 506); assert.equal(large.counts.needsReview, 501); assert.equal(large.pendingBillIds.length, 50); assert.equal(large.cashSurplus, '850.0000');
+    assert.equal(large.counts.total, 506); assert.equal(large.counts.needsReview, 0); assert.equal(large.pendingBillIds.length, 0); assert.equal(large.cashSurplus, '349.0000');
     const analyticsUrl = summaryUrl.replace('/summary?', '/analytics?');
     assert.equal((await request(analyticsUrl, null)).status, 401);
     assert.equal((await request('/ledger/analytics?startDate=2026-02-30&endDate=2026-03-01')).status, 400);
@@ -71,7 +71,7 @@ Module({ imports: [LedgerModule], providers: [{ provide: APP_GUARD, useClass: Jw
     assert.equal(analytics.daily[10].refundInflow, '50.0000');
     assert.equal(analytics.daily[10].refundsFromOtherPeriods, '50.0000'); // Original expense is the previous day.
     assert.equal(analytics.monthly[0].refundsFromSamePeriod, '50.0000');
-    assert.equal(analytics.daily[11].counts.needsReview, 501);
+    assert.equal(analytics.daily[11].counts.needsReview, 0);
     assert.equal(analytics.categories.find(c => c.categoryId === category.id).grossExpense, '200.0000');
     assert.equal(analytics.categories.find(c => c.categoryId === null).counts.total, 505);
     assert.equal(analytics.daily.reduce((n, d) => n + d.counts.total, 0), 506);
@@ -98,17 +98,17 @@ Module({ imports: [LedgerModule], providers: [{ provide: APP_GUARD, useClass: Jw
       if (!page.hasMore) break;
       assert(page.nextAfterId > afterId); afterId = page.nextAfterId;
     } while (true);
-    assert.equal(pendingIds.length, 501); assert.equal(new Set(pendingIds).size, 501);
-    // Editing the bill invalidates its old classification and stale confirmations fail.
+    assert.equal(pendingIds.length, 0); assert.equal(new Set(pendingIds).size, 0);
+    // Editing updates totals automatically; stale legacy override requests still fail.
     const changed = await prisma.bill.update({ where: { id: purchase.id }, data: { amount: '250' } });
     assert.equal((await classify(purchase)).status, 409);
-    assert.equal((await request(`/ledger/bills/${purchase.id}`)).body.data.needsReview, true);
-    assert.equal((await request(summaryUrl)).body.data.counts.needsReview, 502);
+    assert.equal((await request(`/ledger/bills/${purchase.id}`)).body.data.needsReview, false);
+    assert.equal((await request(summaryUrl)).body.data.counts.needsReview, 0);
     const staleAnalytics = (await request(analyticsUrl)).body.data;
-    assert.equal(staleAnalytics.categories.find(c => c.categoryId === category.id).complete, false);
-    assert.equal(staleAnalytics.categories.find(c => c.categoryId === category.id).grossExpense, '0.0000');
+    assert.equal(staleAnalytics.categories.find(c => c.categoryId === category.id).complete, true);
+    assert.equal(staleAnalytics.categories.find(c => c.categoryId === category.id).grossExpense, '250.0000');
     assert.equal((await classify(changed)).status, 200);
-    assert.equal((await request(summaryUrl)).body.data.cashSurplus, '800.0000');
+    assert.equal((await request(summaryUrl)).body.data.cashSurplus, '299.0000');
     const foreignSource = await createBill('10', 'expense', other.id);
     const wrongRefund = await createBill('10', 'income', owner.id, '2026-09-12', { relatedBillId: foreignSource.id });
     assert.equal((await classify(wrongRefund, 'refund')).status, 400);

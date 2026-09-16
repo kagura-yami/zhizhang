@@ -3,6 +3,8 @@ package com.zhizhang.utils
 import android.Manifest
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.zhizhang.BuildConfig
 import com.facebook.react.bridge.Promise
@@ -66,7 +68,7 @@ class InstallApkModule(reactContext: ReactApplicationContext) : ReactContextBase
     }
 
     @ReactMethod
-    fun install(filePath: String) {
+    fun install(filePath: String, promise: Promise) {
         try {
             val file = File(filePath)
             // 安装入口本身也必须做一次完整校验，不能只依赖 JS 层的检查。
@@ -74,10 +76,20 @@ class InstallApkModule(reactContext: ReactApplicationContext) : ReactContextBase
             // .part 半包，系统安装器会报“解析包错误”，甚至留下损坏缓存。
             if (!isInstallableApk(file)) {
                 android.util.Log.w("InstallApk", "拒绝安装无效或未完成的 APK: $filePath")
+                promise.reject("INVALID_APK", "安装包已损坏或不完整，请重新下载更新。")
                 return
             }
 
             val context = reactApplicationContext
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                !context.packageManager.canRequestPackageInstalls()) {
+                val settings = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:${context.packageName}"))
+                settings.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(settings)
+                promise.reject("INSTALL_PERMISSION_REQUIRED", "请允许知账安装应用，然后返回知账再次点击立即更新。")
+                return
+            }
             val intent = Intent(Intent.ACTION_VIEW)
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -95,10 +107,12 @@ class InstallApkModule(reactContext: ReactApplicationContext) : ReactContextBase
 
             intent.setDataAndType(apkUri, "application/vnd.android.package-archive")
             context.startActivity(intent)
+            promise.resolve(true)
 
             android.util.Log.d("InstallApk", "启动 APK 安装: $filePath")
         } catch (e: Exception) {
             android.util.Log.e("InstallApk", "安装 APK 失败", e)
+            promise.reject("INSTALL_START_FAILED", "无法打开系统安装器，请检查安装权限后重试。", e)
         }
     }
 

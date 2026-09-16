@@ -39,7 +39,6 @@ import type { ParsedBill, AIModelConfig, ChatSession } from '../../types/ai';
 import type { CategoryData } from '../../types/category';
 import { ProviderIcon } from '../../components/icons';
 import storage from '../../utils/storage';
-import RetrospectivePanel from './RetrospectivePanel';
 
 const SIDEBAR_WIDTH = Dimensions.get('window').width * 0.78;
 
@@ -884,7 +883,6 @@ export default function AIChatScreen({ autoVoice = false }: { autoVoice?: boolea
   const [savingBills, setSavingBills] = useState(false);
   const [defaultAIConfig, setDefaultAIConfig] = useState<AIModelConfig | null>(null);
   const [configLoaded, setConfigLoaded] = useState(false);
-  const [showRetrospective, setShowRetrospective] = useState(false);
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [sessionRestoring, setSessionRestoring] = useState(true);
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
@@ -2066,9 +2064,7 @@ export default function AIChatScreen({ autoVoice = false }: { autoVoice?: boolea
           </TouchableOpacity>
         )}
         <Text style={styles.headerTitle} numberOfLines={1}>AI 助手</Text>
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel="账单复盘" style={[styles.headerButton, { minWidth: 72 }]} onPress={() => setShowRetrospective(true)}>
-          <Text style={{ color: styles._colors.textPrimary, fontWeight: '700' }}>账单复盘</Text>
-        </TouchableOpacity>
+
         <TouchableOpacity
           style={styles.headerButton}
           onPress={handleNewChat}
@@ -2078,7 +2074,6 @@ export default function AIChatScreen({ autoVoice = false }: { autoVoice?: boolea
         </TouchableOpacity>
       </View>
 
-      {showRetrospective && <RetrospectivePanel navigation={navigation} onClose={() => setShowRetrospective(false)} />}
       {/* 消息列表 */}
       {sessionRestoring ? (
         <ChatSkeleton />

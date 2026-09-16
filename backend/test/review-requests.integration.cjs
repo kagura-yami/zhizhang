@@ -28,7 +28,7 @@ Module({ imports: [SocialModule], providers: [{ provide: APP_GUARD, useClass: Jw
     for (let i = 0; i < 13; i++) {
       const user = await db.user.create({ data: { username: `request-${Date.now()}-${i}`, password: 'test-only' } });
       users.push(user);
-      assert.equal((await call(user, '/enable', { consentVersion: '2026-09-16' })).status, 201);
+      assert.equal((await call(user, '/enable', { consentVersion: '2026-09-17' })).status, 201);
     }
     const [applicant, ...owners] = users;
     const request = owner => db.reviewRequest.findUnique({ where: { ownerId_applicantId: { ownerId: owner.id, applicantId: applicant.id } } });

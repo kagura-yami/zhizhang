@@ -160,7 +160,7 @@ function ReportView({
                 ))}
                 <Text style={s.muted}>
                   共 {report.facts.counts.total} 笔，计入{' '}
-                  {report.facts.counts.included} 笔，待确认{' '}
+                  {report.facts.counts.included} 笔，数据异常{' '}
                   {report.facts.counts.needsReview} 笔。
                 </Text>
                 <Text style={s.small}>
@@ -170,7 +170,7 @@ function ReportView({
                 </Text>
                 {!report.facts.complete && (
                   <Text style={s.error}>
-                    有待确认账单，本次金额不是完整结论。
+                    部分账单数据异常，本次金额可能不完整。
                   </Text>
                 )}
               </View>
@@ -247,7 +247,7 @@ function ReportView({
                         {item.name}：累计毛支出 {money(item.grossExpense)} /
                         额度 {money(item.amount)} ·{' '}
                         {item.overBudget === null
-                          ? '账务待确认'
+                          ? '账务数据异常'
                           : item.overBudget
                           ? '已超过额度'
                           : '未超过额度'}
