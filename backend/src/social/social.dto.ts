@@ -5,6 +5,7 @@ export const SOCIAL_CONSENT_VERSION = '2026-09-16';
 
 export class SocialPreferencesDto {
   @ValidateIf((_object, value) => value !== undefined) @IsBoolean() allowAiFeedback?: boolean;
+  @ValidateIf((_object, value) => value !== undefined) @IsBoolean() allowAiAuthoredFeedback?: boolean;
   @ValidateIf((_object, value) => value !== undefined) @IsBoolean() publicRelations?: boolean;
   @ValidateIf((_object, value) => value !== undefined) @IsIn(['none', 'friends', 'global']) rankingScope?: string;
   @ValidateIf((_object, value) => value !== undefined) @IsBoolean() showRankingAmount?: boolean;

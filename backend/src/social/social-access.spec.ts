@@ -17,6 +17,8 @@ describe('社群权限基础', () => {
   it('旧版同意和隐私字段 null 不会被接受', async () => {
     expect((await validate(plainToInstance(EnableSocialDto, { consentVersion: 'old' }))).length).toBeGreaterThan(0);
     expect((await validate(plainToInstance(SocialPreferencesDto, { allowAiFeedback: null }))).length).toBeGreaterThan(0);
+    expect((await validate(plainToInstance(SocialPreferencesDto, { allowAiAuthoredFeedback: null }))).length).toBeGreaterThan(0);
+    expect(await validate(plainToInstance(SocialPreferencesDto, { allowAiAuthoredFeedback: false }))).toHaveLength(0);
     expect(await validate(plainToInstance(EnableSocialDto, { consentVersion: '2026-09-16' }))).toHaveLength(0);
   });
   it('历史开关允许 null，但授权版本不允许 null', async () => {

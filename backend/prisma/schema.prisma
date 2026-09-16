@@ -63,6 +63,7 @@ model SocialPreference {
   enabledAt DateTime @map("enabled_at") @db.Timestamptz(6)
   consentVersion String @map("consent_version") @db.VarChar(30)
   allowAiFeedback Boolean @default(false) @map("allow_ai_feedback")
+  allowAiAuthoredFeedback Boolean @default(false) @map("allow_ai_authored_feedback")
   publicRelations Boolean @default(false) @map("public_relations")
   rankingScope String @default("none") @map("ranking_scope") @db.VarChar(10)
   showRankingAmount Boolean @default(false) @map("show_ranking_amount")

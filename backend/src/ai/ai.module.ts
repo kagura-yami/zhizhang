@@ -17,11 +17,14 @@ import {
 } from './adapters';
 import { BillsModule } from '../bills/bills.module';
 import { CategoriesModule } from '../categories/categories.module';
+import { BudgetsModule } from '../budgets/budgets.module';
+import { RetrospectiveEvidenceService } from './services/retrospective-evidence.service';
 
 @Module({
-  imports: [BillsModule, CategoriesModule],
+  imports: [BillsModule, CategoriesModule, BudgetsModule],
   controllers: [AIController, AIConfigController, ChatController, AsrController],
   providers: [
+    RetrospectiveEvidenceService,
     AIService,
     AIConfigService,
     ChatService,
