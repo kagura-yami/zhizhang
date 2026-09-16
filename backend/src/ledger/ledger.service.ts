@@ -104,4 +104,58 @@ export class LedgerService {
       return accumulator.result();
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 30000 });
   }
+
+  async analytics(userId: string, query: LedgerSummaryQueryDto) {
+    const { start, end } = businessPeriod(query.startDate, query.endDate);
+    return this.prisma.$transaction(async tx => {
+      const summary = new LedgerAccumulator(userId, start, end);
+      const daily = new Map<string, LedgerAccumulator>();
+      const monthly = new Map<string, LedgerAccumulator>();
+      const categories = new Map<number | null, { id: number | null; name: string | null; accumulator: LedgerAccumulator }>();
+      // Pre-fill empty natural days/months so chart lines never bridge missing periods.
+      for (let time = start.getTime(); time <= end.getTime(); time += 86400000) {
+        const day = new Date(time), key = day.toISOString().slice(0, 10), month = key.slice(0, 7);
+        daily.set(key, new LedgerAccumulator(userId, day, day));
+        if (!monthly.has(month)) {
+          const first = new Date(`${month}-01T00:00:00.000Z`);
+          const next = new Date(first); next.setUTCMonth(next.getUTCMonth() + 1);
+          const last = new Date(next.getTime() - 86400000);
+          monthly.set(month, new LedgerAccumulator(userId, first < start ? start : first, last > end ? end : last));
+        }
+      }
+      let cursor = 0;
+      while (true) {
+        const rows = await tx.bill.findMany({
+          where: { userId, date: { gte: start, lte: end }, id: { gt: cursor } },
+          orderBy: { id: 'asc' }, take: 500,
+          select: {
+            id: true, amount: true, type: true, date: true, updatedAt: true, categoryId: true,
+            category: { select: { name: true } },
+            financialClassification: { select: { kind: true, currency: true, billUpdatedAt: true } },
+            relatedBill: { select: { userId: true, type: true, date: true } },
+          },
+        });
+        for (const row of rows) {
+          summary.add(row);
+          const date = row.date.toISOString().slice(0, 10);
+          daily.get(date).add(row);
+          monthly.get(date.slice(0, 7)).add(row);
+          if (!categories.has(row.categoryId)) categories.set(row.categoryId, {
+            id: row.categoryId, name: row.category?.name ?? null,
+            accumulator: new LedgerAccumulator(userId, start, end),
+          });
+          categories.get(row.categoryId).accumulator.add(row);
+        }
+        if (rows.length < 500) break;
+        cursor = rows[rows.length - 1].id;
+      }
+      return {
+        summary: summary.result(),
+        daily: [...daily].map(([date, accumulator]) => ({ date, ...accumulator.result() })),
+        monthly: [...monthly].map(([month, accumulator]) => ({ month, ...accumulator.result() })),
+        categories: [...categories.values()].sort((a, b) => (a.id ?? -1) - (b.id ?? -1))
+          .map(({ id, name, accumulator }) => ({ categoryId: id, name, ...accumulator.result() })),
+      };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 30000 });
+  }
 }

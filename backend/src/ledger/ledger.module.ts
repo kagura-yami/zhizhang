@@ -24,6 +24,11 @@ export class LedgerController {
     return { success: true, data: await this.ledger.summary(userId, query) };
   }
 
+  @Get('analytics')
+  async analytics(@CurrentUser('id') userId: string, @Query() query: LedgerSummaryQueryDto) {
+    return { success: true, data: await this.ledger.analytics(userId, query) };
+  }
+
   @Put('bills/:id/classification')
   async classify(@CurrentUser('id') userId: string, @Param('id', ParseIntPipe) id: number, @Body() dto: ClassifyBillDto) {
     return { success: true, data: await this.ledger.classify(userId, id, dto) };
