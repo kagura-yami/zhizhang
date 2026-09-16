@@ -100,7 +100,7 @@ export default function LedgerClassificationScreen({
             text="我已核对原交易，确认这是人民币账单，且上述口径准确"
           />
           <Text style={s.muted}>
-            确认会影响未结束周期的结余；已封榜的记录不会重算。当前功能不会同步改写原有首页统计口径。
+            确认后，首页、收支统计、预算和累计结余将在刷新时按新口径计算；已封榜的记录不会重算。
           </Text>
           <Action
             title={r.busy ? '正在保存…' : '保存确认'}

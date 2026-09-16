@@ -1,6 +1,6 @@
 /**
  * 统计报表主屏幕 - Neo-Brutalism 风格
- * 双 Tab 架构：资产 | 收支
+ * 双 Tab 架构：累计结余 | 收支
  */
 import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
@@ -14,7 +14,7 @@ import IncomeExpenseTab from './IncomeExpenseTab';
 type TopTab = 'assets' | 'incomeExpense';
 
 const TOP_TAB_OPTIONS = [
-  { key: 'assets', label: '资产' },
+  { key: 'assets', label: '累计结余' },
   { key: 'incomeExpense', label: '收支' },
 ];
 

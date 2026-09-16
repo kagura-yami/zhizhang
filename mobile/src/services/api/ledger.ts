@@ -10,6 +10,18 @@ export interface LedgerAnalytics {
   monthly: Array<LedgerFacts & { month: string }>;
   categories: Array<LedgerFacts & { categoryId: number | null; name: string | null }>;
 }
+export interface CashHistory {
+  basis: 'reconstructed_cash_surplus'; classificationBasis: 'current';
+  summary: LedgerFacts; opening: LedgerFacts; window: LedgerFacts;
+  monthly: Array<LedgerFacts & { month: string; cumulativeCashSurplus: string; cumulativeNeedsReview: number; cumulativeComplete: boolean }>;
+  categories: LedgerAnalytics['categories'];
+}
+
+export async function getCashHistory(token: string): Promise<CashHistory> {
+  const response = await httpService.get<CashHistory>('/ledger/cash-history', { headers: { Authorization: `Bearer ${token}` } });
+  if (!response.success || !response.data) throw new Error(response.message || '累计结余加载失败');
+  return response.data;
+}
 export interface LedgerCell {
   income: number; expense: number; refund: number; balance: number; pending: number; total: number;
 }
