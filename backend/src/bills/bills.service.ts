@@ -377,9 +377,9 @@ export class BillsService {
     return this.prisma.$transaction(async tx => {
       await lockSocialUsers(tx, [userId]);
       if (!await tx.bill.findFirst({ where: { id, userId }, select: { id: true } })) throw new NotFoundException('账单不存在');
-  
+
       const updateData: any = {};
-  
+
       if (updateBillDto.amount !== undefined) {
         updateData.amount = new Decimal(updateBillDto.amount);
       }
@@ -407,7 +407,7 @@ export class BillsService {
       if (updateBillDto.relatedBillId !== undefined) {
         updateData.relatedBillId = updateBillDto.relatedBillId;
       }
-  
+
       const result = await tx.bill.update({
         where: { id },
         data: updateData,
