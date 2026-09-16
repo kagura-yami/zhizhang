@@ -27,7 +27,8 @@ model User {
   bills          Bill[]           // 用户的所有账单记录
   categories     Category[]       // 用户的自定义分类
   accounts       Account[]        // 用户的账户
-  budgets        Budget[]         // 用户的预算
+    budgets        Budget[]         // 用户的预算
+    budgetRevisions BudgetRevision[]
   financialGoals FinancialGoal[]  // 用户的财务目标
   aiModelConfigs AIModelConfig[]  // 用户的AI模型配置
   chatSessions   ChatSession[]    // 用户的AI聊天会话
@@ -548,6 +549,27 @@ model Budget {
   @@index([userId, period])  // 复合索引：用户ID + 周期
   @@index([categoryId])      // 索引：分类ID
   @@map("budgets")
+  @@schema("public")
+}
+
+// No Budget FK: deleting a budget must retain its historical evidence.
+model BudgetRevision {
+  id BigInt @id @default(autoincrement())
+  budgetId Int @map("budget_id")
+  userId String @map("user_id") @db.Uuid
+  recordedAt DateTime @default(now()) @map("recorded_at") @db.Timestamptz(6)
+  action String @db.VarChar(20)
+  snapshot Json
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, budgetId, recordedAt])
+  @@map("budget_revisions")
+  @@schema("public")
+}
+
+model BudgetHistoryLaunch {
+  id Int @id @default(1)
+  startedAt DateTime @default(now()) @map("started_at") @db.Timestamptz(6)
+  @@map("budget_history_launch")
   @@schema("public")
 }
 

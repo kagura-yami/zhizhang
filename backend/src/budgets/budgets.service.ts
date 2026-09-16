@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBudgetDto, UpdateBudgetDto } from './dto/budget.dto';
 
@@ -6,15 +7,33 @@ import { CreateBudgetDto, UpdateBudgetDto } from './dto/budget.dto';
 export class BudgetsService {
   constructor(private prisma: PrismaService) {}
 
+  private async validateCategory(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    id?: number | null,
+  ) {
+    if (id == null) return;
+    await tx.$queryRaw`SELECT id FROM categories WHERE id = ${id} FOR SHARE`;
+    const category = await tx.category.findFirst({
+      where: { id, type: 'expense', OR: [{ userId }, { isDefault: true }] },
+      select: { id: true },
+    });
+    if (!category)
+      throw new BadRequestException('请选择本人或系统提供的支出分类');
+  }
+
   async create(userId: string, createBudgetDto: CreateBudgetDto) {
-    return this.prisma.budget.create({
-      data: {
-        ...createBudgetDto,
-        userId,
-      },
-      include: {
-        category: true,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      await this.validateCategory(tx, userId, createBudgetDto.categoryId);
+      return tx.budget.create({
+        data: {
+          ...createBudgetDto,
+          userId,
+        },
+        include: {
+          category: true,
+        },
+      });
     });
   }
 
@@ -38,9 +57,17 @@ export class BudgetsService {
   }
 
   async update(id: number, userId: string, updateBudgetDto: UpdateBudgetDto) {
-    return this.prisma.budget.updateMany({
-      where: { id, userId },
-      data: updateBudgetDto,
+    return this.prisma.$transaction(async (tx) => {
+      const budget = await tx.budget.findFirst({
+        where: { id, userId },
+        select: { id: true },
+      });
+      if (!budget) return { count: 0 };
+      await this.validateCategory(tx, userId, updateBudgetDto.categoryId);
+      return tx.budget.updateMany({
+        where: { id, userId },
+        data: updateBudgetDto,
+      });
     });
   }
 
