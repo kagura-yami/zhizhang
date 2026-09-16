@@ -123,8 +123,8 @@ android {
         applicationId "com.zhizhang"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 154
-        versionName "0.0.133"
+        versionCode 157
+        versionName "0.0.136"
     }
     signingConfigs {
         debug {

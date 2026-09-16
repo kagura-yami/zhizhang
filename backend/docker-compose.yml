@@ -30,6 +30,7 @@ services:
       - ./public:/app/public
     env_file:
       - .env
+      - .env.admin
     environment:
       NODE_ENV: production
     depends_on:

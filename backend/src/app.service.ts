@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class AppService {
-  getHello(): any {
+  getHello() {
     return {
       message: '智能记账 API',
       version: '1.0.0',

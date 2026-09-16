@@ -16,6 +16,8 @@ import { AppVersionModule } from './app-version/app-version.module';
 import { AIModule } from './ai/ai.module';
 import { HotUpdateModule } from './hot-update/hot-update.module';
 import { InvoiceMailboxModule } from './invoice-mailbox/invoice-mailbox.module';
+import { AdminModule } from './admin/admin.module';
+import { NotificationSamplesModule } from './notification-samples/notification-samples.module';
 
 @Module({
   imports: [
@@ -37,6 +39,8 @@ import { InvoiceMailboxModule } from './invoice-mailbox/invoice-mailbox.module';
     AIModule,
     HotUpdateModule,
     InvoiceMailboxModule,
+    AdminModule,
+    NotificationSamplesModule,
   ],
   controllers: [AppController],
   providers: [

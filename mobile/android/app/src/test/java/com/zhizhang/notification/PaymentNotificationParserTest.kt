@@ -7,6 +7,120 @@ import org.junit.Test
 import java.util.Calendar
 
 class PaymentNotificationParserTest {
+    @Test
+    fun `留档包含优惠拒绝样本但排除聊天和验证码`() {
+        assertEquals(true, PaymentNotificationParser.shouldArchive(PaymentNotificationContent(
+            packageName = PaymentNotificationParser.ALIPAY_PACKAGE, title = "支付宝卡包", text = "你有5元红包今晚失效"
+        )))
+        assertEquals(false, PaymentNotificationParser.shouldArchive(PaymentNotificationContent(
+            packageName = PaymentNotificationParser.WECHAT_PACKAGE, title = "张三", text = "收到5元红包了吗"
+        )))
+        assertEquals(false, PaymentNotificationParser.shouldArchive(PaymentNotificationContent(
+            packageName = PaymentNotificationParser.ALIPAY_PACKAGE, title = "支付宝", text = "付款验证码123456，金额5元"
+        )))
+    }
+    @Test
+    fun `银行转账充值退款的渠道模板不作为交易对象`() {
+        for ((action, summary) in listOf("转账" to "微信转账", "充值" to "微信零钱充值", "退款" to "微信退款")) {
+            val income = action == "退款"
+            val result = PaymentNotificationParser.parse(PaymentNotificationContent(
+                packageName = PaymentNotificationParser.ICBC_PACKAGE,
+                title = "工商银行",
+                text = "尾号3343卡${if (income) "收入" else "支出"}(${action}财付通-${if (income) "财付通" else "微信转账"})111.32元，余额500.00元"
+            ))
+            assertNotNull(result)
+            assertNull(result!!.counterparty)
+            assertEquals(summary, result.description)
+            assertEquals(111.32, result.amount, 0.001)
+            assertEquals(if (income) "income" else "expense", result.type)
+            assertEquals(if (income) "退款" else null, result.categoryHint)
+        }
+    }
+
+    @Test
+    fun `金额优先实际交易而非余额原价或优惠`() {
+        for (text in listOf(
+            "账户余额900元，支出18.50元，余额881.50元",
+            "原价100元，支付成功85元，优惠15元",
+            "支付成功85元，已使用15元优惠券"
+        )) {
+            val result = PaymentNotificationParser.parse(PaymentNotificationContent(
+                packageName = PaymentNotificationParser.ALIPAY_PACKAGE, title = "支付宝", text = text
+            ))
+            assertNotNull(text, result)
+            assertEquals(if (text.startsWith("账户")) 18.5 else 85.0, result!!.amount, 0.001)
+        }
+    }
+
+    @Test
+    fun `满减红包即使配置了消费关键词也不记账`() {
+        assertNull(PaymentNotificationParser.parse(PaymentNotificationContent(
+            packageName = PaymentNotificationParser.ALIPAY_PACKAGE,
+            title = "支付宝", text = "你有淘宝闪购满25减14元红包，消费可用"
+        ), listOf("消费")))
+    }
+
+    @Test
+    fun `话费充值仍归居住而普通充值不猜分类`() {
+        for (text in listOf("支付成功20元，话费充值", "支付成功20元，余额充值")) {
+            val result = PaymentNotificationParser.parse(PaymentNotificationContent(
+                packageName = PaymentNotificationParser.ALIPAY_PACKAGE, title = "支付宝", text = text
+            ))
+            assertNotNull(result)
+            assertEquals(if (text.contains("话费")) "居住" else null, result!!.categoryHint)
+        }
+    }
+
+    @Test
+    fun `支付宝优惠红包和券提醒不能记为收入`() {
+        val reminders = listOf(
+            "你有淘宝闪购无门槛5元红包今晚失效",
+            "5元优惠券已到账",
+            "收到5元消费红包，立即领取",
+            "你的5元红包即将到期",
+            "5元红包待领取",
+            "红包5元",
+            "恭喜获得5元无门槛红包"
+        )
+        for (text in reminders) {
+            assertNull(text, PaymentNotificationParser.parse(PaymentNotificationContent(
+                packageName = PaymentNotificationParser.ALIPAY_PACKAGE,
+                title = "支付宝",
+                text = text
+            )))
+        }
+        assertNull(PaymentNotificationParser.parse(PaymentNotificationContent(
+            packageName = PaymentNotificationParser.ALIPAY_PACKAGE,
+            title = "支付宝卡包",
+            bigText = reminders.first()
+        ), listOf("红包")))
+    }
+
+    @Test
+    fun `支付宝真实收款退款和现金红包仍能识别`() {
+        for (text in listOf("收款到账5.00元", "退款成功5.00元", "收到张三的5元红包", "红包5元已存入余额")) {
+            val result = PaymentNotificationParser.parse(PaymentNotificationContent(
+                packageName = PaymentNotificationParser.ALIPAY_PACKAGE,
+                title = "支付宝",
+                text = text
+            ))
+            assertNotNull(text, result)
+            assertEquals("income", result!!.type)
+            assertEquals(5.0, result.amount, 0.001)
+        }
+    }
+
+    @Test
+    fun `支付宝付款附带优惠券说明仍按实际付款记账`() {
+        val result = PaymentNotificationParser.parse(PaymentNotificationContent(
+            packageName = PaymentNotificationParser.ALIPAY_PACKAGE,
+            title = "支付宝",
+            text = "支付成功15.00元，已使用5元优惠券"
+        ))
+        assertNotNull(result)
+        assertEquals("expense", result!!.type)
+        assertEquals(15.0, result.amount, 0.001)
+    }
 
     @Test
     fun `默认监听包含微信支付宝和短信`() {

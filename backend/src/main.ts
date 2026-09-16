@@ -105,6 +105,20 @@ async function bootstrap() {
     redirect: false,
   }));
 
+  // 管理端使用独立静态目录与 /admin-api，不写入宣传页导航或站点入口。
+  const adminRoot = join(process.cwd(), 'admin-ui');
+  expressApp.get('/admin', (_req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
+    return res.sendFile(join(adminRoot, 'index.html'));
+  });
+  expressApp.get('/admin/', (_req: Request, res: Response) => res.redirect(308, '/admin'));
+  expressApp.use('/admin-assets', express.static(adminRoot, {
+    index: false,
+    redirect: false,
+    maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0,
+  }));
+
   // Enable CORS for React Native
   app.enableCors({
     origin: '*',
@@ -138,6 +152,7 @@ async function bootstrap() {
     .addTag('bills', '账单管理')
     .addTag('categories', '分类管理')
     .addTag('app-version', '应用版本管理')
+    .addTag('admin', '后台管理')
     .addServer(`http://localhost:${process.env.PORT ?? 3000}`, '开发环境')
     .build();
 

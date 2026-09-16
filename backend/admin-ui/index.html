@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex,nofollow,noarchive" />
+  <meta name="theme-color" content="#080b14" />
+  <title>知账管理端</title>
+  <link rel="icon" type="image/png" href="/assets/logo.png" />
+  <link rel="stylesheet" href="/admin-assets/admin.css" />
+</head>
+<body>
+  <div class="ambient" aria-hidden="true"></div>
+
+  <main id="login-view" class="login-view">
+    <section class="login-panel">
+      <div class="brand"><img src="/assets/logo.png" alt="" /><span>知账</span><small>CONTROL</small></div>
+      <div class="login-copy"><span class="kicker">PRIVATE CONSOLE</span><h1>管理产品，<br />不打扰用户。</h1><p>版本、用户、功能开关与待办集中在一个控制面板。</p></div>
+      <form id="login-form" class="login-form">
+        <label><span>管理员账号</span><input name="username" autocomplete="username" required /></label>
+        <label><span>管理员密码</span><input name="password" type="password" autocomplete="current-password" required /></label>
+        <button class="primary-button" type="submit"><span>进入管理端</span><b>→</b></button>
+        <p id="login-error" class="form-error" role="alert"></p>
+      </form>
+      <footer>该入口未在宣传站公开。所有管理请求均需要独立管理员会话。</footer>
+    </section>
+  </main>
+
+  <div id="app-view" class="app-view" hidden>
+    <aside class="sidebar">
+      <div class="brand"><img src="/assets/logo.png" alt="" /><span>知账</span><small>CONTROL</small></div>
+      <nav id="admin-nav">
+        <button class="nav-item active" data-view="dashboard"><i>⌁</i><span>总览</span></button>
+        <button class="nav-item" data-view="settings"><i>◌</i><span>功能配置</span></button>
+        <button class="nav-item" data-view="versions"><i>↥</i><span>更新日志</span></button>
+        <button class="nav-item" data-view="users"><i>◎</i><span>用户管理</span></button>
+        <button class="nav-item" data-view="issues"><i>◇</i><span>Issue 待办</span></button>
+        <button class="nav-item" data-view="samples"><i>≋</i><span>通知样本</span></button>
+      </nav>
+      <div class="sidebar-foot"><span>服务状态</span><strong><i></i> API ONLINE</strong><button id="logout-button" type="button">退出登录</button></div>
+    </aside>
+
+    <section class="workspace">
+      <header class="topbar">
+        <button id="menu-button" class="menu-button" type="button" aria-label="展开导航">☰</button>
+        <div><span id="page-kicker">OVERVIEW</span><h1 id="page-title">运行总览</h1></div>
+        <div class="topbar-actions"><span id="admin-name"></span><button id="refresh-button" type="button">同步数据 ↻</button></div>
+      </header>
+      <div id="workspace-content" class="workspace-content" aria-live="polite"></div>
+    </section>
+  </div>
+
+  <div id="drawer-backdrop" class="drawer-backdrop" hidden></div>
+  <aside id="editor-drawer" class="editor-drawer" aria-hidden="true">
+    <header><div><span id="drawer-kicker">EDIT</span><h2 id="drawer-title">编辑</h2></div><button id="drawer-close" type="button" aria-label="关闭">×</button></header>
+    <form id="editor-form" class="editor-form"></form>
+  </aside>
+  <div id="toast" class="toast" role="status"></div>
+
+  <script src="/admin-assets/admin.js"></script>
+</body>
+</html>

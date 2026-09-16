@@ -34,6 +34,7 @@ model User {
   biometricCredentials BiometricCredential[] // 绑定到账号的设备生物识别凭据
   invoiceMailbox InvoiceMailbox? // 用户的收票邮箱配置
   invoices       Invoice[]        // 用户整理后的电子发票
+  notificationSamples NotificationSample[]
 
   @@map("users")
   @@schema("public")
@@ -332,6 +333,64 @@ model HotUpdate {
 
   @@index([platform, isActive])
   @@map("hot_updates")
+  @@schema("public")
+}
+
+model NotificationSample {
+  id Int @id @default(autoincrement())
+  userId String @map("user_id") @db.Uuid
+  sampleId String @map("sample_id") @db.VarChar(64)
+  packageName String @map("package_name") @db.VarChar(200)
+  appVersion String @map("app_version") @db.VarChar(30)
+  ruleVersion String @map("rule_version") @db.VarChar(50)
+  postedAt DateTime @map("posted_at") @db.Timestamptz(6)
+  capturedAt DateTime @map("captured_at") @db.Timestamptz(6)
+  status String @db.VarChar(30)
+  reason String @db.VarChar(200)
+  raw Json
+  parsed Json?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, sampleId])
+  @@index([capturedAt, id])
+  @@index([userId, capturedAt])
+  @@index([status, packageName])
+  @@map("notification_samples")
+  @@schema("public")
+}
+
+model SystemSetting {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique @db.VarChar(100)
+  value       Json
+  category    String   @default("general") @db.VarChar(50)
+  description String?  @db.VarChar(500)
+  isSecret    Boolean  @default(false) @map("is_secret")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([category])
+  @@map("system_settings")
+  @@schema("public")
+}
+
+model AdminIssue {
+  id            Int       @id @default(autoincrement())
+  title         String    @db.VarChar(200)
+  description   String?   @db.Text
+  type          String    @default("bug") @db.VarChar(30)
+  status        String    @default("todo") @db.VarChar(30)
+  priority      String    @default("medium") @db.VarChar(20)
+  targetVersion String?   @map("target_version") @db.VarChar(20)
+  assignee      String?   @db.VarChar(100)
+  labels        String[]  @default([])
+  resolvedAt    DateTime? @map("resolved_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status, priority])
+  @@index([targetVersion])
+  @@map("admin_issues")
   @@schema("public")
 }
 

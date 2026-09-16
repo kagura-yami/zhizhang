@@ -54,6 +54,7 @@ typings/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.admin
 
 # parcel-bundler cache
 .cache
@@ -111,7 +112,8 @@ build/
 
 # Prisma
 /generated/prisma
-prisma/migrations/
+prisma/migrations/*
+!prisma/migrations/202609160001_notification_samples/
 
 # Database
 *.sqlite

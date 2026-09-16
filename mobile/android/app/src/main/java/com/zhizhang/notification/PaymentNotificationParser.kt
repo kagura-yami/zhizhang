@@ -10,6 +10,20 @@ import java.util.Locale
  * 普通聊天里单独出现“支付”“100 元”等字样不会触发。
  */
 object PaymentNotificationParser {
+    const val RULE_VERSION = "2026-09-16.2"
+
+    /** 留存支付相关的拒绝样本，但不收集个人聊天或验证码。 */
+    fun shouldArchive(data: PaymentNotificationContent): Boolean {
+        val content = data.allContent()
+        if (content.contains("验证码") || content.contains("动态密码")) return false
+        val trusted = when (data.packageName) {
+            WECHAT_PACKAGE -> listOf(data.title, data.titleBig, data.subText).any { it.contains("微信支付") || it.contains("支付助手") } || content.contains("微信支付凭证")
+            in SMS_PACKAGES -> parseBankSms(data, content, emptyList()) != null
+            in BANK_APP_PACKAGES -> parseBankApp(data, content, emptyList()) != null
+            else -> data.packageName in setOf(ALIPAY_PACKAGE, PINDUODUO_PACKAGE, MEITUAN_PACKAGE, TAOBAO_PACKAGE, JD_PACKAGE, ELEME_PACKAGE)
+        }
+        return trusted && containsAny(content, outgoingKeywords + incomingKeywords + listOf("优惠券", "红包", "余额", "交易", "满减"))
+    }
 
     const val WECHAT_PACKAGE = "com.tencent.mm"
     const val ALIPAY_PACKAGE = "com.eg.android.AlipayGphone"
@@ -94,7 +108,7 @@ object PaymentNotificationParser {
         ),
         "居住" to listOf(
             "房租", "租房", "住房", "物业", "水费", "电费", "燃气", "天然气", "宽带",
-            "话费", "通信缴费", "缴费", "充值", "中国移动", "中国联通", "中国电信"
+            "话费", "通信缴费", "缴费", "中国移动", "中国联通", "中国电信"
         ),
         "娱乐" to listOf(
             "游戏充值", "游戏", "电影票", "电影院", "影院", "视频会员", "音乐会员", "会员续费",
@@ -145,7 +159,7 @@ object PaymentNotificationParser {
         } else {
             inferCategory(categoryContent)
         }
-        val summary = counterparty ?: extractSummary(data, source, paymentChannel)
+        val summary = counterparty ?: extractSummary(data, source, paymentChannel, isIncome, categoryHint == "退款")
         val transactionRef = extractTransactionRef(content)
         val cardTail = extractCardTail(content)
         val balance = extractBalance(content)
@@ -246,7 +260,17 @@ object PaymentNotificationParser {
                 sanitizeKeywords(customKeywords)
         )
         val looksLikeAd = containsAny(content, listOf("优惠", "立减", "返现", "最高", "低至", "活动"))
-        val strongAction = (action && (!looksLikeAd || successAction)) || containsAny(content, incomingKeywords)
+        // 优惠红包不是资金入账；“券到账”与到期/领取提醒也不能绕过广告过滤。
+        // 已完成的付款可能附带优惠说明，仍保留原有支出识别。
+        val promotionalIncome = containsAny(content, listOf(
+            "优惠", "立减", "满减", "最高", "低至", "活动", "无门槛", "券", "卡包",
+            "失效", "到期", "过期", "待领取", "待使用", "去领取", "立即领取", "可领取", "领取红包"
+        ))
+        val receivedCashRedPacket = Regex("""(?:收到|收到了|已领取|领取了).{0,16}红包|红包.{0,16}(?:已到账|已入账|已存入余额)""")
+            .containsMatchIn(content)
+        val incomeAction = containsAny(content, incomingKeywords.filterNot { it == "红包" }) || receivedCashRedPacket
+        val thresholdOffer = Regex("""满\s*\d+(?:\.\d+)?\s*(?:元)?\s*减""").containsMatchIn(content)
+        val strongAction = successAction || (!promotionalIncome && !thresholdOffer && ((action && !looksLikeAd) || incomeAction))
         return if (officialIdentity && strongAction) "alipay" else null
     }
 
@@ -315,10 +339,15 @@ object PaymentNotificationParser {
         amountPatterns.forEach { pattern ->
             pattern.findAll(content).forEach { match ->
                 val value = match.groupValues[1].replace(",", "").toDoubleOrNull() ?: return@forEach
-                val start = (match.range.first - 32).coerceAtLeast(0)
-                val end = (match.range.last + 32).coerceAtMost(content.length)
-                val context = content.substring(start, end)
+                val amountStart = match.groups[1]!!.range.first
+                val before = content.substring(0, amountStart)
+                val prefix = before.substringAfterLast('，').substringAfterLast(',')
+                    .substringAfterLast('。').substringAfterLast('；').substringAfterLast('\n').takeLast(60)
+                // 只检查金额前的同一分句，后面的余额或优惠不能改变交易金额评分。
+                val context = prefix
                 var score = 0
+                if (containsAny(context, listOf("余额", "可用额度", "优惠", "立减", "抵扣", "原价", "已使用"))) return@forEach
+                if (containsAny(match.value.substringBefore(match.groupValues[1]), outgoingKeywords + incomingKeywords)) score += 10
                 if (containsAny(context, outgoingKeywords)) score += 5
                 if (containsAny(context, incomingKeywords)) score += 5
                 if (containsAny(context, listOf("余额", "可用额度", "可用余额", "账户余额"))) score -= 8
@@ -412,8 +441,15 @@ object PaymentNotificationParser {
     private fun extractSummary(
         data: PaymentNotificationContent,
         source: String,
-        paymentChannel: String
+        paymentChannel: String,
+        isIncome: Boolean,
+        isRefund: Boolean
     ): String {
+        val content = data.allContent()
+        val channel = if (containsAny(content, listOf("财付通", "微信"))) "微信" else paymentChannel
+        if (isRefund) return "${channel}退款"
+        if (containsAny(content, listOf("充值财付通", "充值微信", "微信零钱充值"))) return "微信零钱充值"
+        if (containsAny(content, listOf("转账财付通", "微信转账"))) return "${channel}转账"
         val ignoredParts = setOf(
             "微信支付", "支付宝", "支付助手", "交易提醒", "账单", "订单通知", "动账通知"
         )
@@ -425,6 +461,7 @@ object PaymentNotificationParser {
             .filterNot(::looksLikeNotificationTemplate)
             .firstOrNull()
 
+        if (isIncome) return candidate ?: "${channel}收款"
         return candidate ?: when (source.lowercase(Locale.ROOT)) {
             "wechat" -> "微信支付消费"
             "alipay" -> "支付宝消费"
@@ -489,7 +526,7 @@ object PaymentNotificationParser {
 
         val cleaned = value
             .trim()
-            .replace(Regex("""^(?:消费|支出|快捷支付)\s*"""), "")
+            .replace(Regex("""^(?:消费|支出|快捷支付|转账|充值|退款)\s*"""), "")
             .replace(Regex("""^(?:收入|入账|转入|收款)\s*"""), "")
             .replace(Regex("""^(?:消费支付通|消费支付|快捷支付通|支付通)\s*[-－—:：]?\s*"""), "")
             .replace(Regex("""^(?:财付通|支付宝|微信支付|微信|美团支付|美团|云闪付|京东支付|快捷支付)\s*[-－—:：]\s*"""), "")
@@ -500,7 +537,7 @@ object PaymentNotificationParser {
 
         val ignored = listOf(
             "微信支付", "支付宝", "财付通", "美团支付", "快捷支付", "支付助手", "交易提醒",
-            "订单通知", "动账通知", "付款成功", "支付成功", "扣款成功"
+            "订单通知", "动账通知", "付款成功", "支付成功", "扣款成功", "微信转账", "转账", "充值", "退款", "零钱充值"
         )
         // “已支付¥17.98”只是动作与金额，不是商户。把它误当交易对象会让
         // 微信通知与随后到达的银行通知因“商户冲突”无法合并。
@@ -543,10 +580,11 @@ data class PaymentNotificationContent(
     val bigText: String = "",
     val infoText: String = "",
     val tickerText: String = "",
-    val channelId: String = ""
+    val channelId: String = "",
+    val textLines: List<String> = emptyList()
 ) {
     fun contentParts(): List<String> {
-        return listOf(bigText, text, tickerText, summaryText, infoText, titleBig, subText, title)
+        return (listOf(bigText, text) + textLines + listOf(tickerText, summaryText, infoText, titleBig, subText, title))
             .map(String::trim)
             .filter(String::isNotBlank)
             .distinct()

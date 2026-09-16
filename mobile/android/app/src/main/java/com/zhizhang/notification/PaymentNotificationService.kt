@@ -72,6 +72,7 @@ class PaymentNotificationService : NotificationListenerService() {
             Log.i(TAG, "Service 心跳 - 监听 ${supportedPackages.size} 个应用")
             if (isAutoRecordEnabled()) {
                 autoBillRecorder.retryPending()
+                NotificationSampleArchive.flush(this@PaymentNotificationService)
                 // 通知监听服务短暂断开时，onNotificationPosted 可能已经错过；
                 // 对仍停留在通知中心的支付通知做补偿扫描，指纹去重保证不会重复记账。
                 scanActivePaymentNotifications()
@@ -141,6 +142,7 @@ class PaymentNotificationService : NotificationListenerService() {
             val match = PaymentNotificationParser.parse(content, paymentKeywords)
 
             if (match == null) {
+                NotificationSampleArchive.capture(this, content, null, sbn.key, sbn.postTime, "ignored", "未满足可信交易动作或有效金额规则")
                 Log.d(TAG, "通知未通过严格支付校验: package=${sbn.packageName}")
                 return
             }
@@ -165,6 +167,8 @@ class PaymentNotificationService : NotificationListenerService() {
                     ?: sbn.postTime.takeIf { it > 0 }
                     ?: System.currentTimeMillis()
             )
+            NotificationSampleArchive.capture(this, content, match, sbn.key, sbn.postTime,
+                if (queued) "queued" else "deduplicated", if (queued) "已进入记账队列（不代表已入账）" else "被记账队列去重")
             if (queued) {
                 SentryLogger.addBreadcrumb(
                     "支付通知进入自动记账队列",
@@ -173,6 +177,10 @@ class PaymentNotificationService : NotificationListenerService() {
                 )
             }
         } catch (e: Exception) {
+            runCatching {
+                NotificationSampleArchive.capture(this, extractNotificationContent(sbn), null, sbn.key, sbn.postTime,
+                    "error", "处理异常: ${e.javaClass.simpleName}")
+            }
             Log.e(TAG, "处理支付通知失败", e)
             SentryLogger.e(TAG, "处理支付通知失败", e)
         }
@@ -273,6 +281,7 @@ class PaymentNotificationService : NotificationListenerService() {
             bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString().orEmpty(),
             infoText = extras.getCharSequence(Notification.EXTRA_INFO_TEXT)?.toString().orEmpty(),
             tickerText = notification.tickerText?.toString().orEmpty(),
+            textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)?.map { it.toString() }.orEmpty(),
             channelId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 notification.channelId.orEmpty()
             } else {

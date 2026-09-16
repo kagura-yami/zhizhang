@@ -26,6 +26,7 @@ RUN npm ci --omit=dev --no-audit --prefer-offline --legacy-peer-deps \
 
 # 只复制生产运行所需的构建产物
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/admin-ui ./admin-ui
 
 # 创建持久化目录
 RUN mkdir -p uploads/avatars public/downloads

@@ -13,6 +13,7 @@ import {
   UploadedFile,
   Req,
   Header,
+  UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -29,6 +30,7 @@ import { join } from 'path';
 import { copyFileSync, existsSync, mkdirSync, renameSync } from 'fs';
 import { Request } from 'express';
 import { Public } from '../auth/decorators/public.decorator';
+import { AdminAccessGuard } from '../admin/admin-access.guard';
 
 // APK 存储目录
 const UPLOAD_DIR = join(process.cwd(), 'public', 'downloads');
@@ -39,7 +41,6 @@ if (!existsSync(UPLOAD_DIR)) {
 }
 
 @ApiTags('app-version')
-@Public()
 @Controller('app-version')
 export class AppVersionController {
   constructor(private readonly appVersionService: AppVersionService) {}
@@ -54,6 +55,7 @@ export class AppVersionController {
   @Header('Pragma', 'no-cache')
   @Header('Expires', '0')
   @Get('check')
+  @Public()
   async checkUpdate(
     @Query('currentVersion') currentVersion: string,
     @Query('platform') platform?: string,
@@ -79,6 +81,7 @@ export class AppVersionController {
   @Header('Pragma', 'no-cache')
   @Header('Expires', '0')
   @Get('latest')
+  @Public()
   async getLatest(@Query('platform') platform?: string) {
     try {
       const result = await this.appVersionService.getLatest(platform);
@@ -111,6 +114,8 @@ export class AppVersionController {
   })
   @ApiResponse({ status: 201, description: '上传成功' })
   @Post('upload')
+  @Public()
+  @UseGuards(AdminAccessGuard)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
@@ -176,6 +181,7 @@ export class AppVersionController {
    */
   @ApiOperation({ summary: '获取所有版本' })
   @Get()
+  @Public()
   async findAll(@Query('platform') platform?: string) {
     const result = await this.appVersionService.findAll(platform);
     return { success: true, data: result };
@@ -187,6 +193,8 @@ export class AppVersionController {
    */
   @ApiOperation({ summary: '删除版本' })
   @Delete(':id')
+  @Public()
+  @UseGuards(AdminAccessGuard)
   async remove(@Param('id', ParseIntPipe) id: number) {
     try {
       await this.appVersionService.remove(id);
