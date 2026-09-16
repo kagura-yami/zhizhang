@@ -129,6 +129,7 @@ model Bill {
   invoices    Invoice[] // 由收票邮箱匹配到该账单的发票
   relatedBill Bill?     @relation("BillRefund", fields: [relatedBillId], references: [id], onDelete: SetNull)
   refunds     Bill[]    @relation("BillRefund")
+  financialClassification BillFinancialClassification?
 
   @@index([userId, date])    // 复合索引：用户ID + 日期，用于按日期查询用户账单
   @@index([userId, type])    // 复合索引：用户ID + 类型，用于按类型统计
@@ -333,6 +334,19 @@ model HotUpdate {
 
   @@index([platform, isActive])
   @@map("hot_updates")
+  @@schema("public")
+}
+
+// A classification is valid only for the exact bill revision the owner reviewed.
+model BillFinancialClassification {
+  billId        Int      @id @map("bill_id")
+  kind          String   @db.VarChar(30)
+  currency      String   @default("CNY") @db.VarChar(3)
+  billUpdatedAt DateTime @map("bill_updated_at") @db.Timestamptz(6)
+  reviewedAt    DateTime @default(now()) @map("reviewed_at") @db.Timestamptz(6)
+  bill          Bill     @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@map("bill_financial_classifications")
   @@schema("public")
 }
 

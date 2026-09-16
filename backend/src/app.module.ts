@@ -18,6 +18,7 @@ import { HotUpdateModule } from './hot-update/hot-update.module';
 import { InvoiceMailboxModule } from './invoice-mailbox/invoice-mailbox.module';
 import { AdminModule } from './admin/admin.module';
 import { NotificationSamplesModule } from './notification-samples/notification-samples.module';
+import { LedgerModule } from './ledger/ledger.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { NotificationSamplesModule } from './notification-samples/notification-s
     InvoiceMailboxModule,
     AdminModule,
     NotificationSamplesModule,
+    LedgerModule,
   ],
   controllers: [AppController],
   providers: [

@@ -114,6 +114,7 @@ build/
 /generated/prisma
 prisma/migrations/*
 !prisma/migrations/202609160001_notification_samples/
+!prisma/migrations/202609160002_ledger_classification/
 
 # Database
 *.sqlite
