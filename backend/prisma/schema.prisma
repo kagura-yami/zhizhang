@@ -49,6 +49,8 @@ model User {
   writtenReviewThreads BillReviewThread[] @relation("ThreadReviewer")
   reviewMessages ReviewMessage[]
   reviewReports ReviewReport[]
+  ownedBillNotices NewBillNotice[] @relation("NoticeOwner")
+  receivedBillNotices NewBillNotice[] @relation("NoticeReviewer")
 
   @@map("users")
   @@schema("public")
@@ -144,6 +146,36 @@ model SocialInboxEvent {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([userId, id])
   @@map("social_inbox_events")
+  @@schema("public")
+}
+
+model NewBillNotice {
+  id Int @id @default(autoincrement())
+  ownerId String @map("owner_id") @db.Uuid
+  reviewerId String @map("reviewer_id") @db.Uuid
+  grantActivatedAt DateTime @map("grant_activated_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  dueAt DateTime @map("due_at") @db.Timestamptz(6)
+  processedAt DateTime? @map("processed_at") @db.Timestamptz(6)
+  retryAt DateTime? @map("retry_at") @db.Timestamptz(6)
+  attempts Int @default(0)
+  owner User @relation("NoticeOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  reviewer User @relation("NoticeReviewer", fields: [reviewerId], references: [id], onDelete: Cascade)
+  items NewBillNoticeItem[]
+  @@index([processedAt, dueAt, id])
+  @@index([ownerId, reviewerId, processedAt, dueAt])
+  @@map("new_bill_notices")
+  @@schema("public")
+}
+
+model NewBillNoticeItem {
+  noticeId Int @map("notice_id")
+  billId Int @map("bill_id")
+  notice NewBillNotice @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+  bill Bill @relation(fields: [billId], references: [id], onDelete: Cascade)
+  @@id([noticeId, billId])
+  @@index([billId])
+  @@map("new_bill_notice_items")
   @@schema("public")
 }
 
@@ -359,6 +391,7 @@ model Bill {
   refunds     Bill[]    @relation("BillRefund")
   financialClassification BillFinancialClassification?
   reviewThreads BillReviewThread[]
+  newBillNoticeItems NewBillNoticeItem[]
 
   @@index([userId, date])    // 复合索引：用户ID + 日期，用于按日期查询用户账单
   @@index([userId, type])    // 复合索引：用户ID + 类型，用于按类型统计

@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SocialAccessService, SocialTx } from '../social/social-access.service';
 import { ReviewsService } from '../reviews/reviews.service';
 import { InboxQueryDto } from './inbox.dto';
+import { visibleNotice } from './new-bill-notice';
 
 const audience = 'zhizhang-social-read';
 const interactions = ['review_main_created', 'review_reply_created'];
@@ -42,6 +43,15 @@ export class InboxService {
       title = event.kind === 'review_main_created' ? '收到新的评账文字' : '收到私密回复';
       target = { type: 'review', threadId: thread.id, billId: thread.originalBillId };
       if (preview) body = message.body.slice(0, 120);
+    } else if (event.kind === 'review_bills_created') {
+      const notice = await visibleNotice(tx, userId, p.noticeId);
+      if (!notice) return null;
+      title = '收到新的可评账单';
+      target = { type: 'bills', ownerId: notice.ownerId, noticeId: notice.noticeId, count: notice.count };
+      if (preview) {
+        const first = await tx.bill.findFirst({ where: notice.where, orderBy: { id: 'asc' }, select: { amount: true, type: true, category: { select: { name: true } } } });
+        body = notice.count === 1 && first ? `${first.type === 'income' ? '收入' : '支出'} ¥${first.amount.toFixed(4)} · ${first.category?.name || '未分类'}` : `有 ${notice.count} 笔新的可评账单`;
+      }
     } else if (event.kind === 'social_follow_created' || event.kind === 'review_grant_updated') {
       const otherId = event.kind === 'social_follow_created' ? p.followerId : p.ownerId;
       try { await this.access.pair(tx, userId, otherId); }
@@ -98,7 +108,7 @@ export class InboxService {
       const items = [];
       for (const event of fresh) {
         const item = await this.project(tx, userId, event, preference.notificationPreview);
-        if (item) items.push({ ...item, systemNotificationEnabled: preference.notifyInteractions });
+        if (item) items.push({ ...item, systemNotificationEnabled: event.kind === 'review_bills_created' ? preference.notifyNewBills : preference.notifyInteractions });
       }
       return { items, nextAfter: rows.at(-1)?.id ?? query.after, hasMore: candidates.length > query.limit,
         receipt: items.length ? this.receipt(userId, { scope: 'events', ids: items.map(item => item.id) }) : null };

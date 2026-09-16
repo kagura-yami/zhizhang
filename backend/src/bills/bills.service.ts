@@ -14,6 +14,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { PaginatedResponse } from '../common/interfaces/api-response.interface';
 import { lockSocialUsers } from '../social/social-access.service';
 import { reviewSnapshot } from '../reviews/review-snapshot';
+import { captureNewBill } from '../inbox/new-bill-notice';
 
 @Injectable()
 export class BillsService {
@@ -70,7 +71,7 @@ export class BillsService {
       : undefined;
     if (dedupeMarker) {
       const existing = await this.prisma.bill.findFirst({
-        where: { userId, source: 'notification', notes: { startsWith: dedupeMarker } },
+        where: { userId, source: 'notification', OR: [{ notes: dedupeMarker }, { notes: { startsWith: dedupeMarker + ';' } }] },
         include: {
           category: true,
           relatedBill: { select: { id: true, amount: true, type: true, description: true, date: true, time: true } },
@@ -155,26 +156,38 @@ export class BillsService {
       isRefund,
     });
 
-    return this.prisma.bill.create({
-      data: {
-        amount: new Decimal(amount),
-        type,
-        description,
-        date: new Date(date),
-        time: time ? new Date(time) : new Date(),
-        paymentChannel,
-        counterparty,
-        source: source || 'manual',
-        sourceApp,
-        categoryId,
-        relatedBillId: resolvedRelatedBillId,
-        notes: dedupeMarker ? [dedupeMarker, dedupeMeta].filter(Boolean).join(';') : undefined,
-        userId,
-      },
-      include: {
-        category: true,
-        relatedBill: { select: { id: true, amount: true, type: true, description: true, date: true, time: true } },
-      },
+    return this.prisma.$transaction(async tx => {
+      await lockSocialUsers(tx, [userId]);
+      // Repeat the exact idempotency check under the writer lock: concurrent retries must not create two bills/notices.
+      if (dedupeMarker) {
+        const existing = await tx.bill.findFirst({ where: { userId, source: 'notification', OR: [{ notes: dedupeMarker }, { notes: { startsWith: dedupeMarker + ';' } }] },
+          include: { category: true, relatedBill: { select: { id: true, amount: true, type: true, description: true, date: true, time: true } } } });
+        if (existing) return existing;
+      }
+      const bill = await tx.bill.create({
+        data: {
+          createdAt: new Date(),
+          amount: new Decimal(amount),
+          type,
+          description,
+          date: new Date(date),
+          time: time ? new Date(time) : new Date(),
+          paymentChannel,
+          counterparty,
+          source: source || 'manual',
+          sourceApp,
+          categoryId,
+          relatedBillId: resolvedRelatedBillId,
+          notes: dedupeMarker ? [dedupeMarker, dedupeMeta].filter(Boolean).join(';') : undefined,
+          userId,
+        },
+        include: {
+          category: true,
+          relatedBill: { select: { id: true, amount: true, type: true, description: true, date: true, time: true } },
+        },
+      });
+      await captureNewBill(tx, bill);
+      return bill;
     });
   }
 

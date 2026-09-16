@@ -6,6 +6,7 @@ import { ReviewsModule } from '../reviews/reviews.module';
 import { SocialModule } from '../social/social.module';
 import { BillFeedbackDto, InboxQueryDto, ReadInboxDto } from './inbox.dto';
 import { InboxService } from './inbox.service';
+import { NewBillWorker } from './new-bill-worker.service';
 
 @Controller('social/inbox')
 class InboxController {
@@ -26,5 +27,5 @@ class InboxController {
     return { success: true, data: await this.service.read(user, body.receipt) };
   }
 }
-@Module({ imports: [PrismaModule, AuthModule, SocialModule, ReviewsModule], controllers: [InboxController], providers: [InboxService] })
+@Module({ imports: [PrismaModule, AuthModule, SocialModule, ReviewsModule], controllers: [InboxController], providers: [InboxService, NewBillWorker] })
 export class InboxModule {}

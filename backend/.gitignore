@@ -136,3 +136,4 @@ prisma/migrations/*
 public/downloads/bundles/
 !prisma/migrations/202609160007_inbox_read/
 !prisma/migrations/202609160008_follow_generation/
+!prisma/migrations/202609160009_new_bill_notices/

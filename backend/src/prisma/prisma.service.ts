@@ -1,5 +1,7 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { lockSocialUsers } from '../social/social-access.service';
+import { captureNewBill } from '../inbox/new-bill-notice';
 
 @Injectable()
 export class PrismaService
@@ -186,14 +188,20 @@ export class PrismaService
     categoryId?: number;
     userId: string;
   }) {
-    return this.bill.create({
-      data: {
-        ...data,
-        amount: data.amount,
-      },
-      include: {
-        category: true,
-      },
+    return this.$transaction(async tx => {
+      await lockSocialUsers(tx, [data.userId]);
+      const bill = await tx.bill.create({
+        data: {
+          ...data,
+          amount: data.amount,
+          createdAt: new Date(),
+        },
+        include: {
+          category: true,
+        },
+      });
+      await captureNewBill(tx, bill);
+      return bill;
     });
   }
 
