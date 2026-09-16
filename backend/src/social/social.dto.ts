@@ -34,3 +34,19 @@ export class SaveGrantDto {
   historyStart?: string | null;
   @ValidateIf((_object, value) => value !== undefined) @IsInt() @Min(1) expectedVersion?: number;
 }
+
+export class RequestVersionDto {
+  @IsInt() @Min(1) expectedVersion: number;
+}
+
+export class SubmitRequestDto {
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsInt() @Min(1) expectedVersion?: number;
+}
+
+export class ApproveRequestDto extends RequestVersionDto {
+  @IsIn(['income', 'expense', 'both']) scope: string;
+  @ValidateIf((_object, value) => value != null)
+  @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  historyStart?: string | null;
+}

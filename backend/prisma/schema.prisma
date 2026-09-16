@@ -42,6 +42,9 @@ model User {
   blockedBy SocialBlock[] @relation("SocialBlocked")
   givenReviewGrants ReviewGrant[] @relation("GrantOwner")
   receivedReviewGrants ReviewGrant[] @relation("GrantReviewer")
+  incomingReviewRequests ReviewRequest[] @relation("RequestOwner")
+  outgoingReviewRequests ReviewRequest[] @relation("RequestApplicant")
+  socialInboxEvents SocialInboxEvent[]
 
   @@map("users")
   @@schema("public")
@@ -58,6 +61,8 @@ model SocialPreference {
   notifyNewBills Boolean @default(true) @map("notify_new_bills")
   notifyInteractions Boolean @default(true) @map("notify_interactions")
   notificationPreview Boolean @default(false) @map("notification_preview")
+  requestRejectStreak Int @default(0) @map("request_reject_streak")
+  requestCooldownUntil DateTime? @map("request_cooldown_until") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@map("social_preferences")
@@ -104,6 +109,36 @@ model ReviewGrant {
   @@map("review_grants")
   @@schema("public")
 
+}
+
+model ReviewRequest {
+  ownerId String @map("owner_id") @db.Uuid
+  applicantId String @map("applicant_id") @db.Uuid
+  status String @default("pending") @db.VarChar(20)
+  version Int @default(1)
+  requestedAt DateTime @default(now()) @map("requested_at") @db.Timestamptz(6)
+  decidedAt DateTime? @map("decided_at") @db.Timestamptz(6)
+  owner User @relation("RequestOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  applicant User @relation("RequestApplicant", fields: [applicantId], references: [id], onDelete: Cascade)
+  @@id([ownerId, applicantId])
+  @@index([applicantId, status])
+  @@index([ownerId, status, requestedAt])
+  @@map("review_requests")
+  @@schema("public")
+}
+
+// Durable in-app events; delivery and read cursors are implemented separately.
+model SocialInboxEvent {
+  id Int @id @default(autoincrement())
+  userId String @map("user_id") @db.Uuid
+  kind String @db.VarChar(40)
+  dedupeKey String @unique @map("dedupe_key") @db.VarChar(200)
+  payload Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, id])
+  @@map("social_inbox_events")
+  @@schema("public")
 }
 
 model BiometricCredential {

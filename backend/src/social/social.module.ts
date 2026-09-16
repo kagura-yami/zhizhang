@@ -3,16 +3,22 @@ import { AuthModule } from '../auth/auth.module';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { PrismaModule } from '../prisma/prisma.module';
 import { SocialAccessService } from './social-access.service';
-import { EnableSocialDto, SaveGrantDto, SearchSocialDto, SocialPageDto, SocialPreferencesDto } from './social.dto';
+import { ApproveRequestDto, EnableSocialDto, RequestVersionDto, SaveGrantDto, SearchSocialDto, SocialPageDto, SocialPreferencesDto, SubmitRequestDto } from './social.dto';
 import { SocialService } from './social.service';
+import { ReviewRequestService } from './review-request.service';
 
 const normalizeId = { transform: (id: string) => id.toLowerCase() };
 
 @Controller('social')
 class SocialController {
-  constructor(private readonly service: SocialService) {}
+  constructor(private readonly service: SocialService, private readonly requests: ReviewRequestService) {}
   private respond<T>(result: Promise<T>) { return result.then(data => ({ success: true, data })); }
   @Get('me') me(@CurrentUser('id') id: string) { return this.respond(this.service.preferences(id)); }
+  @Get('requests/:direction') requestsList(@CurrentUser('id') id: string, @Param('direction') direction: string, @Query() dto: SocialPageDto) { return this.respond(this.requests.list(id, direction, dto)); }
+  @Post('requests/to/:id') request(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string, @Body() dto: SubmitRequestDto) { return this.respond(this.requests.submit(id, target, dto)); }
+  @Post('requests/to/:id/withdraw') withdraw(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string, @Body() dto: RequestVersionDto) { return this.respond(this.requests.withdraw(id, target, dto)); }
+  @Post('requests/from/:id/approve') approve(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string, @Body() dto: ApproveRequestDto) { return this.respond(this.requests.approve(id, target, dto)); }
+  @Post('requests/from/:id/reject') reject(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string, @Body() dto: RequestVersionDto) { return this.respond(this.requests.reject(id, target, dto)); }
   @Post('enable') enable(@CurrentUser('id') id: string, @Body() dto: EnableSocialDto) { return this.respond(this.service.enable(id, dto)); }
   @Patch('preferences') preferences(@CurrentUser('id') id: string, @Body() dto: SocialPreferencesDto) { return this.respond(this.service.updatePreferences(id, dto)); }
   @Get('users') search(@CurrentUser('id') id: string, @Query() dto: SearchSocialDto) { return this.respond(this.service.search(id, dto)); }
@@ -30,5 +36,5 @@ class SocialController {
   @Get('owners/:id/bills') bills(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string, @Query() dto: SocialPageDto) { return this.respond(this.service.reviewableBills(id, target, dto)); }
 }
 
-@Module({ imports: [PrismaModule, AuthModule], controllers: [SocialController], providers: [SocialService, SocialAccessService], exports: [SocialService, SocialAccessService] })
+@Module({ imports: [PrismaModule, AuthModule], controllers: [SocialController], providers: [SocialService, SocialAccessService, ReviewRequestService], exports: [SocialService, SocialAccessService] })
 export class SocialModule {}

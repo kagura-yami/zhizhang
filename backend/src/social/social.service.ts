@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { businessDate } from '../ledger/ledger-period';
 import { SocialAccessService, SocialTx } from './social-access.service';
 import { EnableSocialDto, SaveGrantDto, SearchSocialDto, SocialPageDto, SocialPreferencesDto, SOCIAL_CONSENT_VERSION } from './social.dto';
+import { recordRequestEvent } from './review-request.service';
 
 const publicProfile = { id: true, nickname: true, avatar: true } as const;
 const pagination = (q: SocialPageDto) => ({ skip: (q.page - 1) * q.pageSize, take: q.pageSize });
@@ -101,6 +102,9 @@ export class SocialService {
         await tx.socialBlock.upsert({ where: { blockerId_blockedId: key }, create: key, update: {} });
         await tx.socialFollow.deleteMany({ where: { OR: [{ followerId: userId, followeeId: targetId }, { followerId: targetId, followeeId: userId }] } });
         await tx.reviewGrant.updateMany({ where: { OR: [{ ownerId: userId, reviewerId: targetId }, { ownerId: targetId, reviewerId: userId }] }, data: { status: 'revoked', version: { increment: 1 } } });
+        // Blocked relationships cannot retain actionable applications.
+        await tx.reviewRequest.updateMany({ where: { status: 'pending', OR: [{ ownerId: userId, applicantId: targetId }, { ownerId: targetId, applicantId: userId }] },
+          data: { status: 'system_cancelled', version: { increment: 1 }, decidedAt: new Date() } });
       } else await tx.socialBlock.deleteMany({ where: key });
       return { blocked };
     });
@@ -120,11 +124,19 @@ export class SocialService {
       const previous = await tx.reviewGrant.findUnique({ where: { ownerId_reviewerId: key } });
       if (previous && dto.expectedVersion !== previous.version) throw new ConflictException('授权已存在或已更新，请刷新后修改');
       if (!previous && dto.expectedVersion != null) throw new ConflictException('授权尚不存在');
-      return tx.reviewGrant.upsert({ where: { ownerId_reviewerId: key },
+      const result = await tx.reviewGrant.upsert({ where: { ownerId_reviewerId: key },
         create: { ...key, scope: dto.scope, historyStart, activatedAt: new Date() },
         update: { scope: dto.scope, historyStart, status: 'active', version: { increment: 1 },
           ...(previous?.status !== 'active' ? { activatedAt: new Date() } : {}) },
       });
+      const requestKey = { ownerId, applicantId: reviewerId };
+      const pending = await tx.reviewRequest.findUnique({ where: { ownerId_applicantId: requestKey } });
+      if (pending?.status === 'pending') {
+        const approved = await tx.reviewRequest.update({ where: { ownerId_applicantId: requestKey }, data: { status: 'approved', version: { increment: 1 }, decidedAt: new Date() } });
+        await tx.socialPreference.update({ where: { userId: reviewerId }, data: { requestRejectStreak: 0, requestCooldownUntil: null } });
+        await recordRequestEvent(tx, approved, reviewerId);
+      }
+      return result;
     });
   }
 

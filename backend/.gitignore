@@ -116,6 +116,7 @@ prisma/migrations/*
 !prisma/migrations/202609160001_notification_samples/
 !prisma/migrations/202609160002_ledger_classification/
 !prisma/migrations/202609160003_social_access/
+!prisma/migrations/202609160004_review_requests/
 
 # Database
 *.sqlite
