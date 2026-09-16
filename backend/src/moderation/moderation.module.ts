@@ -14,6 +14,10 @@ import { ModerationService } from './moderation.service';
 @Controller('review-reports')
 class ReviewReportsController {
   constructor(private readonly service: ModerationService) {}
+  @Get('threads/:threadId/messages/:messageId')
+  async preview(@CurrentUser('id') user: string, @Param('threadId', ParseIntPipe) thread: number, @Param('messageId', ParseIntPipe) message: number) {
+    return { success: true, data: await this.service.preview(user, thread, message) };
+  }
   @Post('threads/:threadId/messages/:messageId')
   async report(@CurrentUser('id') user: string, @Param('threadId', ParseIntPipe) thread: number, @Param('messageId', ParseIntPipe) message: number, @Body() dto: CreateReviewReportDto) {
     return { success: true, data: await this.service.report(user, thread, message, dto) };

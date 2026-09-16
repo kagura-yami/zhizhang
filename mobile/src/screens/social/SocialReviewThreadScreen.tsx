@@ -19,12 +19,14 @@ function MessageCard({
   busy,
   change,
   versions,
+  report,
 }: {
   message: ReviewMessage;
   detail: ReviewDetail;
   busy: boolean;
   change: (action: 'edit' | 'withdraw' | 'restore', body?: string) => void;
   versions: () => void;
+  report: () => void;
 }) {
   const s = useStyles(stylesFor),
     { user } = useAuth(),
@@ -104,6 +106,9 @@ function MessageCard({
       )}
       {!m.hidden && (
         <Action title="查看版本" disabled={busy} onPress={versions} />
+      )}
+      {!m.hidden && m.authorId !== user?.id && (
+        <Action title="举报此内容" disabled={busy} onPress={report} />
       )}
     </View>
   );
@@ -227,6 +232,12 @@ export default function SocialReviewThreadScreen({
                   api.changeReview(id, m.id, m.revision, action, body),
                 );
               }}
+              report={() =>
+                navigation.navigate('SocialReport', {
+                  threadId: id,
+                  messageId: m.id,
+                })
+              }
               versions={() =>
                 navigation.navigate('SocialReviewVersions', {
                   threadId: id,

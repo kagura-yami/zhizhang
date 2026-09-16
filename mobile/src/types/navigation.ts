@@ -32,6 +32,8 @@ declare global {
       SocialReceivedReviews: undefined;
       SocialReviewThread: { threadId: number };
       SocialReviewVersions: { threadId: number; messageId: number };
+      SocialReport: { threadId: number; messageId: number };
+      SocialReports: undefined;
       GeneralSettings: undefined;
       AppSettings: undefined;
       PersonalizationSettings: undefined;

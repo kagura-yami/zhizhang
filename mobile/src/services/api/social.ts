@@ -2,6 +2,17 @@ import { httpService } from '../http';
 import type { ApiResponse } from '../../types/api';
 
 export const SOCIAL_CONSENT_VERSION = '2026-09-16';
+export const REPORT_DISCLOSURE_VERSION = '2026-09-16';
+export interface ReviewReport {
+  id: number;
+  originalMessageId: number;
+  reportedRevision: number;
+  reason: string;
+  status: 'pending' | 'upheld' | 'dismissed';
+  decisionReason: string | null;
+  createdAt: string;
+  decidedAt: string | null;
+}
 export type ReviewVote = 'hang' | 'la';
 export interface SharedBill {
   id?: number;
@@ -119,6 +130,38 @@ export function createSocialApi(token: string) {
   // Bind requests to the session that rendered the controls, including delayed interceptor work.
   const config = { headers: { Authorization: `Bearer ${token}` } };
   return {
+    reportPreview: (thread: number, message: number) =>
+      data<{ message: ReviewMessage; disclosureVersion: string }>(
+        httpService.get(
+          `/review-reports/threads/${thread}/messages/${message}`,
+          config,
+        ),
+      ),
+    reportReview: (
+      thread: number,
+      message: number,
+      expectedRevision: number,
+      reason: string,
+    ) =>
+      data<{ id: number; status: ReviewReport['status'] }>(
+        httpService.post(
+          `/review-reports/threads/${thread}/messages/${message}`,
+          {
+            expectedRevision,
+            reason,
+            acceptDisclosure: true,
+            disclosureVersion: REPORT_DISCLOSURE_VERSION,
+          },
+          config,
+        ),
+      ),
+    reports: (page: number) =>
+      data<ReviewReport[]>(
+        httpService.get('/review-reports', {
+          ...config,
+          params: { page, pageSize: 20 },
+        }),
+      ),
     sharedBills: (id: string, page: number) =>
       data<{ grantVersion: number; items: SharedBill[] }>(
         httpService.get(`/social/owners/${id}/bills`, {

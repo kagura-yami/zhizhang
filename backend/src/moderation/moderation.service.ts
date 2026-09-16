@@ -1,15 +1,25 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { ReviewsService } from '../reviews/reviews.service';
+import { ReviewsService, visibleReviewMessage } from '../reviews/reviews.service';
 import { SocialAccessService } from '../social/social-access.service';
 import { SocialPageDto } from '../social/social.dto';
-import { CreateReviewReportDto, DecideReviewReportDto, ModerationQueryDto } from './moderation.dto';
+import { CreateReviewReportDto, DecideReviewReportDto, ModerationQueryDto, REPORT_DISCLOSURE_VERSION } from './moderation.dto';
 
 const page = (q: SocialPageDto) => ({ skip: (q.page - 1) * q.pageSize, take: q.pageSize });
 @Injectable()
 export class ModerationService {
   constructor(private readonly prisma: PrismaService, private readonly reviews: ReviewsService, private readonly access: SocialAccessService) {}
+
+  async preview(userId: string, threadId: number, messageId: number) {
+    return this.reviews.withThread(userId, threadId, false, async tx => {
+      const message = await tx.reviewMessage.findFirst({ where: { id: messageId, threadId } });
+      if (!message) throw new NotFoundException('文字不存在');
+      if (message.authorId === userId) throw new BadRequestException('不能举报自己的内容');
+      if (message.hidden) throw new BadRequestException('内容已隐藏，无需重复举报');
+      return { message: visibleReviewMessage(message), disclosureVersion: REPORT_DISCLOSURE_VERSION };
+    });
+  }
 
   async report(userId: string, threadId: number, messageId: number, dto: CreateReviewReportDto) {
     return this.reviews.withThread(userId, threadId, false, async (tx, thread) => {

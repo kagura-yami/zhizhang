@@ -40,6 +40,13 @@ Module({ imports: [ModerationModule, BillsModule], providers: [{ provide: APP_GU
     }
     const [t, ct] = threads, [m, cm] = mains;
     const reportPath = `/review-reports/threads/${t}/messages/${m.id}`;
+    assert.equal((await call(null, reportPath)).status, 401);
+    assert.equal((await call(c, reportPath)).status, 404);
+    assert.equal((await call(b, reportPath)).status, 400);
+    const preview = (await call(a, reportPath)).data;
+    assert.equal(preview.message.body, '举报目标原文');
+    assert.equal(preview.disclosureVersion, '2026-09-16');
+    assert(!JSON.stringify(preview).includes('其他评价者秘密'));
     assert.equal((await call(null, reportPath, 'POST', reportBody)).status, 401);
     assert.equal((await call(c, reportPath, 'POST', reportBody)).status, 404);
     assert.equal((await call(b, reportPath, 'POST', reportBody)).status, 400);
@@ -68,6 +75,7 @@ Module({ imports: [ModerationModule, BillsModule], providers: [{ provide: APP_GU
     assert.equal(await db.reviewModerationAudit.count({ where: { reportId: id, action: 'upheld' } }), 1);
     assert.equal(await db.socialInboxEvent.count({ where: { dedupeKey: { startsWith: `review-report:${id}:` } } }), 2);
     assert.equal((await call(a, `/reviews/threads/${t}`)).data.messages[0].body, null);
+    assert.equal((await call(a, reportPath)).status, 400);
     assert.equal((await call(a, `/reviews/threads/${t}/messages/${m.id}/versions`)).status, 403);
     assert.equal((await call(b, `/reviews/threads/${t}/messages/${m.id}`, 'PATCH', { action: 'restore', expectedRevision: 2 })).status, 403);
     assert.equal((await call(a, `/reviews/threads/${t}/replies`, 'POST', message('隐藏主评后可继续回复'))).status, 201);
