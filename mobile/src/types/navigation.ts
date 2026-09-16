@@ -23,6 +23,7 @@ declare global {
       Main: undefined;
       Settings: undefined;
       SocialSettings: undefined;
+      SocialPrivacy: undefined;
       SocialCommunity: undefined;
       SocialGrants: undefined;
       SocialRankings: undefined;

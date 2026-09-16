@@ -16,7 +16,7 @@ import SocialReceivedReviewsScreen from './SocialReceivedReviewsScreen';
 import SocialRankingsScreen from './SocialRankingsScreen';
 import SocialPeopleScreen from './SocialPeopleScreen';
 
-const tabs = ['互评账单', '我的反馈', '排行榜', '关系管理'] as const;
+const tabs = ['互评账单', '我的反馈', '排行榜', '关系管理', '更多'] as const;
 export default function SocialCommunityScreen({
   navigation,
 }: {
@@ -48,7 +48,7 @@ export default function SocialCommunityScreen({
           />
           <Action
             title="隐私"
-            onPress={() => navigation.navigate('SocialSettings')}
+            onPress={() => navigation.navigate('SocialPrivacy')}
           />
         </View>
         <View accessibilityRole="tablist" style={[s.row, { gap: 8 }]}>
@@ -83,6 +83,12 @@ export default function SocialCommunityScreen({
       {tab === 0 && <SocialReviewableOwnersScreen navigation={navigation} />}
       {tab === 1 && <SocialReceivedReviewsScreen navigation={navigation} />}
       {tab === 2 && <SocialRankingsScreen navigation={navigation} />}
+      {tab === 4 && <Page>
+        <Text style={s.title}>社群管理</Text>
+        <Action title="评账申请" onPress={() => navigation.navigate('SocialRequests')} />
+        <Action title="我的举报" onPress={() => navigation.navigate('SocialReports')} />
+        <Action title="管理已拉黑用户" onPress={() => navigation.navigate('SocialPeople', { mode: 'blocks' })} />
+      </Page>}
       {tab === 3 && (
         <SocialPeopleScreen
           navigation={navigation}

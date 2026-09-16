@@ -19,9 +19,11 @@ import {
 export default function SocialSettingsScreen({
   navigation,
   onEnabled,
+  privacy = false,
 }: {
   navigation: any;
   onEnabled?: () => void;
+  privacy?: boolean;
 }) {
   const api = useSocialApi();
   const s = useStyles(stylesFor),
@@ -46,9 +48,9 @@ export default function SocialSettingsScreen({
   };
   return (
     <Page>
-      <Text style={s.title}>分享之前，由你决定</Text>
+      <Text style={s.title}>{privacy ? '社群隐私' : '启用社群'}</Text>
       <Text style={s.muted}>
-        关注不等于授权。你可以按人选择允许评价的账单范围，并随时撤销。
+        {privacy ? '关注不等于授权。你可以按人选择允许评价的账单范围，并随时撤销。' : '社群是可选扩展，关闭不影响普通记账。互动、排行榜和隐私选项都在底部社群栏目中。'}
       </Text>
       <Status {...resource} />
       {status && !status.enabled && (
@@ -89,24 +91,19 @@ export default function SocialSettingsScreen({
       )}
       {status?.enabled && status.preference && (
         <>
-          <View style={s.card}>
+          {!privacy && <View style={s.card}>
             <View style={s.row}>
               <Text style={[s.heading, s.grow]}>启用社群</Text>
-              <Switch accessibilityLabel="启用社群" value disabled={resource.busy} onValueChange={() => confirm('关闭社群', '将退出排行榜并撤销评账授权和关注关系。你的账单、收支统计和自动记账继续保留。再次开启需重新授权。', () => { void resource.run(api.disable, () => { DeviceEventEmitter.emit('communityChanged'); void resource.refresh(); }); })} />
+              <Switch accessibilityLabel="启用社群" value disabled={resource.busy} onValueChange={() => confirm('关闭社群', '将退出排行榜并撤销评账授权和关注关系。你的账单、收支统计和自动记账继续保留。再次开启需重新授权。', () => { void resource.run(api.disable, () => { DeviceEventEmitter.emit('communityChanged'); setAccepted(false); void resource.refresh(); }); })} />
             </View>
             <Text style={s.muted}>社群是可选扩展，不影响日常记账。</Text>
-          </View>
-          <View style={s.card}>
+          </View>}
+          {privacy && <><View style={s.card}>
             <Text style={s.heading}>我的用户 ID</Text>
             <Text selectable style={s.small}>
               {user?.id}
             </Text>
             <Text style={s.muted}>昵称可能重名；添加关系时请核对完整 ID。</Text>
-            <Action
-              primary
-              title="查找用户与管理关系"
-              onPress={() => navigation.navigate('SocialPeople')}
-            />
           </View>
           <View style={s.card}>
             <Text style={s.heading}>隐私设置</Text>
@@ -148,34 +145,13 @@ export default function SocialSettingsScreen({
               </View>
             ))}
           </View>
-          <Action
-            title="结余排行榜"
-            onPress={() => navigation.navigate('SocialRankings')}
-          />
-          <Action
-            title="社群消息"
-            onPress={() => navigation.navigate('SocialInbox')}
-          />
-          <Action
-            title="我的举报"
-            onPress={() => navigation.navigate('SocialReports')}
-          />
-          <Action
-            title="收到的评账"
-            onPress={() => navigation.navigate('SocialReceivedReviews')}
-          />
-          <Action
-            title="评账申请"
-            onPress={() => navigation.navigate('SocialRequests')}
-          />
-          <Action
-            title="管理已拉黑用户"
-            onPress={() =>
-              navigation.navigate('SocialPeople', { mode: 'blocks' })
-            }
-          />
+          </>}
         </>
       )}
     </Page>
   );
+}
+
+export function SocialPrivacyScreen(props: { navigation: any }) {
+  return <SocialSettingsScreen {...props} privacy />;
 }
