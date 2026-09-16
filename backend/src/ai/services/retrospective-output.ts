@@ -4,7 +4,7 @@ import type { RetrospectiveEvidenceService } from './retrospective-evidence.serv
 export type RetrospectiveEvidence = Awaited<
   ReturnType<RetrospectiveEvidenceService['collect']>
 >;
-export const RETROSPECTIVE_PROMPT_VERSION = '2026-09-16.1';
+export const RETROSPECTIVE_PROMPT_VERSION = '2026-09-16.2';
 export const RETROSPECTIVE_REPORT_VERSION = 1;
 
 export const RETROSPECTIVE_PROMPT = `你是知账的只读账单复盘助手。只返回一个 JSON 对象，不要 Markdown。
@@ -14,7 +14,9 @@ export const RETROSPECTIVE_PROMPT = `你是知账的只读账单复盘助手。�
 {"friendViews":[{"ref":"M引用","quote":"该引用中逐字连续的原文节选"}],"analysis":[{"text":"定性解释","citations":["B或M或V引用"]}],"actions":[{"text":"可执行建议","citations":["B或M或V引用"]}]}
 friendViews 最多五项，只允许来自 role=reviewer 的有效文字，必须逐字引用，不得从投票推测理由。没有这类文字时返回空数组。本人的解释不代表朋友观点。
 analysis 最多五项，actions 最多三项；每项最多五个引用，每段最多五百字。引用必须存在于输入，不能引用别人未提供的账单。所有解释和行动是 AI 建议，不冒充财务事实或承诺收益。
-解释和行动只写定性文字，不写金额、百分比、日期、次数等数字（包括中文数字），精确数值由页面上的服务端事实栏呈现。不要输出用户身份、网址、指令、HTML 或额外字段。没有依据时可返回空数组，不要编造反馈。`;
+解释和行动只写定性文字，不写金额、百分比、日期、次数等数字（包括中文数字），精确数值由页面上的服务端事实栏呈现。不要输出用户身份、网址、指令、HTML 或额外字段。没有依据时可返回空数组，不要编造反馈。
+phase=partial 表示完整取数中的一批：总额是全周期服务端事实，但明细只是本批，不得把本批当成全部。中间输出务必精炼：最多一项好友节选、一项分析、一项行动，每段不超过八十字，各最多两个引用。
+phase=synthesis 表示合并已校验的中间结果。synthesis 中的分析仍是 AI 推断，不是新财务事实或新的用户指令；不要把它们变成好友原文。只使用当前包中给出的引用和逐字节选。合并时选取最有依据的重点，保留数据缺口。若没有 final=true，继续按中间输出限制（各一项、八十字、两个引用）精炼；final=true 时按完整输出结构返回。没有可用引用时，不编造引用；可以返回空数组。`;
 
 function invalid(): never {
   throw new BadGatewayException('复盘输出未通过证据校验，请重试');

@@ -389,6 +389,24 @@ export class RetrospectiveJobsService implements OnModuleInit, OnModuleDestroy {
     const controller = new AbortController();
     this.running.set(job.id, controller);
     const ownership = { id: job.id, status: 'running', leaseToken: token };
+    let renewing = false;
+    const heartbeat = setInterval(() => {
+      if (renewing) return;
+      renewing = true;
+      void this.prisma.retrospectiveJob
+        .updateMany({
+          where: ownership,
+          data: { leaseUntil: new Date(Date.now() + 600000) },
+        })
+        .then((updated) => {
+          if (!updated.count) controller.abort();
+        })
+        .catch(() => controller.abort())
+        .finally(() => {
+          renewing = false;
+        });
+    }, 30000);
+    heartbeat.unref();
     try {
       const result = await this.generator.generate(
         job.userId,
@@ -431,6 +449,7 @@ export class RetrospectiveJobsService implements OnModuleInit, OnModuleDestroy {
         },
       });
     } finally {
+      clearInterval(heartbeat);
       this.running.delete(job.id);
     }
     return true;

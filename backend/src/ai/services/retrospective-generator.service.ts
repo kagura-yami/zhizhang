@@ -14,10 +14,10 @@ import {
 } from '../adapters';
 import { RetrospectiveEvidenceService } from './retrospective-evidence.service';
 import type { RetrospectiveEvidence } from './retrospective-output';
+import { generateBatchedReport } from './retrospective-batches';
 import {
   RETROSPECTIVE_PROMPT,
   RETROSPECTIVE_PROMPT_VERSION,
-  validateRetrospectiveOutput,
 } from './retrospective-output';
 
 @Injectable()
@@ -66,41 +66,64 @@ export class RetrospectiveGeneratorService {
     const abort = () => controller.abort();
     signal?.addEventListener('abort', abort, { once: true });
     if (signal?.aborted) controller.abort();
-    const timeout = setTimeout(abort, 120000);
+    const timeout = setTimeout(abort, 480000);
     try {
       if (controller.signal.aborted)
         throw new BadGatewayException('复盘生成已取消');
-      let response;
-      try {
-        response = await adapter.chat(
-          [
-            { role: 'system', content: RETROSPECTIVE_PROMPT },
-            { role: 'user', content: JSON.stringify(input.payload) },
-          ],
-          [],
-          {
-            apiKey: config.apiKey,
-            apiBaseUrl: config.apiBaseUrl,
-            model: config.model,
-            signal: controller.signal,
-            redactErrors: true,
-          },
-        );
-      } catch {
-        throw new BadGatewayException(
-          controller.signal.aborted
-            ? '复盘生成超时或已取消，请重试'
-            : '模型暂时无法完成复盘，请重试',
-        );
-      }
-      if (
-        controller.signal.aborted ||
-        response.stopReason !== 'end_turn' ||
-        response.toolCalls.length
-      ) {
-        throw new BadGatewayException('模型未完成有效复盘，请重试');
-      }
-      const report = validateRetrospectiveOutput(response.content, input);
+      let calls = 0;
+      const generated = await generateBatchedReport(input, async (payload) => {
+        if (controller.signal.aborted)
+          throw new BadGatewayException('复盘生成超时或已取消，请重试');
+        // The job fence is rechecked before EACH remote request, including reduction passes.
+        if (onEvidence) await onEvidence(input);
+        else if (calls) {
+          const latest = await this.evidence.collect(userId, kind, period);
+          if (latest.inputDigest !== input.inputDigest)
+            throw new ConflictException(
+              '复盘期间账单、评价或授权已变化，请重新生成',
+            );
+        }
+        calls++;
+        const callController = new AbortController();
+        const abortCall = () => callController.abort();
+        controller.signal.addEventListener('abort', abortCall, { once: true });
+        if (controller.signal.aborted) callController.abort();
+        const callTimeout = setTimeout(abortCall, 120000);
+        try {
+          const response = await adapter.chat(
+            [
+              { role: 'system', content: RETROSPECTIVE_PROMPT },
+              { role: 'user', content: JSON.stringify(payload) },
+            ],
+            [],
+            {
+              apiKey: config.apiKey,
+              apiBaseUrl: config.apiBaseUrl,
+              model: config.model,
+              signal: callController.signal,
+              redactErrors: true,
+            },
+          );
+          if (
+            callController.signal.aborted ||
+            response.stopReason !== 'end_turn' ||
+            response.toolCalls.length
+          ) {
+            throw new BadGatewayException('模型未完成有效复盘，请重试');
+          }
+          return response.content;
+        } catch (error) {
+          if (error instanceof BadGatewayException) throw error;
+          throw new BadGatewayException(
+            callController.signal.aborted
+              ? '复盘生成超时或已取消，请重试'
+              : '模型暂时无法完成复盘，请重试',
+          );
+        } finally {
+          clearTimeout(callTimeout);
+          controller.signal.removeEventListener('abort', abortCall);
+        }
+      });
       // No stale authorization/hidden text may be accepted after an in-flight model response.
       const current = await this.evidence.collect(userId, kind, period);
       if (controller.signal.aborted)
@@ -110,7 +133,7 @@ export class RetrospectiveGeneratorService {
           '复盘期间账单、评价或授权已变化，请重新生成',
         );
       return {
-        report,
+        ...generated,
         sources: input.sources,
         inputDigest: input.inputDigest,
         capturedAt: input.capturedAt,

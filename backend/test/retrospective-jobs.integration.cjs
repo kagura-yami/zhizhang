@@ -30,9 +30,10 @@ const model = http.createServer(async (req, res) => {
   if (mode === 'error') { res.writeHead(503); res.end('private-upstream-text'); return; }
   const finish = () => {
     const friend = input.feedback.find(m => m.role === 'reviewer');
+    const ref = input.facts.bills.at(-1)?.ref ?? friend?.ref ?? input.votes.at(-1)?.ref;
     res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify({
       friendViews: friend ? [{ ref: friend.ref, quote: friend.text }] : [],
-      analysis: [{ text: '可以检查消费安排', citations: ['B1'] }], actions: [{ text: '提前安排工作餐', citations: ['B1'] }],
+      analysis: ref ? [{ text: '可以检查消费安排', citations: [ref] }] : [], actions: ref ? [{ text: '提前安排工作餐', citations: [ref] }] : [],
     }) }, finish_reason: 'stop' }] }));
   };
   if (mode === 'hold') { release = finish; entered(); } else finish();
@@ -117,6 +118,21 @@ const model = http.createServer(async (req, res) => {
     await db.user.update({ where: { id: friend.id }, data: { isActive: false } });
     await db.user.update({ where: { id: friend.id }, data: { isActive: true } });
     assert.equal((await request(`/${expired.id}`, owner)).status, 'invalidated');
+    // A long-running request renews its DB lease; then revocation stops ALL later chunks.
+    await db.bill.createMany({ data: Array.from({ length: 601 }, () => ({ userId: owner.id, amount: 1, type: 'expense', date: new Date('2020-02-10'), description: '完整的大批量账单测试' })) });
+    mode = 'hold'; const multiWait = new Promise(resolve => { entered = resolve; });
+    const multi = await request('', owner, 'POST', dto(), 201), callsBefore = modelCalls, multiRun = jobs.runOne();
+    await multiWait;
+    const leaseBefore = (await db.retrospectiveJob.findUnique({ where: { id: multi.id } })).leaseUntil;
+    await new Promise(resolve => setTimeout(resolve, 31000));
+    const leaseAfter = (await db.retrospectiveJob.findUnique({ where: { id: multi.id } })).leaseUntil;
+    assert.ok(leaseAfter > leaseBefore);
+    await db.socialPreference.update({ where: { userId: friend.id }, data: { allowAiAuthoredFeedback: false } });
+    release(); await multiRun;
+    assert.equal(modelCalls - callsBefore, 1);
+    assert.equal((await request(`/${multi.id}`, owner)).status, 'invalidated');
+    await db.socialPreference.update({ where: { userId: friend.id }, data: { allowAiAuthoredFeedback: true } });
+    mode = 'ok';
     await db.retrospectiveJob.createMany({ data: Array.from({ length: 21 }, () => ({ id: randomUUID(), userId: owner.id, clientKey: randomUUID(), configId: config.id, kind: 'day', period: '2020-02-10', status: 'failed', updatedAt: new Date() })) });
     const page1 = await request('?page=1&pageSize=20', owner), page2 = await request('?page=2&pageSize=20', owner);
     assert.equal(page1.items.length, 20); assert.ok(page2.items.length > 0);
