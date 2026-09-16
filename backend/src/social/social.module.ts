@@ -15,6 +15,7 @@ class SocialController {
   private respond<T>(result: Promise<T>) { return result.then(data => ({ success: true, data })); }
   @Get('me') me(@CurrentUser('id') id: string) { return this.respond(this.service.preferences(id)); }
   @Get('requests/:direction') requestsList(@CurrentUser('id') id: string, @Param('direction') direction: string, @Query() dto: SocialPageDto) { return this.respond(this.requests.list(id, direction, dto)); }
+  @Get('requests/to/:id') requestContext(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string) { return this.respond(this.requests.context(id, target)); }
   @Post('requests/to/:id') request(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string, @Body() dto: SubmitRequestDto) { return this.respond(this.requests.submit(id, target, dto)); }
   @Post('requests/to/:id/withdraw') withdraw(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string, @Body() dto: RequestVersionDto) { return this.respond(this.requests.withdraw(id, target, dto)); }
   @Post('requests/from/:id/approve') approve(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string, @Body() dto: ApproveRequestDto) { return this.respond(this.requests.approve(id, target, dto)); }

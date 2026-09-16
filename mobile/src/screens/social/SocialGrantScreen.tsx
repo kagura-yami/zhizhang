@@ -157,6 +157,7 @@ export default function SocialGrantScreen({
 }) {
   const api = useSocialApi();
   const id: string = route.params.userId;
+  const requestVersion: number | undefined = route.params.requestVersion;
   const r = useSocialResource(
     useCallback(async (): Promise<GrantData> => {
       const [person, grants, sample] = await Promise.all([
@@ -179,13 +180,19 @@ export default function SocialGrantScreen({
           save={(scope, historyStart) => {
             void r.run(
               () =>
-                api.grant(id, {
-                  scope,
-                  historyStart,
-                  ...(r.value?.grant
-                    ? { expectedVersion: r.value.grant.version }
-                    : {}),
-                }),
+                requestVersion !== undefined
+                  ? api.approveRequest(id, {
+                      scope,
+                      historyStart,
+                      expectedVersion: requestVersion,
+                    })
+                  : api.grant(id, {
+                      scope,
+                      historyStart,
+                      ...(r.value?.grant
+                        ? { expectedVersion: r.value.grant.version }
+                        : {}),
+                    }),
               () => navigation.goBack(),
             );
           }}

@@ -25,7 +25,8 @@ declare global {
       SocialSettings: undefined;
       SocialPeople: { mode?: 'search' | 'following' | 'followers' | 'friends' | 'blocks' } | undefined;
       SocialPerson: { userId: string };
-      SocialGrant: { userId: string };
+      SocialGrant: { userId: string; requestVersion?: number };
+      SocialRequests: undefined;
       GeneralSettings: undefined;
       AppSettings: undefined;
       PersonalizationSettings: undefined;

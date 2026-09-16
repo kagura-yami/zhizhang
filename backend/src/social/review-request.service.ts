@@ -33,6 +33,16 @@ export class ReviewRequestService {
       orderBy: [{ requestedAt: 'desc' }, { ownerId: 'asc' }, { applicantId: 'asc' }], skip: (query.page - 1) * query.pageSize, take: query.pageSize });
   }
 
+  async context(applicantId: string, ownerId: string) {
+    return this.locked(ownerId, applicantId, async tx => {
+      await this.access.pair(tx, ownerId, applicantId);
+      const preference = await this.access.enabled(tx, applicantId);
+      const request = await tx.reviewRequest.findUnique({ where: { ownerId_applicantId: { ownerId, applicantId } } });
+      const pendingCount = await tx.reviewRequest.count({ where: { applicantId, status: 'pending' } });
+      return { request, pendingCount, pendingLimit: 10, cooldownUntil: preference.requestCooldownUntil };
+    });
+  }
+
   async submit(applicantId: string, ownerId: string, dto: SubmitRequestDto) {
     return this.locked(ownerId, applicantId, async tx => {
       await this.access.pair(tx, ownerId, applicantId);

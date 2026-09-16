@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import { Text, View } from 'react-native';
 import { useAlert } from '../../providers';
 import { useStyles } from '../../hooks/useStyles';
+import { requestLabels } from './SocialRequestsScreen';
 
 import {
   Action,
@@ -26,11 +27,12 @@ export default function SocialPersonScreen({
     { confirm } = useAlert();
   const r = useSocialResource(
     useCallback(async () => {
-      const [person, grants] = await Promise.all([
+      const [person, grants, requestContext] = await Promise.all([
         api.person(id),
         api.grants(id),
+        api.requestContext(id),
       ]);
-      return { person, ...grants };
+      return { person, ...grants, requestContext };
     }, [api, id]),
   );
   return (
@@ -38,6 +40,83 @@ export default function SocialPersonScreen({
       <Status {...r} />
       {r.value && (
         <>
+          {r.value.received?.status !== 'active' && (
+            <View style={s.card}>
+              <Text style={s.heading}>申请查看对方的账单</Text>
+              <Text style={s.muted}>
+                仅向对方发送申请；由对方决定是否批准及开放范围。
+              </Text>
+              <Text style={s.text}>
+                待处理 {r.value.requestContext.pendingCount}/
+                {r.value.requestContext.pendingLimit} ·{' '}
+                {r.value.requestContext.request
+                  ? requestLabels[r.value.requestContext.request.status]
+                  : '尚未申请'}
+              </Text>
+              {!!r.value.requestContext.cooldownUntil &&
+                new Date(r.value.requestContext.cooldownUntil).getTime() >
+                  Date.now() && (
+                  <Text style={s.error}>
+                    申请冷却至{' '}
+                    {new Date(
+                      r.value.requestContext.cooldownUntil,
+                    ).toLocaleString()}
+                    。到期后请重新加载。
+                  </Text>
+                )}
+              {r.value.requestContext.request?.status === 'pending' ? (
+                <Action
+                  title="撤回申请"
+                  disabled={r.busy}
+                  onPress={() =>
+                    confirm(
+                      '撤回申请',
+                      '撤回后对方不能批准这一轮申请。',
+                      () => {
+                        void r.run(() =>
+                          api.withdrawRequest(
+                            id,
+                            r.value!.requestContext.request!.version,
+                          ),
+                        );
+                      },
+                    )
+                  }
+                />
+              ) : (
+                <Action
+                  title="发起评账申请"
+                  disabled={
+                    r.busy ||
+                    r.value.requestContext.pendingCount >=
+                      r.value.requestContext.pendingLimit ||
+                    (!!r.value.requestContext.cooldownUntil &&
+                      new Date(r.value.requestContext.cooldownUntil).getTime() >
+                        Date.now())
+                  }
+                  onPress={() =>
+                    confirm(
+                      '发起评账申请',
+                      '将向对方展示你的昵称、头像和用户 ID。最多同时保留十条待处理申请；连续三次被拒绝后冷却 24 小时。',
+                      () => {
+                        void r.run(() =>
+                          api.submitRequest(
+                            id,
+                            r.value!.requestContext.request?.version,
+                          ),
+                        );
+                      },
+                    )
+                  }
+                />
+              )}
+              <Action
+                title="刷新申请状态"
+                disabled={r.busy}
+                onPress={r.refresh}
+              />
+            </View>
+          )}
           <View style={s.card}>
             <Text style={s.title}>
               {r.value.person.nickname || '未设置昵称'}

@@ -43,6 +43,15 @@ Module({ imports: [SocialModule], providers: [{ provide: APP_GUARD, useClass: Jw
     const pendingOwners = owners.slice(0, 11).filter((_, i) => parallel[i].status === 201);
     const [o0, o1, o2, o3, o4, o5] = pendingOwners;
     const initial = await request(o0);
+    const context = (await call(applicant, '/requests/to/' + o0.id, undefined, 'GET')).data;
+    assert.equal(context.request.version, initial.version);
+    assert.equal(context.pendingCount, 10);
+    assert.equal(context.pendingLimit, 10);
+    assert.equal(context.cooldownUntil, null);
+    const reverse = (await call(o0, '/requests/to/' + applicant.id, undefined, 'GET')).data;
+    assert.equal(reverse.request, null);
+    assert.equal(reverse.pendingCount, 0);
+    assert.equal((await call(applicant, '/requests/to/' + applicant.id, undefined, 'GET')).status, 400);
     assert.equal((await submit(o0)).data.version, initial.version);
     assert.equal(await db.socialInboxEvent.count({ where: { userId: o0.id, kind: 'review_request_pending' } }), 1);
     const withdrawn = await call(applicant, `/requests/to/${o0.id}/withdraw`, { expectedVersion: initial.version });

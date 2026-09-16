@@ -2,6 +2,27 @@ import { httpService } from '../http';
 import type { ApiResponse } from '../../types/api';
 
 export const SOCIAL_CONSENT_VERSION = '2026-09-16';
+export interface ReviewRequest {
+  ownerId: string;
+  applicantId: string;
+  version: number;
+  status:
+    | 'pending'
+    | 'approved'
+    | 'rejected'
+    | 'withdrawn'
+    | 'system_cancelled';
+  requestedAt: string;
+  decidedAt: string | null;
+  owner: SocialPerson;
+  applicant: SocialPerson;
+}
+export interface RequestContext {
+  request: Omit<ReviewRequest, 'owner' | 'applicant'> | null;
+  pendingCount: number;
+  pendingLimit: number;
+  cooldownUntil: string | null;
+}
 export interface SocialPerson {
   id: string;
   nickname: string | null;
@@ -49,6 +70,52 @@ export function createSocialApi(token: string) {
   // Bind requests to the session that rendered the controls, including delayed interceptor work.
   const config = { headers: { Authorization: `Bearer ${token}` } };
   return {
+    requestContext: (id: string) =>
+      data<RequestContext>(
+        httpService.get(`/social/requests/to/${id}`, config),
+      ),
+    requests: (direction: 'incoming' | 'outgoing', page: number) =>
+      data<ReviewRequest[]>(
+        httpService.get(`/social/requests/${direction}`, {
+          ...config,
+          params: { page, pageSize: 20 },
+        }),
+      ),
+    submitRequest: (id: string, expectedVersion?: number) =>
+      data(
+        httpService.post(
+          `/social/requests/to/${id}`,
+          { expectedVersion },
+          config,
+        ),
+      ),
+    withdrawRequest: (id: string, expectedVersion: number) =>
+      data(
+        httpService.post(
+          `/social/requests/to/${id}/withdraw`,
+          { expectedVersion },
+          config,
+        ),
+      ),
+    rejectRequest: (id: string, expectedVersion: number) =>
+      data(
+        httpService.post(
+          `/social/requests/from/${id}/reject`,
+          { expectedVersion },
+          config,
+        ),
+      ),
+    approveRequest: (
+      id: string,
+      values: {
+        expectedVersion: number;
+        scope: ReviewGrant['scope'];
+        historyStart?: string;
+      },
+    ) =>
+      data(
+        httpService.post(`/social/requests/from/${id}/approve`, values, config),
+      ),
     status: () => data<SocialStatus>(httpService.get('/social/me', config)),
     enable: () =>
       data<SocialPreferences>(

@@ -38,6 +38,7 @@ import SocialSettingsScreen from '../screens/social/SocialSettingsScreen';
 import SocialPeopleScreen from '../screens/social/SocialPeopleScreen';
 import SocialPersonScreen from '../screens/social/SocialPersonScreen';
 import SocialGrantScreen from '../screens/social/SocialGrantScreen';
+import SocialRequestsScreen from '../screens/social/SocialRequestsScreen';
 
 import { useTheme, useAuth } from '../providers';
 import { spacing, borderRadius, borderWidth } from '../theme/spacing';
@@ -358,6 +359,7 @@ export default function AppNavigator() {
             <Stack.Screen name="SocialPeople" component={SocialPeopleScreen} options={{ headerShown: true, title: '关系管理' }} />
             <Stack.Screen name="SocialPerson" component={SocialPersonScreen} options={{ headerShown: true, title: '关系与授权' }} />
             <Stack.Screen name="SocialGrant" component={SocialGrantScreen} options={{ headerShown: true, title: '确认评账授权' }} />
+            <Stack.Screen name="SocialRequests" component={SocialRequestsScreen} options={{ headerShown: true, title: '评账申请' }} />
             <Stack.Screen
               name="About"
               component={AboutScreen}

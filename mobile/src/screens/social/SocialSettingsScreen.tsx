@@ -135,6 +135,10 @@ export default function SocialSettingsScreen({
             ))}
           </View>
           <Action
+            title="评账申请"
+            onPress={() => navigation.navigate('SocialRequests')}
+          />
+          <Action
             title="管理已拉黑用户"
             onPress={() =>
               navigation.navigate('SocialPeople', { mode: 'blocks' })
