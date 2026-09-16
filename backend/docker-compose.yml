@@ -36,8 +36,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    # 已确认现有发票不存在重复哈希，应用用户级去重约束。
-    command: ['sh', '-c', 'npx prisma db push --accept-data-loss && node dist/main.js']
+    # 发布前显式备份并执行增量迁移；服务重启不得自动更改数据库结构。
+    command: ['node', 'dist/main.js']
     restart: unless-stopped
     healthcheck:
       test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3006/').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"]

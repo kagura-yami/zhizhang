@@ -33,5 +33,5 @@ RUN mkdir -p uploads/avatars public/downloads
 
 EXPOSE 3006
 
-# 启动服务（数据库 schema 通过 prisma db push 手动管理）
+# 只启动服务；数据库备份和增量迁移由发布流程先行执行。
 CMD ["node", "dist/main.js"]
