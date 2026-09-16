@@ -48,6 +48,7 @@ model User {
   ownedReviewThreads BillReviewThread[] @relation("ThreadOwner")
   writtenReviewThreads BillReviewThread[] @relation("ThreadReviewer")
   reviewMessages ReviewMessage[]
+  reviewReports ReviewReport[]
 
   @@map("users")
   @@schema("public")
@@ -160,6 +161,7 @@ model BillReviewThread {
   reviewer User @relation("ThreadReviewer", fields: [reviewerId], references: [id], onDelete: Cascade)
   bill Bill? @relation(fields: [billId], references: [id], onDelete: SetNull)
   messages ReviewMessage[]
+  reports ReviewReport[]
   @@unique([originalBillId, reviewerId])
   @@index([ownerId, id])
   @@index([reviewerId, id])
@@ -183,6 +185,7 @@ model ReviewMessage {
   thread BillReviewThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
   author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
   versions ReviewMessageVersion[]
+  reports ReviewReport[]
   @@unique([threadId, mainSlot])
   @@unique([threadId, authorId, clientKey])
   @@index([threadId, id])
@@ -201,6 +204,65 @@ model ReviewMessageVersion {
   message ReviewMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
   @@unique([messageId, revision])
   @@map("review_message_versions")
+  @@schema("public")
+}
+
+model ReviewReport {
+  id Int @id @default(autoincrement())
+  reporterId String? @map("reporter_id") @db.Uuid
+  threadId Int? @map("thread_id")
+  messageId Int? @map("message_id")
+  originalMessageId Int @map("original_message_id")
+  reportedRevision Int @map("reported_revision")
+  ownerId String @map("owner_id") @db.Uuid
+  reviewerId String @map("reviewer_id") @db.Uuid
+  authorId String @map("author_id") @db.Uuid
+  reason String @db.Text
+  status String @default("pending") @db.VarChar(20)
+  disclosureVersion String @map("disclosure_version") @db.VarChar(30)
+  decisionReason String? @map("decision_reason") @db.Text
+  decidedBy String? @map("decided_by") @db.VarChar(100)
+  decidedAt DateTime? @map("decided_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  reporter User? @relation(fields: [reporterId], references: [id], onDelete: SetNull)
+  thread BillReviewThread? @relation(fields: [threadId], references: [id], onDelete: SetNull)
+  message ReviewMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  evidence ReviewReportEvidence[]
+  audit ReviewModerationAudit[]
+  @@unique([reporterId, originalMessageId, reportedRevision])
+  @@index([status, id])
+  @@map("review_reports")
+  @@schema("public")
+}
+
+model ReviewReportEvidence {
+  id Int @id @default(autoincrement())
+  reportId Int @map("report_id")
+  originalMessageId Int @map("original_message_id")
+  authorId String @map("author_id") @db.Uuid
+  isMain Boolean @map("is_main")
+  body String @db.Text
+  withdrawn Boolean
+  hidden Boolean
+  revision Int
+  versions Json
+  messageCreatedAt DateTime @map("message_created_at") @db.Timestamptz(6)
+  report ReviewReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  @@unique([reportId, originalMessageId])
+  @@map("review_report_evidence")
+  @@schema("public")
+}
+
+model ReviewModerationAudit {
+  id Int @id @default(autoincrement())
+  reportId Int @map("report_id")
+  actor String @db.VarChar(100)
+  action String @db.VarChar(20)
+  reason String? @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  report ReviewReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  @@index([reportId, id])
+  @@map("review_moderation_audit")
   @@schema("public")
 }
 

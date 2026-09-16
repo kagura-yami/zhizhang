@@ -4,6 +4,7 @@ const titles = {
   dashboard: ['OVERVIEW', '运行总览'], settings: ['SYSTEM CONFIG', '功能配置'], versions: ['RELEASE NOTES', '更新日志'],
   users: ['USER DATA', '用户管理'], issues: ['ROADMAP & FIXES', 'Issue 待办'],
   samples: ['NOTIFICATION SAMPLES', '通知样本'],
+  moderation: ['PRIVATE REVIEW MODERATION', '举报审核'],
 };
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
@@ -28,6 +29,7 @@ function toast(message, isError = false) {
 }
 
 function logout() {
+  closeDrawer(); $('#editor-form').replaceChildren();
   state.token = ''; sessionStorage.removeItem('zz-admin-token'); $('#app-view').hidden = true; $('#login-view').hidden = false;
 }
 
@@ -60,6 +62,7 @@ async function loadCurrent() {
     if (state.view === 'versions') return renderVersions(await request('/versions'));
     if (state.view === 'users') return loadUsers();
     if (state.view === 'issues') return loadIssues();
+    if (state.view === 'moderation') return await loadModeration();
     if (state.view === 'samples') return await loadSamples();
   } catch (error) { content.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`; toast(error.message, true); }
 }
@@ -146,6 +149,40 @@ function field(label, name, value = '', type = 'text', required = false) { retur
 function selectField(label, name, value, options) { return `<label><span>${label}</span><select name="${name}">${options.map(([key, text]) => `<option value="${key}" ${key === value ? 'selected' : ''}>${text}</option>`).join('')}</select></label>`; }
 function textarea(label, name, value = '', required = false) { return `<label><span>${label}</span><textarea name="${name}" ${required ? 'required' : ''}>${escapeHtml(value || '')}</textarea></label>`; }
 
+const moderationLabels = { pending: '待审核', upheld: '已隐藏', dismissed: '未违规' };
+let evidenceRequest = 0;
+async function loadModeration() {
+  const params = new URLSearchParams({ page: state.page, pageSize: 20, ...(state.filters.status ? { status: state.filters.status } : {}) });
+  const data = await request(`/moderation?${params}`);
+  $('#workspace-content').innerHTML = `<div class="section-header"><div><h2>私密评账举报</h2><p>按举报查看限定线程的证据。查看及处理均留有审核记录。</p></div><div class="toolbar"><select id="moderation-status" aria-label="举报状态"><option value="">全部状态</option>${Object.entries(moderationLabels).map(([value, label]) => `<option value="${value}" ${state.filters.status === value ? 'selected' : ''}>${label}</option>`).join('')}</select><button data-action="filter-moderation">筛选</button></div></div>
+    <div class="table-scroll"><table class="data-table moderation-table"><thead><tr><th>举报</th><th>举报原因</th><th>状态</th><th>提交时间</th><th></th></tr></thead><tbody>${data.items.map(item => `<tr><td><strong>#${item.id}</strong><small>文字 #${item.originalMessageId} · 版本 ${item.reportedRevision}</small></td><td class="issue-title"><p>${escapeHtml(item.reason)}</p></td><td><span class="badge">${moderationLabels[item.status] || '未知'}</span></td><td>${formatDate(item.createdAt)}</td><td><div class="row-actions"><button data-action="moderation-detail" data-id="${item.id}">查看证据</button></div></td></tr>`).join('') || '<tr><td colspan="5"><div class="empty-state">没有符合条件的举报</div></td></tr>'}</tbody></table></div>${pagination(data)}`;
+}
+
+async function showEvidence(id, page = 1) {
+  const requestId = ++evidenceRequest;
+  const form = $('#editor-form');
+  // Preserve an unfinished decision while paging through its evidence.
+  const draft = form.dataset.type === 'moderation' && form.dataset.id === String(id) ? Object.fromEntries(new FormData(form)) : {};
+  form.dataset.type = 'moderation'; form.dataset.id = id;
+  form.innerHTML = '<div class="loading">正在读取证据…</div>';
+  $('#drawer-title').textContent = `举报 #${id}`; $('#drawer-kicker').textContent = 'REVIEW EVIDENCE';
+  $('#drawer-backdrop').hidden = false; $('#editor-drawer').classList.add('open'); $('#editor-drawer').setAttribute('aria-hidden', 'false');
+  try {
+    const data = await request(`/moderation/${id}/evidence?page=${page}&pageSize=10`);
+    if (requestId !== evidenceRequest) return;
+    const report = data.report;
+    form.innerHTML = `<p class="moderation-notice">仅披露举报时该账单主人与该评价者之间的文字及历史版本。此处为留档证据，之后的编辑不会覆盖它。</p>
+      <div class="moderation-meta"><strong>${moderationLabels[report.status]}</strong><p>举报原因：${escapeHtml(report.reason)}</p><small>提交于 ${formatDate(report.createdAt)} · 已确认披露范围 ${escapeHtml(report.disclosureVersion)}</small></div>
+      ${data.items.map(item => `<article class="moderation-evidence ${item.originalMessageId === report.originalMessageId ? 'reported' : ''}"><h3>${item.originalMessageId === report.originalMessageId ? '举报目标 · ' : ''}${item.isMain ? '主评' : '回复'} #${item.originalMessageId}</h3><small>${item.authorId === report.ownerId ? '账单主人' : '评价者'} · 版本 ${item.revision} · ${formatDate(item.messageCreatedAt)}${item.withdrawn ? ' · 已撤回' : ''}${item.hidden ? ' · 已隐藏' : ''}</small><p class="moderation-body">${escapeHtml(item.body)}</p><details><summary>历史版本（${item.versions.length}）</summary>${item.versions.map(v => `<div class="moderation-version"><small>版本 ${v.revision} · ${escapeHtml(v.action)} · ${formatDate(v.createdAt)}</small><p class="moderation-body">${escapeHtml(v.body)}</p></div>`).join('')}</details></article>`).join('')}
+      <div class="pagination"><span>证据 ${data.total} 条 · ${data.page}/${data.pages} 页</span><div><button type="button" data-action="evidence-page" data-id="${id}" data-page="${data.page - 1}" ${data.page <= 1 ? 'disabled' : ''}>上一页</button><button type="button" data-action="evidence-page" data-id="${id}" data-page="${data.page + 1}" ${data.page >= data.pages ? 'disabled' : ''}>下一页</button></div></div>
+      ${report.status === 'pending' ? `${selectField('审核结论', 'status', draft.status || '', [['', '请选择审核结论'], ['upheld', '违规：隐藏该文字及全部历史版本'], ['dismissed', '未违规：保留文字']])}${textarea('处理说明（发送给举报人；违规时也通知作者）', 'reason', draft.reason || '', true)}<p class="moderation-notice">隐藏会作用于该文字的当前版本及历史版本，不改变投票，也不关闭其他回复。</p><div class="editor-actions"><button type="button" data-action="close-drawer">稍后处理</button><button class="save" type="submit">提交审核结果</button></div>` : `<div class="moderation-meta"><p>处理说明：${escapeHtml(report.decisionReason)}</p><small>${escapeHtml(report.decidedBy)} · ${formatDate(report.decidedAt)}</small></div>`}`;
+    if (form.elements.status) form.elements.status.required = true;
+    if (form.elements.reason) form.elements.reason.maxLength = 1000;
+  } catch (error) {
+    if (requestId === evidenceRequest) form.innerHTML = `<p role="alert">${escapeHtml(error.message)}</p><button type="button" data-action="moderation-detail" data-id="${id}">重试</button>`;
+  }
+}
+
 function openDrawer(type, item = null) {
   const form = $('#editor-form'); form.dataset.type = type; form.dataset.id = item?.id || '';
   const configs = {
@@ -160,12 +197,23 @@ function openDrawer(type, item = null) {
   $('#drawer-backdrop').hidden = false; $('#editor-drawer').classList.add('open'); $('#editor-drawer').setAttribute('aria-hidden','false');
 }
 
-function closeDrawer() { $('#editor-drawer').classList.remove('open'); $('#editor-drawer').setAttribute('aria-hidden','true'); setTimeout(() => { $('#drawer-backdrop').hidden = true; }, 300); }
+function closeDrawer() { evidenceRequest += 1; $('#editor-drawer').classList.remove('open'); $('#editor-drawer').setAttribute('aria-hidden','true'); $('#drawer-backdrop').hidden = true; }
 function parseValue(value) { const trimmed = value.trim(); if (trimmed === 'true') return true; if (trimmed === 'false') return false; if (trimmed !== '' && !Number.isNaN(Number(trimmed))) return Number(trimmed); try { return JSON.parse(trimmed); } catch { return value; } }
 
 async function submitEditor(event) {
   event.preventDefault(); const form = event.currentTarget; const values = Object.fromEntries(new FormData(form)); const id = form.dataset.id; const type = form.dataset.type;
   try {
+    if (type === 'moderation') {
+      const submit = form.querySelector('[type="submit"]');
+      if (!submit || submit.disabled) return;
+      if (!values.reason?.trim()) throw new Error('请填写处理说明');
+      submit.disabled = true;
+      try {
+        await request(`/moderation/${id}/decision`, { method: 'POST', body: JSON.stringify({ status: values.status, reason: values.reason.trim() }) });
+        closeDrawer(); toast('审核结果已保存'); await loadCurrent();
+      } finally { submit.disabled = false; }
+      return;
+    }
     let path; let body; const method = id ? 'PATCH' : 'POST';
     if (type === 'user') { path = id ? `/users/${id}` : '/users'; body = { ...values, isActive: form.elements.isActive.checked }; if (!body.password) delete body.password; }
     if (type === 'version') { path = id ? `/versions/${id}` : '/versions'; body = { ...values, forceUpdate: form.elements.forceUpdate.checked }; }
@@ -184,6 +232,8 @@ document.addEventListener('click', async (event) => {
   const button = event.target.closest('button'); if (!button) return; const action = button.dataset.action; const id = button.dataset.id;
   if (button.classList.contains('nav-item')) return switchView(button.dataset.view);
   if (action === 'sample-detail') return showSample(id);
+  if (action === 'moderation-detail' || action === 'evidence-page') return showEvidence(id, Number(button.dataset.page || 1));
+  if (action === 'filter-moderation') { state.filters.status = $('#moderation-status').value; state.page = 1; return loadCurrent(); }
   if (action === 'export-samples') return exportSamples(button);
   if (action === 'filter-samples') { state.filters = Object.fromEntries($$('[data-sample-filter]').map((el) => [el.dataset.sampleFilter, el.value.trim()])); state.page = 1; return loadCurrent(); }
   if (action === 'new-user') return openDrawer('user'); if (action === 'new-version') return openDrawer('version'); if (action === 'new-setting') return openDrawer('setting'); if (action === 'new-issue') return openDrawer('issue');

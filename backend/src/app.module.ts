@@ -21,6 +21,7 @@ import { NotificationSamplesModule } from './notification-samples/notification-s
 import { LedgerModule } from './ledger/ledger.module';
 import { SocialModule } from './social/social.module';
 import { ReviewsModule } from './reviews/reviews.module';
+import { ModerationModule } from './moderation/moderation.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { ReviewsModule } from './reviews/reviews.module';
     LedgerModule,
     SocialModule,
     ReviewsModule,
+    ModerationModule,
   ],
   controllers: [AppController],
   providers: [

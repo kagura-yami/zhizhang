@@ -118,6 +118,7 @@ prisma/migrations/*
 !prisma/migrations/202609160003_social_access/
 !prisma/migrations/202609160004_review_requests/
 !prisma/migrations/202609160005_private_reviews/
+!prisma/migrations/202609160006_review_moderation/
 
 # Database
 *.sqlite

@@ -19,5 +19,5 @@ class ReviewsController {
   @Patch('threads/:id/messages/:messageId') change(@CurrentUser('id') user: string, @Param('id', ParseIntPipe) id: number, @Param('messageId', ParseIntPipe) message: number, @Body() dto: ChangeReviewMessageDto) { return this.result(this.service.changeMessage(user, id, message, dto)); }
   @Get('threads/:id/messages/:messageId/versions') versions(@CurrentUser('id') user: string, @Param('id', ParseIntPipe) id: number, @Param('messageId', ParseIntPipe) message: number, @Query() q: ReviewPageDto) { return this.result(this.service.versions(user, id, message, q)); }
 }
-@Module({ imports: [PrismaModule, AuthModule, SocialModule], controllers: [ReviewsController], providers: [ReviewsService] })
+@Module({ imports: [PrismaModule, AuthModule, SocialModule], controllers: [ReviewsController], providers: [ReviewsService], exports: [ReviewsService] })
 export class ReviewsModule {}

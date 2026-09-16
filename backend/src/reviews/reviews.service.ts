@@ -20,7 +20,7 @@ export function visibleReviewMessage(message: ReviewMessage) {
 export class ReviewsService {
   constructor(private readonly prisma: PrismaService, private readonly access: SocialAccessService) {}
 
-  private async withThread<T>(userId: string, id: number, write: boolean, run: (tx: SocialTx, thread: BillReviewThread) => Promise<T>): Promise<T> {
+  async withThread<T>(userId: string, id: number, write: boolean, run: (tx: SocialTx, thread: BillReviewThread) => Promise<T>): Promise<T> {
     const identity = await this.prisma.billReviewThread.findUnique({ where: { id }, select: { ownerId: true, reviewerId: true } });
     if (!identity || ![identity.ownerId, identity.reviewerId].includes(userId)) throw new NotFoundException('评价不存在');
     return this.prisma.$transaction(async tx => {

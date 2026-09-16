@@ -183,3 +183,21 @@ button { color: inherit; }
 .sample-preview { max-width: 340px; overflow-wrap: anywhere; }
 .sample-preview small { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .sample-json { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.7; padding: 14px; border: 1px solid #303747; border-radius: 8px; max-height: 420px; overflow: auto; }
+/* Report evidence stays readable at drawer and phone widths. */
+.moderation-notice { color: #aab4ca; font-size: 13px; line-height: 1.8; }
+.moderation-meta, .moderation-evidence { padding: 16px; border: 1px solid #283147; margin-bottom: 16px; }
+.moderation-evidence.reported { border-color: #7187ff; }
+.moderation-evidence h3 { margin: 0 0 10px; font-size: 15px; }
+.moderation-evidence small, .moderation-meta small { color: #9ba7be; line-height: 1.8; overflow-wrap: anywhere; }
+.moderation-body, .moderation-meta p { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.8; }
+.moderation-version { border-top: 1px solid #283147; margin-top: 12px; padding-top: 12px; }
+.moderation-evidence summary { cursor: pointer; color: #aebaff; }
+.moderation-table { min-width: 0; }
+.moderation-table td, .moderation-table th { white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .moderation-table, .moderation-table tbody, .moderation-table tr, .moderation-table td { display: block; width: 100%; }
+  .moderation-table thead { display: none; }
+  .moderation-table tr { border: 1px solid var(--line); margin-bottom: 12px; padding: 12px; }
+  .moderation-table td { border: 0; padding: 6px; }
+  .moderation-table .row-actions { justify-content: flex-start; }
+}
