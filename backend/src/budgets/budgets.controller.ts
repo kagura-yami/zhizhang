@@ -46,6 +46,12 @@ export class BudgetsController {
     return this.budgetsService.getBudgetProgress(userId);
   }
 
+  @Get('ledger-progress')
+  @ApiOperation({ summary: '获取已确认账务口径的当前预算进度' })
+  async getLedgerProgress(@CurrentUser('id') userId: string) {
+    return { success: true, data: await this.budgetsService.getLedgerProgress(userId) };
+  }
+
   @Get(':id')
   @ApiOperation({ summary: '获取单个预算' })
   @ApiResponse({ status: 200, description: '返回预算详情' })

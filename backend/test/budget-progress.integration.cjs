@@ -1,0 +1,80 @@
+const assert = require('node:assert/strict');
+const { randomUUID } = require('node:crypto');
+const database = new URL(process.env.DATABASE_URL || 'http://missing');
+if (database.hostname !== '127.0.0.1' || database.port !== '15451' || database.pathname !== '/zhizhang_budget_progress_test') throw Error('Requires isolated budget progress DB');
+process.env.JWT_SECRET = 'synthetic-budget-progress-secret';
+const { Module, ValidationPipe } = require('@nestjs/common');
+const { NestFactory, APP_GUARD } = require('@nestjs/core');
+const { JwtService } = require('@nestjs/jwt');
+const { AuthModule } = require('../dist/auth/auth.module');
+const { JwtAuthGuard } = require('../dist/auth/jwt-auth.guard');
+const { BudgetsModule } = require('../dist/budgets/budgets.module');
+const { BudgetsService } = require('../dist/budgets/budgets.service');
+const { PrismaService } = require('../dist/prisma/prisma.service');
+class Root {}
+Module({ imports: [AuthModule, BudgetsModule], providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }] })(Root);
+(async () => {
+  const app = await NestFactory.create(Root, { logger: ['error'] });
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  await app.listen(0, '127.0.0.1');
+  const db = app.get(PrismaService), service = app.get(BudgetsService), jwt = new JwtService(), base = await app.getUrl(), users = [];
+  const request = async user => {
+    const response = await fetch(base + '/budgets/ledger-progress', { headers: user ? { Authorization: 'Bearer ' + jwt.sign({ sub: user.id }, { secret: process.env.JWT_SECRET }) } : {} });
+    return { status: response.status, body: await response.json() };
+  };
+  try {
+    for (let i = 0; i < 2; i++) users.push(await db.user.create({ data: { username: randomUUID(), password: 'test-only' } }));
+    const [owner, other] = users;
+    assert.equal((await request()).status, 401);
+    assert.deepEqual((await request(owner)).body.data, []);
+    const cat = await db.category.create({ data: { userId: owner.id, name: '合成消费分类', type: 'expense' } });
+    const makeBudget = (name, amount, period, categoryId) => service.create(owner.id, { name, amount, period, categoryId });
+    const total = await makeBudget('月总额', 100, 'monthly');
+    const classified = await makeBudget('分类预算', 60, 'monthly', cat.id);
+    const yearly = await makeBudget('年总额', 1000, 'yearly');
+    const zero = await makeBudget('零预算', 0, 'monthly', cat.id);
+    const duplicate = await makeBudget('同范围另一预算', 200, 'monthly');
+    const today = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
+    const makeBill = async (amount, kind, categoryId = null, type = 'expense', userId = owner.id, date = today) => {
+      const row = await db.bill.create({ data: { userId, amount, type, date: new Date(date), categoryId, notes: '私密通知不得进入预算统计' } });
+      if (kind) await db.billFinancialClassification.create({ data: { billId: row.id, kind, currency: 'CNY', billUpdatedAt: row.updatedAt, reviewedAt: new Date() } });
+      return row;
+    };
+    await makeBill('80.1234', 'ordinary', cat.id);
+    await makeBill('30.0001', 'ordinary');
+    await makeBill('20.1234', 'refund', cat.id, 'income');
+    await makeBill('500', 'internal_transfer', cat.id);
+    await makeBill('50', 'ignored', cat.id);
+    await makeBill('10000', 'ordinary', null, 'expense', other.id);
+    const rows = (await request(owner)).body.data, byId = id => rows.find(r => r.id === id);
+    assert.equal(byId(total.id).spent, '110.1235'); assert.equal(byId(total.id).remaining, '-10.1235');
+    assert.equal(byId(total.id).progressPercent, '110.1235'); assert.equal(byId(total.id).isOverBudget, true);
+    assert.equal(byId(total.id).refundInflow, '20.1234'); assert.equal(byId(total.id).spendingBasis, 'gross_expense');
+    assert.equal(byId(classified.id).spent, '80.1234'); assert.equal(byId(classified.id).ledger.counts.internalTransfer, 1);
+    assert.equal(byId(yearly.id).spent, '110.1235'); assert.equal(byId(yearly.id).isOverBudget, false);
+    assert.equal(byId(zero.id).progressPercent, null); assert.equal(byId(zero.id).needsAlert, true);
+    assert.equal(byId(duplicate.id).spent, '110.1235');
+    assert(!JSON.stringify(rows).includes('私密通知')); assert.deepEqual((await request(other)).body.data, []);
+    await db.bill.createMany({ data: Array.from({ length: 501 }, () => ({ userId: owner.id, amount: '1', type: 'expense', date: new Date(today) })) });
+    const incomplete = (await request(owner)).body.data;
+    const partial = incomplete.find(r => r.id === total.id);
+    assert.equal(partial.ledger.counts.total, 506); assert.equal(partial.ledger.counts.needsReview, 501);
+    assert.equal(partial.isOverBudget, null); assert.equal(partial.confirmedOverBudget, true); assert.equal(partial.needsAlert, true);
+    assert.equal(incomplete.find(r => r.id === classified.id).comparisonStatus, 'complete');
+    await db.bill.updateMany({ where: { userId: owner.id, categoryId: cat.id }, data: { description: '修改使确认过期', updatedAt: new Date(Date.now() + 1000) } });
+    const stale = (await request(owner)).body.data.find(r => r.id === classified.id);
+    assert.equal(stale.comparisonStatus, 'incomplete'); assert.equal(stale.spent, '0.0000');
+    await service.update(zero.id, owner.id, { isActive: false });
+    assert(!(await request(owner)).body.data.some(r => r.id === zero.id));
+    // Deterministic UTC+8 boundary: Jan is selected even though the UTC date is December.
+    const edgeYear = Number(today.slice(0, 4)) + 2;
+    await makeBill('9', 'ordinary', null, 'expense', owner.id, `${edgeYear}-01-01`);
+    const boundary = await service.getLedgerProgress(owner.id, new Date(`${edgeYear - 1}-12-31T16:00:00Z`));
+    assert.equal(boundary.find(r => r.id === total.id).spent, '9.0000');
+    assert.equal(boundary.find(r => r.id === total.id).ledger.startDate, `${edgeYear}-01-01`);
+    assert.equal(boundary.find(r => r.id === yearly.id).ledger.endDate, `${edgeYear}-12-31`);
+    await db.category.delete({ where: { id: cat.id } });
+    assert(!(await request(owner)).body.data.some(r => r.id === classified.id));
+    console.log('PASS budget progress: HTTP ownership, complete paging, exact Decimal, separate refunds, scope reuse, incomplete/stale flags, zero budget, UTC+8 boundary and deleted category');
+  } finally { for (const user of users) await db.user.deleteMany({ where: { id: user.id } }); await app.close(); }
+})().catch(error => { console.error(error); process.exitCode = 1; });
