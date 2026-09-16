@@ -262,6 +262,7 @@ model ReviewMessage {
   reports ReviewReport[]
   @@unique([threadId, mainSlot])
   @@unique([threadId, authorId, clientKey])
+  @@index([authorId, createdAt])
   @@index([threadId, id])
   @@map("review_messages")
   @@schema("public")
@@ -277,6 +278,7 @@ model ReviewMessageVersion {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   message ReviewMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
   @@unique([messageId, revision])
+  @@index([messageId, createdAt])
   @@map("review_message_versions")
   @@schema("public")
 }

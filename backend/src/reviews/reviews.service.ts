@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { BillReviewThread, Prisma, ReviewMessage } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
@@ -144,6 +144,24 @@ export class ReviewsService {
     return tx.reviewMessage.findUnique({ where: { threadId_mainSlot: { threadId, mainSlot: 1 } } });
   }
 
+  /** Caller holds the author's User row lock; limits span threads and server instances. */
+  private async checkWriteLimit(tx: SocialTx, userId: string, editing: boolean) {
+    const now = Date.now();
+    const count = (windowMs: number) => {
+      const createdAt = { gt: new Date(now - windowMs) };
+      return editing
+        ? tx.reviewMessageVersion.count({ where: { message: { authorId: userId }, action: { in: ['edit', 'restore'] }, createdAt } })
+        : tx.reviewMessage.count({ where: { authorId: userId, createdAt } });
+    };
+    const [short, day] = await Promise.all([count(editing ? 3600000 : 60000), count(86400000)]);
+    if (short >= (editing ? 30 : 20) || day >= 200) throw new HttpException(
+      day >= 200
+        ? (editing ? '24 小时内最多编辑或恢复 200 次，请稍后重试' : '24 小时内最多发布 200 条评账文字，请稍后重试')
+        : (editing ? '每小时最多编辑或恢复 30 次，请稍后重试' : '每分钟最多发布 20 条评账文字，请稍后重试'),
+      HttpStatus.TOO_MANY_REQUESTS,
+    );
+  }
+
   async createMessage(userId: string, threadId: number, dto: NewReviewMessageDto, isMain: boolean) {
     return this.withThread(userId, threadId, true, async (tx, thread) => {
       const existing = await tx.reviewMessage.findUnique({ where: { threadId_authorId_clientKey: { threadId, authorId: userId, clientKey: dto.clientKey } } });
@@ -159,6 +177,7 @@ export class ReviewsService {
         if (!main) throw new ConflictException('请先发布主评');
         if (main.withdrawn && !main.hidden) throw new ConflictException('主评已撤回，对话暂为只读');
       }
+      await this.checkWriteLimit(tx, userId, false);
       const message = await tx.reviewMessage.create({ data: { threadId, authorId: userId, clientKey: dto.clientKey,
         mainSlot: isMain ? 1 : null, body: dto.body.trim(),
         versions: { create: { revision: 1, body: dto.body.trim(), withdrawn: false, action: 'create' } },
@@ -185,6 +204,8 @@ export class ReviewsService {
       const withdrawn = dto.action === 'withdraw' ? true : dto.action === 'restore' ? false : message.withdrawn;
       const body = dto.action === 'edit' ? dto.body.trim() : message.body;
       if (withdrawn === message.withdrawn && body === message.body) return visibleReviewMessage(message);
+      // A user may always withdraw accessible content, even after hitting a write limit.
+      if (dto.action !== 'withdraw') await this.checkWriteLimit(tx, userId, true);
       const updated = await tx.reviewMessage.update({ where: { id: messageId }, data: {
         body, withdrawn, revision: { increment: 1 },
         versions: { create: { revision: message.revision + 1, body, withdrawn, action: dto.action } },
