@@ -22,6 +22,7 @@ import { LedgerModule } from './ledger/ledger.module';
 import { SocialModule } from './social/social.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { ModerationModule } from './moderation/moderation.module';
+import { InboxModule } from './inbox/inbox.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { ModerationModule } from './moderation/moderation.module';
     SocialModule,
     ReviewsModule,
     ModerationModule,
+    InboxModule,
   ],
   controllers: [AppController],
   providers: [

@@ -138,6 +138,7 @@ model SocialInboxEvent {
   kind String @db.VarChar(40)
   dedupeKey String @unique @map("dedupe_key") @db.VarChar(200)
   payload Json
+  readAt DateTime? @map("read_at") @db.Timestamptz(6)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([userId, id])

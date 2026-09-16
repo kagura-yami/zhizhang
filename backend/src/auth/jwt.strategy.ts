@@ -8,6 +8,7 @@ interface JwtPayload {
   username: string;
   iat?: number;
   exp?: number;
+  purpose?: string;
 }
 
 @Injectable()
@@ -25,6 +26,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
    * 返回的对象会被附加到request.user
    */
   async validate(payload: JwtPayload) {
+    if (payload.purpose || typeof payload.sub !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.sub)) {
+      throw new UnauthorizedException('无效的登录凭证');
+    }
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       select: {
