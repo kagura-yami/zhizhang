@@ -166,7 +166,7 @@ class AIService {
         if (!response.ok) throw new Error(payload?.message || payload?.error || `语音接口请求失败（${response.status}）`);
         const text = payload?.text || payload?.data?.text || payload?.result?.text || payload?.transcript;
         if (!text) throw new Error('语音接口未返回 text 字段');
-        return { success: true, data: { text: String(text) } };
+        return { success: true, message: '语音识别成功', data: { text: String(text) } };
       }
     } catch (error: any) {
       return { success: false, message: error?.message || '自定义语音接口调用失败' } as ApiResponse<{ text: string }>;

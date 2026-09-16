@@ -88,6 +88,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     {
       title: '⚙️ 应用',
       items: [
+        { id: 'social-settings', label: '社群与隐私', icon: 'settings', onPress: () => navigation?.navigate('SocialSettings') },
         {
           id: 'app-settings',
           label: '应用设置',

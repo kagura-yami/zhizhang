@@ -167,6 +167,17 @@ export class SocialService {
       orderBy: [{ updatedAt: 'desc' }, { ownerId: 'asc' }, { reviewerId: 'asc' }], ...pagination(query) });
   }
 
+  async grantsWith(userId: string, otherId: string) {
+    return this.locked([userId, otherId], async tx => {
+      await this.access.pair(tx, userId, otherId);
+      const [given, received] = await Promise.all([
+        tx.reviewGrant.findUnique({ where: { ownerId_reviewerId: { ownerId: userId, reviewerId: otherId } } }),
+        tx.reviewGrant.findUnique({ where: { ownerId_reviewerId: { ownerId: otherId, reviewerId: userId } } }),
+      ]);
+      return { given, received };
+    });
+  }
+
   async reviewableBills(reviewerId: string, ownerId: string, query: SocialPageDto) {
     return this.locked([ownerId, reviewerId], async tx => {
       const grant = await this.access.grant(tx, ownerId, reviewerId);

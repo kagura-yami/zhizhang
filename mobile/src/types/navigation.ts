@@ -22,6 +22,10 @@ declare global {
       // 主要导航
       Main: undefined;
       Settings: undefined;
+      SocialSettings: undefined;
+      SocialPeople: { mode?: 'search' | 'following' | 'followers' | 'friends' | 'blocks' } | undefined;
+      SocialPerson: { userId: string };
+      SocialGrant: { userId: string };
       GeneralSettings: undefined;
       AppSettings: undefined;
       PersonalizationSettings: undefined;

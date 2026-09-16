@@ -34,6 +34,10 @@ import BudgetScreen from '../screens/BudgetScreen';
 import InvoiceMailboxScreen from '../screens/InvoiceMailboxScreen';
 import InvoiceCenterScreen from '../screens/InvoiceCenterScreen';
 import InvoiceDetailScreen from '../screens/InvoiceDetailScreen';
+import SocialSettingsScreen from '../screens/social/SocialSettingsScreen';
+import SocialPeopleScreen from '../screens/social/SocialPeopleScreen';
+import SocialPersonScreen from '../screens/social/SocialPersonScreen';
+import SocialGrantScreen from '../screens/social/SocialGrantScreen';
 
 import { useTheme, useAuth } from '../providers';
 import { spacing, borderRadius, borderWidth } from '../theme/spacing';
@@ -350,6 +354,10 @@ export default function AppNavigator() {
           <>
             <Stack.Screen name="Main" component={MainNavigator} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
+            <Stack.Screen name="SocialSettings" component={SocialSettingsScreen} options={{ headerShown: true, title: '社群与隐私' }} />
+            <Stack.Screen name="SocialPeople" component={SocialPeopleScreen} options={{ headerShown: true, title: '关系管理' }} />
+            <Stack.Screen name="SocialPerson" component={SocialPersonScreen} options={{ headerShown: true, title: '关系与授权' }} />
+            <Stack.Screen name="SocialGrant" component={SocialGrantScreen} options={{ headerShown: true, title: '确认评账授权' }} />
             <Stack.Screen
               name="About"
               component={AboutScreen}

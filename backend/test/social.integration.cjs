@@ -54,6 +54,14 @@ Module({ imports: [SocialModule], providers: [{ provide: APP_GUARD, useClass: Jw
     const old = await db.bill.create({ data: { userId: a.id, type: 'expense', amount: 1, date: new Date('2020-01-01'), description: 'private-description', notes: 'private-notification', counterparty: 'private-merchant' } });
     let grant = (await call(a, '/grants/given/' + b.id, 'PUT', { scope: 'expense' })).data;
     assert.equal(grant.status, 'active');
+    const ownerPair = (await call(a, '/grants/with/' + b.id)).data;
+    assert.equal(ownerPair.given.ownerId, a.id);
+    assert.equal(ownerPair.received, null);
+    const reviewerPair = (await call(b, '/grants/with/' + a.id)).data;
+    assert.equal(reviewerPair.given, null);
+    assert.equal(reviewerPair.received.reviewerId, b.id);
+    assert.deepEqual((await call(c, '/grants/with/' + a.id)).data, { given: null, received: null });
+    assert.equal((await call(a, '/grants/with/' + a.id)).status, 400);
     assert.equal((await call(a, '/owners/' + b.id + '/bills')).status, 403); // one way
     const day = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
     const expense = await db.bill.create({ data: { userId: a.id, type: 'expense', amount: 32, date: new Date(day), description: 'private-description', counterparty: 'private-merchant', notes: 'private-notification' } });
@@ -85,6 +93,7 @@ Module({ imports: [SocialModule], providers: [{ provide: APP_GUARD, useClass: Jw
     assert.equal(await db.reviewGrant.count({ where: { status: 'active' } }), 0);
     assert.equal((await call(a, '/users?query=' + b.id)).data.length, 0);
     assert.equal((await call(a, '/following/' + b.id, 'PUT')).status, 403);
+    assert.equal((await call(a, '/grants/with/' + b.id)).status, 403);
     await call(b, '/blocks/' + a.id, 'DELETE');
     assert.equal((await call(b, '/owners/' + a.id + '/bills')).status, 403); // unblock never restores access
     assert.equal((await call(b, '/users/' + a.id)).data.friend, false);

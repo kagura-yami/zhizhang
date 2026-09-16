@@ -48,7 +48,7 @@ class HttpService {
         // 添加认证token
         const secureSession = await getAuthSession();
         const token = secureSession?.token || await storage.getItem<string>(STORAGE_KEYS.USER_TOKEN);
-        if (token) {
+        if (token && !config.headers.Authorization) {
           config.headers.Authorization = `Bearer ${token}`;
         }
 

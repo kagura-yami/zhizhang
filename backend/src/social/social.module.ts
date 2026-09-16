@@ -30,6 +30,7 @@ class SocialController {
   @Put('blocks/:id') block(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string) { return this.respond(this.service.block(id, target, true)); }
   @Delete('blocks/:id') unblock(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string) { return this.respond(this.service.block(id, target, false)); }
   @Get('grants/:direction') grants(@CurrentUser('id') id: string, @Param('direction') direction: string, @Query() dto: SocialPageDto) { return this.respond(this.service.grants(id, direction, dto)); }
+  @Get('grants/with/:id') grantsWith(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string) { return this.respond(this.service.grantsWith(id, target)); }
   @Put('grants/given/:id') grant(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string, @Body() dto: SaveGrantDto) { return this.respond(this.service.saveGrant(id, target, dto)); }
   @Delete('grants/given/:id') revoke(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string) { return this.respond(this.service.endGrant(id, target, false)); }
   @Delete('grants/received/:id') exit(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string) { return this.respond(this.service.endGrant(id, target, true)); }

@@ -35,7 +35,7 @@ export function useAssetsData() {
         endDate,
         granularity: 'monthly',
       });
-      return res.data ?? { monthlyTrends: [], totalIncome: 0, totalExpense: 0 };
+      return res.data ?? { monthlyTrends: [], totalIncome: 0, totalExpense: 0, incomeCategoryStats: [], expenseCategoryStats: [] };
     },
     staleTime: CACHE_TIME.STATISTICS,
     gcTime: GC_TIME.DEFAULT,
