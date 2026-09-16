@@ -43,6 +43,9 @@ Module({ imports: [ReviewsModule, BillsModule], providers: [{ provide: APP_GUARD
     const bt = (await call(b, votePath, 'PUT', { vote: 'la' })).data.threadId;
     const ct = (await call(c, votePath, 'PUT', { vote: 'hang' })).data.threadId;
     assert.deepEqual((await call(b, minePath)).data.thread, { id: bt, vote: 'la' });
+    assert.equal((await call(b, `/social/owners/${a.id}/bills?state=pending`)).data.total, 0);
+    assert.deepEqual((await call(b, `/social/owners/${a.id}/bills?state=reviewed`)).data.items.map(i => i.id), [bill.id]);
+    assert.equal((await call(b, '/social/reviewable-owners')).data.items[0].reviewedCount, 1);
     assert.equal((await call(c, minePath)).data.thread.id, ct);
     assert.equal((await call(b, votePath, 'PUT', { vote: 'hang' })).data.threadId, bt);
     assert.equal(await db.socialInboxEvent.count({ where: { userId: a.id } }), 0);
@@ -106,6 +109,12 @@ Module({ imports: [ReviewsModule, BillsModule], providers: [{ provide: APP_GUARD
     assert.equal((await call(a, `/reviews/bills/${bill.id}/summary`)).data.hang, 2);
     assert.equal(await db.billReviewThread.count({ where: { originalBillId: bill.id } }), 2);
     assert.equal((await call(a, '/reviews/mine')).data.length, 2);
+    const grouped = (await call(a, '/reviews/mine/bills')).data;
+    assert.equal(grouped.length, 1); assert.equal(grouped[0].originalBillId, bill.id);
+    assert.equal(grouped[0].hang, 2); assert.ok(grouped[0].deletedAt);
+    assert.equal(grouped[0].snapshot.amount, '200.0000');
+    assert.equal((await call(b, '/reviews/mine/bills')).data.length, 0);
+    assert(!JSON.stringify(grouped).includes('私密主评'));
     const raceBill = await db.bill.create({ data: { userId: a.id, amount: '12', type: 'expense', date: new Date('2026-09-16') } });
     const raceVotes = await Promise.all(['hang', 'la'].map(vote => call(c, `/reviews/bills/${raceBill.id}/vote`, 'PUT', { vote })));
     assert(raceVotes.every(r => r.status === 200));
@@ -121,6 +130,12 @@ Module({ imports: [ReviewsModule, BillsModule], providers: [{ provide: APP_GUARD
     assert([201, 403].includes(deleteRace[1].status));
     assert.equal((await call(a, `/reviews/threads/${raceThread}`)).data.deleted, true);
     assert.equal((await call(c, `/reviews/threads/${raceThread}`)).status, 403);
+    await db.bill.createMany({ data: Array.from({ length: 21 }, () => ({ userId: a.id, type: 'expense', amount: '1', date: new Date('2026-09-16') })) });
+    const pageBills = await db.bill.findMany({ where: { userId: a.id } });
+    for (const pageBill of pageBills) assert.equal((await call(c, `/reviews/bills/${pageBill.id}/vote`, 'PUT', { vote: 'hang' })).status, 200);
+    const billPages = await Promise.all([1, 2, 3].map(p => call(a, `/reviews/mine/bills?page=${p}&pageSize=10`)));
+    assert.deepEqual(billPages.map(p => p.data.length), [10, 10, 3]);
+    assert.equal(new Set(billPages.flatMap(p => p.data.map(item => item.originalBillId))).size, 23);
     console.log('PASS private reviews: independent votes, one main, author-only edits, idempotency, version history, withdrawn/hidden rules, reviewer isolation, grant changes, bill updates and deleted owner-only archive');
   } finally {
     for (const u of users) await db.user.deleteMany({ where: { id: u.id } });

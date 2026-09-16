@@ -22,6 +22,10 @@ export class SocialPageDto {
   @Type(() => Number) @IsInt() @Min(1) @Max(50) pageSize = 20;
 }
 
+export class ReviewableBillsQuery extends SocialPageDto {
+  @IsIn(['pending', 'reviewed', 'all']) state: 'pending' | 'reviewed' | 'all' = 'all';
+}
+
 export class SearchSocialDto extends SocialPageDto {
   @IsString() @MaxLength(100) query: string;
 }

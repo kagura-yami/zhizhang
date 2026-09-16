@@ -9,7 +9,7 @@ import {
   useSocialApi,
   useSocialResource,
 } from './shared';
-import { BillSnapshot, Pager, voteLabels } from './reviewShared';
+import { BillSnapshot, Pager } from './reviewShared';
 export default function SocialReceivedReviewsScreen({
   navigation,
 }: {
@@ -19,31 +19,30 @@ export default function SocialReceivedReviewsScreen({
     s = useStyles(stylesFor),
     [page, setPage] = useState(1);
   const r = useSocialResource(
-    useCallback(() => api.receivedReviews(page), [api, page]),
+    useCallback(() => api.receivedBillReviews(page), [api, page]),
   );
   return (
     <Page>
-      <Text style={s.title}>收到的评账</Text>
+      <Text style={s.title}>我的反馈</Text>
       <Text style={s.muted}>
         每位评价者有独立对话。删除账单后，历史对话仍在这里只读保留。
       </Text>
       <Status {...r} />
       {r.value?.map(row => (
-        <View style={s.card} key={row.id}>
+        <View style={s.card} key={row.originalBillId}>
           <Text style={s.heading}>
-            {row.reviewer.nickname || '未设置昵称'} · {voteLabels[row.vote]}
-          </Text>
-          <Text selectable style={s.small}>
-            {row.reviewer.id}
+            夯 {row.hang} · 拉 {row.la}
           </Text>
           {!!row.deletedAt && (
             <Text style={s.muted}>原账单已删除 · 只读存档</Text>
           )}
           <BillSnapshot bill={row.snapshot} />
           <Action
-            title="打开私密对话"
+            title="查看这笔账单的反馈"
             onPress={() =>
-              navigation.navigate('SocialReviewThread', { threadId: row.id })
+              navigation.navigate('SocialBillFeedback', {
+                billId: row.originalBillId,
+              })
             }
           />
         </View>

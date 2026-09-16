@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { businessDate } from '../ledger/ledger-period';
 import { SocialAccessService, SocialTx } from './social-access.service';
-import { EnableSocialDto, SaveGrantDto, SearchSocialDto, SocialPageDto, SocialPreferencesDto, SOCIAL_CONSENT_VERSION } from './social.dto';
+import { EnableSocialDto, ReviewableBillsQuery, SaveGrantDto, SearchSocialDto, SocialPageDto, SocialPreferencesDto, SOCIAL_CONSENT_VERSION } from './social.dto';
 import { recordRequestEvent } from './review-request.service';
 import { recordGrantEvent } from './grant-event';
 import { changeRankingParticipation } from '../rankings/ranking-projection';
@@ -169,7 +169,7 @@ export class SocialService {
   async grants(userId: string, direction: string, query: SocialPageDto) {
     await this.access.enabled(this.prisma, userId);
     if (!['given', 'received'].includes(direction)) throw new BadRequestException('授权方向不正确');
-    return this.prisma.reviewGrant.findMany({ where: direction === 'given' ? { ownerId: userId } : { reviewerId: userId },
+    return this.prisma.reviewGrant.findMany({ where: direction === 'given' ? { ownerId: userId, reviewer: this.visibleUsers(userId) } : { reviewerId: userId, owner: this.visibleUsers(userId) },
       include: { owner: { select: publicProfile }, reviewer: { select: publicProfile } },
       orderBy: [{ updatedAt: 'desc' }, { ownerId: 'asc' }, { reviewerId: 'asc' }], ...pagination(query) });
   }
@@ -185,12 +185,32 @@ export class SocialService {
     });
   }
 
-  async reviewableBills(reviewerId: string, ownerId: string, query: SocialPageDto) {
+  async reviewableOwners(reviewerId: string, query: SocialPageDto) {
+    return this.prisma.$transaction(async tx => {
+      await this.access.enabled(tx, reviewerId);
+      const where = { reviewerId, status: 'active', owner: this.visibleUsers(reviewerId) };
+      const total = await tx.reviewGrant.count({ where });
+      const grants = await tx.reviewGrant.findMany({ where, include: { owner: { select: publicProfile } }, orderBy: { ownerId: 'asc' }, ...pagination(query) });
+      const items = [];
+      for (const grant of grants) {
+        const bills = this.access.billWhere(grant);
+        const pendingCount = await tx.bill.count({ where: { ...bills, reviewThreads: { none: { reviewerId } } } });
+        const reviewedCount = await tx.bill.count({ where: { ...bills, reviewThreads: { some: { reviewerId } } } });
+        items.push({ owner: grant.owner, scope: grant.scope, historyStart: grant.historyStart, pendingCount, reviewedCount });
+      }
+      return { items, total };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 30000 });
+  }
+
+  async reviewableBills(reviewerId: string, ownerId: string, query: ReviewableBillsQuery) {
     return this.locked([ownerId, reviewerId], async tx => {
       const grant = await this.access.grant(tx, ownerId, reviewerId);
-      const rows = await tx.bill.findMany({ where: this.access.billWhere(grant), orderBy: [{ date: 'desc' }, { time: 'desc' }, { id: 'desc' }],
+      const where: Prisma.BillWhereInput = { ...this.access.billWhere(grant),
+        ...(query.state === 'pending' ? { reviewThreads: { none: { reviewerId } } } : query.state === 'reviewed' ? { reviewThreads: { some: { reviewerId } } } : {}) };
+      const total = await tx.bill.count({ where });
+      const rows = await tx.bill.findMany({ where, orderBy: [{ date: 'desc' }, { time: 'desc' }, { id: 'desc' }],
         select: { id: true, amount: true, type: true, date: true, time: true, category: { select: { name: true } } }, ...pagination(query) });
-      return { grantVersion: grant.version, items: rows.map(row => ({ id: row.id, amount: row.amount.toFixed(4), type: row.type,
+      return { grantVersion: grant.version, total, items: rows.map(row => ({ id: row.id, amount: row.amount.toFixed(4), type: row.type,
         date: row.date.toISOString().slice(0, 10), time: row.time?.toISOString() ?? null, category: row.category?.name ?? null })) };
     });
   }

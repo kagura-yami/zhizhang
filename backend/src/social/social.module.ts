@@ -3,7 +3,7 @@ import { AuthModule } from '../auth/auth.module';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { PrismaModule } from '../prisma/prisma.module';
 import { SocialAccessService } from './social-access.service';
-import { ApproveRequestDto, EnableSocialDto, RequestVersionDto, SaveGrantDto, SearchSocialDto, SocialPageDto, SocialPreferencesDto, SubmitRequestDto } from './social.dto';
+import { ApproveRequestDto, EnableSocialDto, RequestVersionDto, ReviewableBillsQuery, SaveGrantDto, SearchSocialDto, SocialPageDto, SocialPreferencesDto, SubmitRequestDto } from './social.dto';
 import { SocialService } from './social.service';
 import { ReviewRequestService } from './review-request.service';
 
@@ -14,6 +14,7 @@ class SocialController {
   constructor(private readonly service: SocialService, private readonly requests: ReviewRequestService) {}
   private respond<T>(result: Promise<T>) { return result.then(data => ({ success: true, data })); }
   @Get('me') me(@CurrentUser('id') id: string) { return this.respond(this.service.preferences(id)); }
+  @Get('reviewable-owners') reviewableOwners(@CurrentUser('id') id: string, @Query() dto: SocialPageDto) { return this.respond(this.service.reviewableOwners(id, dto)); }
   @Get('requests/:direction') requestsList(@CurrentUser('id') id: string, @Param('direction') direction: string, @Query() dto: SocialPageDto) { return this.respond(this.requests.list(id, direction, dto)); }
   @Get('requests/to/:id') requestContext(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string) { return this.respond(this.requests.context(id, target)); }
   @Post('requests/to/:id') request(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string, @Body() dto: SubmitRequestDto) { return this.respond(this.requests.submit(id, target, dto)); }
@@ -35,7 +36,7 @@ class SocialController {
   @Put('grants/given/:id') grant(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string, @Body() dto: SaveGrantDto) { return this.respond(this.service.saveGrant(id, target, dto)); }
   @Delete('grants/given/:id') revoke(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string) { return this.respond(this.service.endGrant(id, target, false)); }
   @Delete('grants/received/:id') exit(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string) { return this.respond(this.service.endGrant(id, target, true)); }
-  @Get('owners/:id/bills') bills(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string, @Query() dto: SocialPageDto) { return this.respond(this.service.reviewableBills(id, target, dto)); }
+  @Get('owners/:id/bills') bills(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string, @Query() dto: ReviewableBillsQuery) { return this.respond(this.service.reviewableBills(id, target, dto)); }
 }
 
 @Module({ imports: [PrismaModule, AuthModule], controllers: [SocialController], providers: [SocialService, SocialAccessService, ReviewRequestService], exports: [SocialService, SocialAccessService] })

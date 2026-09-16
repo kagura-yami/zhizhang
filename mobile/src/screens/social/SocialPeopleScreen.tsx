@@ -15,9 +15,11 @@ import {
 export default function SocialPeopleScreen({
   navigation,
   route,
+  community = false,
 }: {
   navigation: any;
   route: any;
+  community?: boolean;
 }) {
   const api = useSocialApi();
   const s = useStyles(stylesFor),
@@ -38,8 +40,22 @@ export default function SocialPeopleScreen({
   );
   return (
     <Page>
-      <Text style={s.title}>找到一起复盘的人</Text>
+      <Text style={s.title}>{community ? '关系管理' : '找到一起复盘的人'}</Text>
       <Text style={s.muted}>关注只建立关系，不会自动分享任何账单。</Text>
+      <View style={s.row}>
+        <View style={s.grow}>
+          <Action
+            title="评账授权"
+            onPress={() => navigation.navigate('SocialGrants')}
+          />
+        </View>
+        <View style={s.grow}>
+          <Action
+            title="评账申请"
+            onPress={() => navigation.navigate('SocialRequests')}
+          />
+        </View>
+      </View>
       <View style={s.chipRow}>
         {(
           [

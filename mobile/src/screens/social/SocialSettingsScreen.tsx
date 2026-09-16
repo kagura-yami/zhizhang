@@ -18,8 +18,10 @@ import {
 
 export default function SocialSettingsScreen({
   navigation,
+  onEnabled,
 }: {
   navigation: any;
+  onEnabled?: () => void;
 }) {
   const api = useSocialApi();
   const s = useStyles(stylesFor),
@@ -80,7 +82,7 @@ export default function SocialSettingsScreen({
               status.requiredConsentVersion !== SOCIAL_CONSENT_VERSION
             }
             onPress={() => {
-              void resource.run(api.enable);
+              void resource.run(api.enable, onEnabled);
             }}
           />
         </View>

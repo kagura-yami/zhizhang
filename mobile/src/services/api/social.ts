@@ -105,6 +105,20 @@ export interface ReceivedReview {
   deletedAt: string | null;
   reviewer: SocialPerson;
 }
+export interface ReceivedBillReview {
+  originalBillId: number;
+  snapshot: SharedBill;
+  deletedAt: string | null;
+  hang: number;
+  la: number;
+}
+export interface ReviewableOwner {
+  owner: SocialPerson;
+  scope: string;
+  historyStart: string | null;
+  pendingCount: number;
+  reviewedCount: number;
+}
 export interface ReviewRequest {
   ownerId: string;
   applicantId: string;
@@ -231,11 +245,36 @@ export function createSocialApi(token: string) {
           params: { page, pageSize: 20 },
         }),
       ),
-    sharedBills: (id: string, page: number) =>
-      data<{ grantVersion: number; items: SharedBill[] }>(
-        httpService.get(`/social/owners/${id}/bills`, {
+    reviewableOwners: (page: number) =>
+      data<{ items: ReviewableOwner[]; total: number }>(
+        httpService.get('/social/reviewable-owners', {
           ...config,
           params: { page, pageSize: 20 },
+        }),
+      ),
+    grantList: (direction: 'given' | 'received', page: number) =>
+      data<(ReviewGrant & { owner: SocialPerson; reviewer: SocialPerson })[]>(
+        httpService.get(`/social/grants/${direction}`, {
+          ...config,
+          params: { page, pageSize: 20 },
+        }),
+      ),
+    receivedBillReviews: (page: number) =>
+      data<ReceivedBillReview[]>(
+        httpService.get('/reviews/mine/bills', {
+          ...config,
+          params: { page, pageSize: 20 },
+        }),
+      ),
+    sharedBills: (
+      id: string,
+      page: number,
+      state: 'pending' | 'reviewed' | 'all' = 'pending',
+    ) =>
+      data<{ grantVersion: number; total: number; items: SharedBill[] }>(
+        httpService.get(`/social/owners/${id}/bills`, {
+          ...config,
+          params: { page, pageSize: 20, state },
         }),
       ),
     myVote: (id: number) =>
@@ -258,7 +297,7 @@ export function createSocialApi(token: string) {
       data<ReviewDetail>(
         httpService.get(`/reviews/threads/${id}`, {
           ...config,
-          params: { page, pageSize: 20, aroundMessageId },
+          params: { page, pageSize: 20, ...(aroundMessageId === undefined ? {} : { aroundMessageId }) },
         }),
       ),
     sendReview: (id: number, main: boolean, body: string, clientKey: string) =>

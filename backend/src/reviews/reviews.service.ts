@@ -1,5 +1,5 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { BillReviewThread, ReviewMessage } from '@prisma/client';
+import { BillReviewThread, Prisma, ReviewMessage } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { SocialAccessService, SocialTx } from '../social/social-access.service';
@@ -122,6 +122,22 @@ export class ReviewsService {
     await this.access.enabled(this.prisma, userId);
     return this.prisma.billReviewThread.findMany({ where: { ownerId: userId },
       select: { id: true, originalBillId: true, vote: true, snapshot: true, deletedAt: true, reviewer: { select: profile } }, orderBy: { id: 'desc' }, ...page(query) });
+  }
+
+  async myBills(userId: string, query: ReviewPageDto) {
+    return this.prisma.$transaction(async tx => {
+      await this.access.enabled(tx, userId);
+      const groups = await tx.billReviewThread.groupBy({ by: ['originalBillId'], where: { ownerId: userId },
+        orderBy: { originalBillId: 'desc' }, ...page(query) });
+      const items = [];
+      for (const group of groups) {
+        const where = { ownerId: userId, originalBillId: group.originalBillId };
+        const first = await tx.billReviewThread.findFirstOrThrow({ where, select: { snapshot: true, deletedAt: true }, orderBy: { id: 'asc' } });
+        const votes = await tx.billReviewThread.groupBy({ by: ['vote'], where, _count: true });
+        items.push({ originalBillId: group.originalBillId, ...first, hang: votes.find(v => v.vote === 'hang')?._count ?? 0, la: votes.find(v => v.vote === 'la')?._count ?? 0 });
+      }
+      return items;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 30000 });
   }
 
   private async main(tx: SocialTx, threadId: number) {

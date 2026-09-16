@@ -21,8 +21,9 @@ export default function SocialBillsScreen({
     s = useStyles(stylesFor),
     id: string = route.params.userId;
   const [page, setPage] = useState(1);
+  const [state, setState] = useState<'pending' | 'reviewed' | 'all'>('pending');
   const r = useSocialResource(
-    useCallback(() => api.sharedBills(id, page), [api, id, page]),
+    useCallback(() => api.sharedBills(id, page, state), [api, id, page, state]),
   );
   return (
     <Page>
@@ -30,6 +31,26 @@ export default function SocialBillsScreen({
       <Text style={s.muted}>
         仅显示当前获准的范围。你的票与文字不会展示给其他评价者。
       </Text>
+      <View style={s.row}>
+        {(
+          [
+            ['pending', '待评'],
+            ['reviewed', '已评价'],
+            ['all', '全部'],
+          ] as const
+        ).map(([value, label]) => (
+          <View style={s.grow} key={value}>
+            <Action
+              title={label}
+              primary={state === value}
+              onPress={() => {
+                setState(value);
+                setPage(1);
+              }}
+            />
+          </View>
+        ))}
+      </View>
       <Status {...r} />
       {r.value?.items.map(b => (
         <View key={b.id}>
@@ -48,7 +69,7 @@ export default function SocialBillsScreen({
       {r.value && (
         <Pager
           page={page}
-          hasNext={r.value.items.length === 20}
+          hasNext={page * 20 < r.value.total}
           change={setPage}
         />
       )}

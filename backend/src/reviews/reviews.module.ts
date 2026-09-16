@@ -14,6 +14,7 @@ class ReviewsController {
   @Get('bills/:id/mine') myVote(@CurrentUser('id') user: string, @Param('id', ParseIntPipe) id: number) { return this.result(this.service.myVote(user, id)); }
   @Get('bills/:id/summary') summary(@CurrentUser('id') user: string, @Param('id', ParseIntPipe) id: number, @Query() q: ReviewPageDto) { return this.result(this.service.ownerSummary(user, id, q)); }
   @Get('mine') mine(@CurrentUser('id') user: string, @Query() q: ReviewPageDto) { return this.result(this.service.mine(user, q)); }
+  @Get('mine/bills') myBills(@CurrentUser('id') user: string, @Query() q: ReviewPageDto) { return this.result(this.service.myBills(user, q)); }
   @Get('threads/:id') detail(@CurrentUser('id') user: string, @Param('id', ParseIntPipe) id: number, @Query() q: ReviewPageDto) { return this.result(this.service.detail(user, id, q)); }
   @Post('threads/:id/main') main(@CurrentUser('id') user: string, @Param('id', ParseIntPipe) id: number, @Body() dto: NewReviewMessageDto) { return this.result(this.service.createMessage(user, id, dto, true)); }
   @Post('threads/:id/replies') reply(@CurrentUser('id') user: string, @Param('id', ParseIntPipe) id: number, @Body() dto: NewReviewMessageDto) { return this.result(this.service.createMessage(user, id, dto, false)); }

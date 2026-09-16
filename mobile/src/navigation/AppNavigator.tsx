@@ -35,6 +35,8 @@ import InvoiceMailboxScreen from '../screens/InvoiceMailboxScreen';
 import InvoiceCenterScreen from '../screens/InvoiceCenterScreen';
 import InvoiceDetailScreen from '../screens/InvoiceDetailScreen';
 import SocialSettingsScreen from '../screens/social/SocialSettingsScreen';
+import SocialCommunityScreen from '../screens/social/SocialCommunityScreen';
+import SocialGrantsScreen from '../screens/social/SocialGrantsScreen';
 import SocialRankingsScreen from '../screens/social/SocialRankingsScreen';
 import SocialRankingSettingsScreen from '../screens/social/SocialRankingSettingsScreen';
 import LedgerReviewScreen from '../screens/social/LedgerReviewScreen';
@@ -369,6 +371,8 @@ export default function AppNavigator() {
             <Stack.Screen name="Main" component={MainNavigator} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
             <Stack.Screen name="SocialSettings" component={SocialSettingsScreen} options={{ headerShown: true, title: '社群与隐私' }} />
+            <Stack.Screen name="SocialCommunity" component={SocialCommunityScreen} options={{ headerShown: true, title: '社群' }} />
+            <Stack.Screen name="SocialGrants" component={SocialGrantsScreen} options={{ headerShown: true, title: '评账授权' }} />
             <Stack.Screen name="SocialRankings" component={SocialRankingsScreen} options={{ headerShown: true, title: '结余排行榜' }} />
             <Stack.Screen name="SocialRankingSettings" component={SocialRankingSettingsScreen} options={{ headerShown: true, title: '参榜与金额隐私' }} />
             <Stack.Screen name="LedgerReview" component={LedgerReviewScreen} options={{ headerShown: true, title: '确认账务口径' }} />

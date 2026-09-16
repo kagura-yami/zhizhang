@@ -71,6 +71,14 @@ Module({ imports: [SocialModule], providers: [{ provide: APP_GUARD, useClass: Jw
     assert.deepEqual(visible.items.map(x => x.id), [expense.id]);
     assert.deepEqual(Object.keys(visible.items[0]).sort(), ['amount', 'category', 'date', 'id', 'time', 'type']);
     assert(!JSON.stringify(visible).includes('private-'));
+    const owners = (await call(b, '/reviewable-owners')).data;
+    assert.equal(owners.total, 1); assert.equal(owners.items[0].owner.id, a.id);
+    assert.equal(owners.items[0].pendingCount, 1); assert.equal(owners.items[0].reviewedCount, 0);
+    assert(!JSON.stringify(owners).includes('private-'));
+    assert.equal((await call(c, '/reviewable-owners')).data.total, 0);
+    assert.equal((await call(b, '/owners/' + a.id + '/bills?state=reviewed')).data.total, 0);
+    assert.equal((await call(b, '/owners/' + a.id + '/bills?state=pending')).data.total, 1);
+    assert.equal((await call(b, '/owners/' + a.id + '/bills?state=invalid')).status, 400);
     assert.equal((await call(c, '/owners/' + a.id + '/bills')).status, 403);
     assert.equal((await call(a, '/grants/given/' + b.id, 'PUT', { scope: 'both' })).status, 409);
     assert.equal((await call(a, '/grants/given/' + b.id, 'PUT', { scope: 'both', historyStart: '2026-02-30', expectedVersion: grant.version })).status, 400);
@@ -82,6 +90,7 @@ Module({ imports: [SocialModule], providers: [{ provide: APP_GUARD, useClass: Jw
     ]);
     assert.deepEqual(sameTime.map(x => x.status).sort(), [200, 409]);
     await call(b, '/grants/received/' + a.id, 'DELETE');
+    assert.equal((await call(b, '/reviewable-owners')).data.total, 0);
     assert.equal((await call(b, '/owners/' + a.id + '/bills')).status, 403);
     const previous = await db.reviewGrant.findUnique({ where: { ownerId_reviewerId: { ownerId: a.id, reviewerId: b.id } } });
     await call(a, '/grants/given/' + b.id, 'PUT', { scope: 'expense', historyStart: '2020-01-01', expectedVersion: previous.version });
@@ -94,9 +103,20 @@ Module({ imports: [SocialModule], providers: [{ provide: APP_GUARD, useClass: Jw
     assert.equal((await call(a, '/users?query=' + b.id)).data.length, 0);
     assert.equal((await call(a, '/following/' + b.id, 'PUT')).status, 403);
     assert.equal((await call(a, '/grants/with/' + b.id)).status, 403);
+    assert.equal((await call(b, '/reviewable-owners')).data.total, 0);
+    assert.equal((await call(a, '/grants/given')).data.length, 0);
     await call(b, '/blocks/' + a.id, 'DELETE');
     assert.equal((await call(b, '/owners/' + a.id + '/bills')).status, 403); // unblock never restores access
     assert.equal((await call(b, '/users/' + a.id)).data.friend, false);
+    for (let i = 0; i < 21; i++) {
+      const extra = await db.user.create({ data: { username: `owner-page-${Date.now()}-${i}`, password: 'test-only', socialPreference: { create: { enabledAt: new Date(), consentVersion: '2026-09-16' } } } });
+      users.push(extra);
+      await db.reviewGrant.create({ data: { ownerId: extra.id, reviewerId: b.id, scope: 'expense', activatedAt: new Date() } });
+    }
+    const ownerPage1 = (await call(b, '/reviewable-owners?page=1&pageSize=20')).data;
+    const ownerPage2 = (await call(b, '/reviewable-owners?page=2&pageSize=20')).data;
+    assert.equal(ownerPage1.total, 21); assert.equal(ownerPage1.items.length, 20); assert.equal(ownerPage2.items.length, 1);
+    assert.equal(new Set([...ownerPage1.items, ...ownerPage2.items].map(item => item.owner.id)).size, 21);
     console.log('PASS social integration: explicit consent, default privacy, search projection, mutual following, private lists, grant direction/scope/history, version conflicts, exit, block races and revocation');
   } finally {
     for (const u of users) await db.user.deleteMany({ where: { id: u.id } });

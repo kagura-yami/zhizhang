@@ -23,6 +23,8 @@ declare global {
       Main: undefined;
       Settings: undefined;
       SocialSettings: undefined;
+      SocialCommunity: undefined;
+      SocialGrants: undefined;
       SocialRankings: undefined;
       SocialRankingSettings: undefined;
       LedgerReview: { startDate: string; endDate: string } | undefined;
