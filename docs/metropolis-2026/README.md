@@ -16,3 +16,11 @@
 产品主线：自动记账 → 主动授权的私密评账 → 有据复盘。拟探索扩展：AI 整理分账草案 → 用户确认签名 → Monad 结算 → 账本对账。支付模式尚待确定，材料明确标为候选设计，未伪装成已完成。
 
 社群、排行榜和专用复盘已有本地实现；真实模型、系统推送、原生 QA、生产发布和真实链上支付仍有工作。材料以 3 分钟主讲＋2 分钟演示编写，不代表已确认活动时间分配。
+
+## 0.0.152 路演材料修订
+
+PPT/PDF 已同步自动记账和可选社群边界，删除人工确认前置流程；普通记账与社群分开，AI 使用用户自配 API。10 页经 PowerPoint 渲染，文字溢出 0 项，缩略图已目视检查。支付保持“候选设计 / 未实现”，真实模型与真机未验收的限制仍保留。
+
+已提交可编辑生成源码 `build-track02.cjs` 和渲染脚本 `render-track02.ps1`。生成需要 PptxGenJS、slides 技能的 pptxgenjs_helpers；设置 NODE_PATH 指向包含 pptxgenjs 的 node_modules，SLIDES_HELPERS_PATH 可指定助手库绝对目录，DECK_OUTPUT_DIR 可指定已存在的输出目录。默认输出为项目 output/metropolis-2026。PowerPoint 渲染脚本默认读取该输出目录，生成 PNG、PDF 和 validation-track02.json。
+
+离线材料包：`output/metropolis-2026/知账-Track02-路演材料-0.0.152.zip`，包含 PPTX、PDF、可重建源码、所需助手库、渲染脚本及讲稿。它是材料修订，不是新 APK。
