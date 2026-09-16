@@ -45,6 +45,9 @@ model User {
   incomingReviewRequests ReviewRequest[] @relation("RequestOwner")
   outgoingReviewRequests ReviewRequest[] @relation("RequestApplicant")
   socialInboxEvents SocialInboxEvent[]
+  ownedReviewThreads BillReviewThread[] @relation("ThreadOwner")
+  writtenReviewThreads BillReviewThread[] @relation("ThreadReviewer")
+  reviewMessages ReviewMessage[]
 
   @@map("users")
   @@schema("public")
@@ -141,6 +144,66 @@ model SocialInboxEvent {
   @@schema("public")
 }
 
+model BillReviewThread {
+  id Int @id @default(autoincrement())
+  ownerId String @map("owner_id") @db.Uuid
+  reviewerId String @map("reviewer_id") @db.Uuid
+  billId Int? @map("bill_id")
+  originalBillId Int @map("original_bill_id")
+  vote String @db.VarChar(5)
+  snapshot Json
+  initialBillUpdatedAt DateTime @map("initial_bill_updated_at") @db.Timestamptz(6)
+  snapshotUpdatedAt DateTime @map("snapshot_updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  owner User @relation("ThreadOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  reviewer User @relation("ThreadReviewer", fields: [reviewerId], references: [id], onDelete: Cascade)
+  bill Bill? @relation(fields: [billId], references: [id], onDelete: SetNull)
+  messages ReviewMessage[]
+  @@unique([originalBillId, reviewerId])
+  @@index([ownerId, id])
+  @@index([reviewerId, id])
+  @@index([billId])
+  @@map("bill_review_threads")
+  @@schema("public")
+}
+
+model ReviewMessage {
+  id Int @id @default(autoincrement())
+  threadId Int @map("thread_id")
+  authorId String @map("author_id") @db.Uuid
+  clientKey String @map("client_key") @db.Uuid
+  mainSlot Int? @map("main_slot")
+  body String @db.Text
+  withdrawn Boolean @default(false)
+  hidden Boolean @default(false)
+  revision Int @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  thread BillReviewThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  versions ReviewMessageVersion[]
+  @@unique([threadId, mainSlot])
+  @@unique([threadId, authorId, clientKey])
+  @@index([threadId, id])
+  @@map("review_messages")
+  @@schema("public")
+}
+
+model ReviewMessageVersion {
+  id Int @id @default(autoincrement())
+  messageId Int @map("message_id")
+  revision Int
+  body String @db.Text
+  withdrawn Boolean
+  action String @db.VarChar(10)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  message ReviewMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  @@unique([messageId, revision])
+  @@map("review_message_versions")
+  @@schema("public")
+}
+
 model BiometricCredential {
   id             String    @id @default(uuid()) @db.Uuid
   userId         String    @map("user_id") @db.Uuid
@@ -231,6 +294,7 @@ model Bill {
   relatedBill Bill?     @relation("BillRefund", fields: [relatedBillId], references: [id], onDelete: SetNull)
   refunds     Bill[]    @relation("BillRefund")
   financialClassification BillFinancialClassification?
+  reviewThreads BillReviewThread[]
 
   @@index([userId, date])    // 复合索引：用户ID + 日期，用于按日期查询用户账单
   @@index([userId, type])    // 复合索引：用户ID + 类型，用于按类型统计

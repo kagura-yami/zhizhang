@@ -3,12 +3,16 @@ import { Prisma, ReviewGrant } from '@prisma/client';
 
 export type SocialTx = Prisma.TransactionClient;
 
+export async function lockSocialUsers(tx: SocialTx, ids: string[]) {
+  const sorted = [...new Set(ids.map(id => id.toLowerCase()))].sort();
+  await tx.$queryRaw(Prisma.sql`SELECT id FROM public.users WHERE id::text IN (${Prisma.join(sorted)}) ORDER BY id FOR UPDATE`);
+}
+
 @Injectable()
 export class SocialAccessService {
   /** All relationship writes and protected reads acquire user locks in the same order. */
   async lockUsers(tx: SocialTx, ids: string[]) {
-    const sorted = [...new Set(ids.map(id => id.toLowerCase()))].sort();
-    await tx.$queryRaw(Prisma.sql`SELECT id FROM public.users WHERE id::text IN (${Prisma.join(sorted)}) ORDER BY id FOR UPDATE`);
+    await lockSocialUsers(tx, ids);
   }
 
   async enabled(tx: SocialTx, id: string) {

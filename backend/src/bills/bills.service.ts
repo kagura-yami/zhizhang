@@ -12,6 +12,8 @@ import {
 } from './dto/bill.dto';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PaginatedResponse } from '../common/interfaces/api-response.interface';
+import { lockSocialUsers } from '../social/social-access.service';
+import { reviewSnapshot } from '../reviews/review-snapshot';
 
 @Injectable()
 export class BillsService {
@@ -372,46 +374,50 @@ export class BillsService {
    * 更新账单
    */
   async update(userId: string, id: number, updateBillDto: UpdateBillDto) {
-    // 先检查账单是否存在且属于该用户
-    await this.findOne(userId, id);
-
-    const updateData: any = {};
-
-    if (updateBillDto.amount !== undefined) {
-      updateData.amount = new Decimal(updateBillDto.amount);
-    }
-    if (updateBillDto.type !== undefined) {
-      updateData.type = updateBillDto.type;
-    }
-    if (updateBillDto.description !== undefined) {
-      updateData.description = updateBillDto.description;
-    }
-    if (updateBillDto.date !== undefined) {
-      updateData.date = new Date(updateBillDto.date);
-    }
-    if (updateBillDto.time !== undefined) {
-      updateData.time = new Date(updateBillDto.time);
-    }
-    if (updateBillDto.paymentChannel !== undefined) {
-      updateData.paymentChannel = updateBillDto.paymentChannel;
-    }
-    if (updateBillDto.counterparty !== undefined) {
-      updateData.counterparty = updateBillDto.counterparty;
-    }
-    if (updateBillDto.categoryId !== undefined) {
-      updateData.categoryId = updateBillDto.categoryId;
-    }
-    if (updateBillDto.relatedBillId !== undefined) {
-      updateData.relatedBillId = updateBillDto.relatedBillId;
-    }
-
-    return this.prisma.bill.update({
-      where: { id },
-      data: updateData,
-      include: {
-        category: true,
-        relatedBill: { select: { id: true, amount: true, type: true, description: true, date: true, time: true } },
-      },
+    return this.prisma.$transaction(async tx => {
+      await lockSocialUsers(tx, [userId]);
+      if (!await tx.bill.findFirst({ where: { id, userId }, select: { id: true } })) throw new NotFoundException('账单不存在');
+  
+      const updateData: any = {};
+  
+      if (updateBillDto.amount !== undefined) {
+        updateData.amount = new Decimal(updateBillDto.amount);
+      }
+      if (updateBillDto.type !== undefined) {
+        updateData.type = updateBillDto.type;
+      }
+      if (updateBillDto.description !== undefined) {
+        updateData.description = updateBillDto.description;
+      }
+      if (updateBillDto.date !== undefined) {
+        updateData.date = new Date(updateBillDto.date);
+      }
+      if (updateBillDto.time !== undefined) {
+        updateData.time = new Date(updateBillDto.time);
+      }
+      if (updateBillDto.paymentChannel !== undefined) {
+        updateData.paymentChannel = updateBillDto.paymentChannel;
+      }
+      if (updateBillDto.counterparty !== undefined) {
+        updateData.counterparty = updateBillDto.counterparty;
+      }
+      if (updateBillDto.categoryId !== undefined) {
+        updateData.categoryId = updateBillDto.categoryId;
+      }
+      if (updateBillDto.relatedBillId !== undefined) {
+        updateData.relatedBillId = updateBillDto.relatedBillId;
+      }
+  
+      const result = await tx.bill.update({
+        where: { id },
+        data: updateData,
+        include: {
+          category: true,
+          relatedBill: { select: { id: true, amount: true, type: true, description: true, date: true, time: true } },
+        },
+      });
+      await tx.billReviewThread.updateMany({ where: { billId: id, ownerId: userId }, data: { snapshot: reviewSnapshot(result), snapshotUpdatedAt: result.updatedAt } });
+      return result;
     });
   }
 
@@ -419,11 +425,14 @@ export class BillsService {
    * 删除账单
    */
   async remove(userId: string, id: number) {
-    // 先检查账单是否存在且属于该用户
-    await this.findOne(userId, id);
-
-    return this.prisma.bill.delete({
-      where: { id },
+    return this.prisma.$transaction(async tx => {
+      await lockSocialUsers(tx, [userId]);
+      const bill = await tx.bill.findFirst({ where: { id, userId }, include: { category: { select: { name: true } } } });
+      if (!bill) throw new NotFoundException('账单不存在');
+      await tx.billReviewThread.updateMany({ where: { billId: id, ownerId: userId }, data: {
+        snapshot: reviewSnapshot(bill), snapshotUpdatedAt: bill.updatedAt, deletedAt: new Date(), billId: null,
+      } });
+      return tx.bill.delete({ where: { id } });
     });
   }
 
