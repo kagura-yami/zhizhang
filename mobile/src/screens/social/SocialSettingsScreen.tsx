@@ -82,7 +82,7 @@ export default function SocialSettingsScreen({
               status.requiredConsentVersion !== SOCIAL_CONSENT_VERSION
             }
             onPress={() => {
-              void resource.run(api.enable, () => { DeviceEventEmitter.emit('communityChanged'); onEnabled?.(); });
+              void resource.run(api.enable, () => { DeviceEventEmitter.emit('communityChanged'); void resource.refresh(); onEnabled?.(); });
             }}
           />
         </View>
@@ -92,7 +92,7 @@ export default function SocialSettingsScreen({
           <View style={s.card}>
             <View style={s.row}>
               <Text style={[s.heading, s.grow]}>启用社群</Text>
-              <Switch accessibilityLabel="启用社群" value disabled={resource.busy} onValueChange={() => confirm('关闭社群', '将退出排行榜并撤销评账授权和关注关系。你的账单、收支统计和自动记账继续保留。再次开启需重新授权。', () => { void resource.run(api.disable, () => DeviceEventEmitter.emit('communityChanged')); })} />
+              <Switch accessibilityLabel="启用社群" value disabled={resource.busy} onValueChange={() => confirm('关闭社群', '将退出排行榜并撤销评账授权和关注关系。你的账单、收支统计和自动记账继续保留。再次开启需重新授权。', () => { void resource.run(api.disable, () => { DeviceEventEmitter.emit('communityChanged'); void resource.refresh(); }); })} />
             </View>
             <Text style={s.muted}>社群是可选扩展，不影响日常记账。</Text>
           </View>
