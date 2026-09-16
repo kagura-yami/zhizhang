@@ -5,6 +5,7 @@ import { businessDate } from '../ledger/ledger-period';
 import { SocialAccessService, SocialTx } from './social-access.service';
 import { EnableSocialDto, SaveGrantDto, SearchSocialDto, SocialPageDto, SocialPreferencesDto, SOCIAL_CONSENT_VERSION } from './social.dto';
 import { recordRequestEvent } from './review-request.service';
+import { recordGrantEvent } from './grant-event';
 
 const publicProfile = { id: true, nickname: true, avatar: true } as const;
 const pagination = (q: SocialPageDto) => ({ skip: (q.page - 1) * q.pageSize, take: q.pageSize });
@@ -73,7 +74,14 @@ export class SocialService {
     return this.locked([userId, targetId], async tx => {
       await this.access.pair(tx, userId, targetId);
       const key = { followerId: userId, followeeId: targetId };
-      if (followed) await tx.socialFollow.upsert({ where: { followerId_followeeId: key }, create: key, update: {} });
+      if (followed) {
+        const previous = await tx.socialFollow.findUnique({ where: { followerId_followeeId: key } });
+        if (!previous) {
+          const follow = await tx.socialFollow.create({ data: key });
+          await tx.socialInboxEvent.create({ data: { userId: targetId, kind: 'social_follow_created',
+            dedupeKey: `follow:${follow.generation}`, payload: { followerId: userId, generation: follow.generation } } });
+        }
+      }
       else await tx.socialFollow.deleteMany({ where: key });
       return { following: followed };
     });
@@ -124,11 +132,13 @@ export class SocialService {
       const previous = await tx.reviewGrant.findUnique({ where: { ownerId_reviewerId: key } });
       if (previous && dto.expectedVersion !== previous.version) throw new ConflictException('授权已存在或已更新，请刷新后修改');
       if (!previous && dto.expectedVersion != null) throw new ConflictException('授权尚不存在');
-      const result = await tx.reviewGrant.upsert({ where: { ownerId_reviewerId: key },
+      const unchanged = previous?.status === 'active' && previous.scope === dto.scope && (previous.historyStart?.getTime() ?? null) === (historyStart?.getTime() ?? null);
+      const result = unchanged ? previous : await tx.reviewGrant.upsert({ where: { ownerId_reviewerId: key },
         create: { ...key, scope: dto.scope, historyStart, activatedAt: new Date() },
         update: { scope: dto.scope, historyStart, status: 'active', version: { increment: 1 },
           ...(previous?.status !== 'active' ? { activatedAt: new Date() } : {}) },
       });
+      if (!unchanged) await recordGrantEvent(tx, result);
       const requestKey = { ownerId, applicantId: reviewerId };
       const pending = await tx.reviewRequest.findUnique({ where: { ownerId_applicantId: requestKey } });
       if (pending?.status === 'pending') {

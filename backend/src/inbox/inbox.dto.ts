@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsString, Max, MaxLength, Min } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsInt, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class InboxQueryDto {
   @Type(() => Number) @IsInt() @Min(0) @Max(2147483647) after = 0;
@@ -7,4 +7,8 @@ export class InboxQueryDto {
 }
 export class ReadInboxDto {
   @IsString() @MaxLength(12000) receipt: string;
+}
+export class BillFeedbackDto {
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(50) @ArrayUnique()
+  @IsInt({ each: true }) @Min(1, { each: true }) @Max(2147483647, { each: true }) billIds: number[];
 }

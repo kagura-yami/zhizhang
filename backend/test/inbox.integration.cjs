@@ -7,10 +7,11 @@ const { Module, ValidationPipe } = require('@nestjs/common');
 const { NestFactory, APP_GUARD } = require('@nestjs/core');
 const { JwtService } = require('@nestjs/jwt');
 const { InboxModule } = require('../dist/inbox/inbox.module');
+const { BillsModule } = require('../dist/bills/bills.module');
 const { PrismaService } = require('../dist/prisma/prisma.service');
 const { JwtAuthGuard } = require('../dist/auth/jwt-auth.guard');
 class Root {}
-Module({ imports: [InboxModule], providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }] })(Root);
+Module({ imports: [InboxModule, BillsModule], providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }] })(Root);
 (async () => {
   const app = await NestFactory.create(Root, { logger: ['error'] });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
@@ -68,7 +69,7 @@ Module({ imports: [InboxModule], providers: [{ provide: APP_GUARD, useClass: Jwt
     // Hidden main does not prevent replies. Revoking blocks reviewer notification previews and read deep links.
     await call(a, `/reviews/threads/${t}/replies`, 'POST', message('主人给评价者的回复'));
     const bInbox = (await call(b, inbox)).data;
-    assert.equal(bInbox.items.length, 1);
+    assert.equal(bInbox.items.filter(i => i.kind === 'review_reply_created').length, 1);
     const bBoundary = (await call(b, `${inbox}/threads/${t}`)).data;
     await call(a, '/social/grants/given/' + b.id, 'DELETE');
     assert.equal((await call(b, inbox)).data.items.length, 0);
@@ -95,6 +96,51 @@ Module({ imports: [InboxModule], providers: [{ provide: APP_GUARD, useClass: Jwt
     ]);
     assert.equal(race[0].status, 201); assert.equal(race[1].status, 201);
     assert.equal((await call(b, `${inbox}/threads/${t}`)).data.unread, 1);
+    // Home summaries expose only the owner's counters; never another reviewer's aggregate.
+    const summarize = u => call(u, inbox + '/bills/summary', 'POST', { billIds: [bill.id] });
+    assert.deepEqual((await summarize(a)).data, [{ billId: bill.id, hang: 1, la: 0, hasUnreadText: false }]);
+    assert.deepEqual((await summarize(b)).data, []);
+    assert.equal((await call(b, `${inbox}/bills/${bill.id}`)).status, 404);
+    assert.equal((await call(a, inbox + '/bills/summary', 'POST', { billIds: [] })).status, 400);
+    await call(a, '/social/blocks/' + c.id, 'DELETE');
+    await call(a, '/social/grants/given/' + c.id, 'PUT', { scope: 'expense', historyStart: '2020-01-01' });
+    const ct = (await call(c, `/reviews/bills/${bill.id}/vote`, 'PUT', { vote: 'la' })).data.threadId;
+    await call(c, `/reviews/threads/${ct}/main`, 'POST', message('第二位评价者的文字'));
+    assert.deepEqual((await summarize(a)).data, [{ billId: bill.id, hang: 1, la: 1, hasUnreadText: true }]);
+    const anotherBill = await db.bill.create({ data: { userId: a.id, amount: '7', type: 'expense', date: new Date('2026-09-16') } });
+    const anotherThread = (await call(c, `/reviews/bills/${anotherBill.id}/vote`, 'PUT', { vote: 'la' })).data.threadId;
+    await call(c, `/reviews/threads/${anotherThread}/main`, 'POST', message('另一账单仍应保持未读'));
+    const billBoundary = (await call(a, `${inbox}/bills/${bill.id}`)).data;
+    await call(b, `/reviews/threads/${t}/replies`, 'POST', message('账单边界之后到达'));
+    assert.equal((await call(b, inbox + '/read', 'POST', { receipt: billBoundary.receipt })).status, 403);
+    await call(a, inbox + '/read', 'POST', { receipt: billBoundary.receipt });
+    assert.equal((await summarize(a)).data[0].hasUnreadText, true);
+    const finalBoundary = (await call(a, `${inbox}/bills/${bill.id}`)).data;
+    await call(a, inbox + '/read', 'POST', { receipt: finalBoundary.receipt });
+    assert.equal((await summarize(a)).data[0].hasUnreadText, false);
+    assert.equal((await call(a, inbox + '/bills/summary', 'POST', { billIds: [anotherBill.id] })).data[0].hasUnreadText, true);
+    await call(c, `/reviews/bills/${bill.id}/vote`, 'PUT', { vote: 'hang' });
+    assert.deepEqual((await summarize(a)).data, [{ billId: bill.id, hang: 2, la: 0, hasUnreadText: false }]);
+    // Repeat follows are idempotent; refollow has a fresh generation and cannot revive the old event.
+    await Promise.all([call(c, '/social/following/' + a.id, 'PUT'), call(c, '/social/following/' + a.id, 'PUT')]);
+    const follows = () => db.socialInboxEvent.findMany({ where: { userId: a.id, kind: 'social_follow_created' } });
+    assert.equal((await follows()).length, 1);
+    const oldFollowId = (await follows())[0].id;
+    await call(c, '/social/following/' + a.id, 'DELETE');
+    assert(!(await call(a, inbox)).data.items.some(i => i.id === oldFollowId));
+    await call(c, '/social/following/' + a.id, 'PUT');
+    const followItems = (await call(a, inbox)).data.items.filter(i => i.kind === 'social_follow_created');
+    assert.equal(followItems.length, 1); assert.notEqual(followItems[0].id, oldFollowId);
+    // Opening historical access creates one summary, not an event for every old bill.
+    const grants = await db.socialInboxEvent.count({ where: { userId: c.id, kind: 'review_grant_updated' } });
+    const grant = await db.reviewGrant.findUnique({ where: { ownerId_reviewerId: { ownerId: a.id, reviewerId: c.id } } });
+    const noChange = await call(a, '/social/grants/given/' + c.id, 'PUT', { expectedVersion: grant.version, scope: grant.scope, historyStart: '2020-01-01' });
+    assert.equal(noChange.data.version, grant.version);
+    assert.equal(await db.socialInboxEvent.count({ where: { userId: c.id, kind: 'review_grant_updated' } }), grants);
+    assert.equal((await call(a, `/bills/${bill.id}`, 'DELETE')).status, 200);
+    assert.deepEqual((await summarize(a)).data, [{ billId: bill.id, hang: 2, la: 0, hasUnreadText: false }]);
+    assert.equal((await call(a, `${inbox}/bills/${bill.id}`)).status, 200);
+    assert.equal((await call(c, `${inbox}/bills/${bill.id}`)).status, 404);
     console.log('PASS inbox: auth, default privacy, opt-in current preview, switches, page cursors, signed user-bound receipts, concurrent unread boundary, idempotency, hidden/withdrawn filtering, revoked deep links');
   } finally {
     for (const u of users) await db.user.deleteMany({ where: { id: u.id } });

@@ -4,12 +4,18 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ReviewsModule } from '../reviews/reviews.module';
 import { SocialModule } from '../social/social.module';
-import { InboxQueryDto, ReadInboxDto } from './inbox.dto';
+import { BillFeedbackDto, InboxQueryDto, ReadInboxDto } from './inbox.dto';
 import { InboxService } from './inbox.service';
 
 @Controller('social/inbox')
 class InboxController {
   constructor(private readonly service: InboxService) {}
+  @Post('bills/summary') async summaries(@CurrentUser('id') user: string, @Body() body: BillFeedbackDto) {
+    return { success: true, data: await this.service.billSummaries(user, body.billIds) };
+  }
+  @Get('bills/:id') async bill(@CurrentUser('id') user: string, @Param('id', ParseIntPipe) id: number) {
+    return { success: true, data: await this.service.billFeedback(user, id) };
+  }
   @Get() async list(@CurrentUser('id') user: string, @Query() query: InboxQueryDto) {
     return { success: true, data: await this.service.list(user, query) };
   }

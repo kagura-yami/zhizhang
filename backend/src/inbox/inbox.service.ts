@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma, SocialInboxEvent } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -42,6 +42,25 @@ export class InboxService {
       title = event.kind === 'review_main_created' ? '收到新的评账文字' : '收到私密回复';
       target = { type: 'review', threadId: thread.id, billId: thread.originalBillId };
       if (preview) body = message.body.slice(0, 120);
+    } else if (event.kind === 'social_follow_created' || event.kind === 'review_grant_updated') {
+      const otherId = event.kind === 'social_follow_created' ? p.followerId : p.ownerId;
+      try { await this.access.pair(tx, userId, otherId); }
+      catch (error) {
+        if (error?.getStatus?.() === 403 || error?.getStatus?.() === 404) return null;
+        throw error;
+      }
+      if (event.kind === 'social_follow_created') {
+        const follow = await tx.socialFollow.findUnique({ where: { followerId_followeeId: { followerId: otherId, followeeId: userId } } });
+        if (!follow || follow.generation !== p.generation) return null;
+        title = '收到新的关注'; target = { type: 'profile', userId: otherId };
+      } else {
+        if (p.reviewerId !== userId) return null;
+        const grant = await tx.reviewGrant.findUnique({ where: { ownerId_reviewerId: { ownerId: otherId, reviewerId: userId } } });
+        if (!grant || grant.status !== 'active' || grant.version !== p.version) return null;
+        title = grant.historyStart ? '评账授权已更新，含历史账单' : '收到评账授权';
+        target = { type: 'grant', ownerId: otherId, version: grant.version, scope: grant.scope,
+          historyStart: grant.historyStart?.toISOString().slice(0, 10) ?? null };
+      }
     } else if (event.kind.startsWith('review_request_')) {
       if (![p.ownerId, p.applicantId].includes(userId)) return null;
       try { await this.access.pair(tx, p.ownerId, p.applicantId); }
@@ -70,7 +89,7 @@ export class InboxService {
     const rows = candidates.slice(0, query.limit);
     const identities = await this.prisma.billReviewThread.findMany({ where: { id: { in: rows.filter(e => interactions.includes(e.kind)).map(e => payloadOf(e).threadId) } }, select: { ownerId: true, reviewerId: true } });
     const ids = [userId, ...identities.flatMap(t => [t.ownerId, t.reviewerId]), ...rows.flatMap(e => {
-      const p = payloadOf(e); return [p.ownerId, p.applicantId].filter(v => typeof v === 'string' && uuid.test(v));
+      const p = payloadOf(e); return [p.ownerId, p.applicantId, p.followerId].filter(v => typeof v === 'string' && uuid.test(v));
     })];
     return this.prisma.$transaction(async tx => {
       await this.access.lockUsers(tx, ids);
@@ -108,6 +127,14 @@ export class InboxService {
     try { claim = this.jwt.verify(receipt, { audience }); }
     catch { throw new ForbiddenException('已读凭证已失效，请刷新后重试'); }
     if (claim.purpose !== 'social-read' || claim.userId !== userId) throw new ForbiddenException('已读凭证不属于当前用户');
+    if (claim.scope === 'bill') {
+      return this.prisma.$transaction(async tx => {
+        await this.access.lockUsers(tx, [userId]); await this.access.enabled(tx, userId);
+        await this.ownedBill(tx, userId, claim.billId);
+        return tx.socialInboxEvent.updateMany({ where: { userId, readAt: null, id: { lte: claim.through }, kind: { in: interactions },
+          payload: { path: ['originalBillId'], equals: claim.billId } }, data: { readAt: new Date() } });
+      });
+    }
     if (claim.scope === 'thread') {
       return this.reviews.withThread(userId, claim.threadId, false, tx => tx.socialInboxEvent.updateMany({
         where: { userId, readAt: null, id: { lte: claim.through }, kind: { in: interactions }, payload: { path: ['threadId'], equals: claim.threadId } }, data: { readAt: new Date() },
@@ -117,6 +144,51 @@ export class InboxService {
     return this.prisma.$transaction(async tx => {
       await this.access.lockUsers(tx, [userId]); await this.access.enabled(tx, userId);
       return tx.socialInboxEvent.updateMany({ where: { userId, readAt: null, id: { in: claim.ids } }, data: { readAt: new Date() } });
+    });
+  }
+
+  private async ownedBill(tx: SocialTx, userId: string, billId: number) {
+    if (!await tx.bill.findFirst({ where: { id: billId, userId }, select: { id: true } }) &&
+      !await tx.billReviewThread.findFirst({ where: { ownerId: userId, originalBillId: billId }, select: { id: true } })) {
+      throw new NotFoundException('账单不存在');
+    }
+  }
+
+  private async summaries(tx: SocialTx, userId: string, billIds: number[]) {
+    const bills = await tx.bill.findMany({ where: { userId, id: { in: billIds } }, select: { id: true } });
+    const groups = await tx.billReviewThread.groupBy({ by: ['originalBillId', 'vote'], where: { ownerId: userId, originalBillId: { in: billIds } }, _count: true });
+    const ownIds = new Set([...bills.map(b => b.id), ...groups.map(g => g.originalBillId)]);
+    const unread = await tx.$queryRaw<{ billId: number }[]>(Prisma.sql`
+      SELECT DISTINCT t.original_bill_id AS "billId" FROM public.social_inbox_events e
+      JOIN public.review_messages m ON e.payload->>'messageId' = m.id::text
+      JOIN public.bill_review_threads t ON m.thread_id = t.id
+      WHERE e.user_id = ${userId}::uuid AND t.owner_id = ${userId}::uuid
+        AND t.original_bill_id IN (${Prisma.join(billIds)}) AND e.read_at IS NULL
+        AND e.kind IN ('review_main_created', 'review_reply_created')
+        AND e.payload->>'threadId' = t.id::text AND m.author_id <> ${userId}::uuid
+        AND m.hidden = false AND m.withdrawn = false`);
+    const unreadIds = new Set(unread.map(row => row.billId));
+    return billIds.filter(id => ownIds.has(id)).map(billId => ({ billId,
+      hang: groups.find(g => g.originalBillId === billId && g.vote === 'hang')?._count ?? 0,
+      la: groups.find(g => g.originalBillId === billId && g.vote === 'la')?._count ?? 0,
+      hasUnreadText: unreadIds.has(billId) }));
+  }
+
+  async billSummaries(userId: string, billIds: number[]) {
+    return this.prisma.$transaction(async tx => {
+      await this.access.lockUsers(tx, [userId]); await this.access.enabled(tx, userId);
+      return this.summaries(tx, userId, billIds);
+    });
+  }
+
+  async billFeedback(userId: string, billId: number) {
+    return this.prisma.$transaction(async tx => {
+      await this.access.lockUsers(tx, [userId]); await this.access.enabled(tx, userId);
+      await this.ownedBill(tx, userId, billId);
+      const latest = await tx.socialInboxEvent.findFirst({ where: { userId, kind: { in: interactions }, payload: { path: ['originalBillId'], equals: billId } }, orderBy: { id: 'desc' }, select: { id: true } });
+      const through = latest?.id ?? 0;
+      return { ...(await this.summaries(tx, userId, [billId]))[0], through,
+        receipt: this.receipt(userId, { scope: 'bill', billId, through }) };
     });
   }
 }

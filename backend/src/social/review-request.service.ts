@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { businessDate } from '../ledger/ledger-period';
 import { SocialAccessService, SocialTx } from './social-access.service';
 import { ApproveRequestDto, RequestVersionDto, SocialPageDto, SubmitRequestDto } from './social.dto';
+import { recordGrantEvent } from './grant-event';
 
 export async function recordRequestEvent(tx: SocialTx, request: ReviewRequest, userId: string) {
   await tx.socialInboxEvent.create({ data: {
@@ -89,9 +90,10 @@ export class ReviewRequestService {
       // A separate direct grant must not be overwritten by an obsolete approval screen.
       const previous = await tx.reviewGrant.findUnique({ where: { ownerId_reviewerId: key } });
       if (previous?.status === 'active') throw new ConflictException('授权已生效，请在授权管理中修改');
-      await tx.reviewGrant.upsert({ where: { ownerId_reviewerId: key },
+      const grant = await tx.reviewGrant.upsert({ where: { ownerId_reviewerId: key },
         create: { ...key, scope: dto.scope, historyStart, activatedAt: new Date() },
         update: { scope: dto.scope, historyStart, activatedAt: new Date(), status: 'active', version: { increment: 1 } } });
+      await recordGrantEvent(tx, grant);
       await tx.socialPreference.update({ where: { userId: applicantId }, data: { requestRejectStreak: 0, requestCooldownUntil: null } });
       const request = await tx.reviewRequest.update({ where: { ownerId_applicantId: { ownerId, applicantId } },
         data: { status: 'approved', version: { increment: 1 }, decidedAt: new Date() } });

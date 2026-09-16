@@ -74,6 +74,7 @@ model SocialPreference {
 }
 
 model SocialFollow {
+  generation String @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   followerId String @map("follower_id") @db.Uuid
   followeeId String @map("followee_id") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)

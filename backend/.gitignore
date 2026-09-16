@@ -135,3 +135,4 @@ prisma/migrations/*
 # 热更新 bundle 上传文件
 public/downloads/bundles/
 !prisma/migrations/202609160007_inbox_read/
+!prisma/migrations/202609160008_follow_generation/
