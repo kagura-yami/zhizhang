@@ -203,6 +203,8 @@ export function createSocialApi(token: string) {
           params: { page, pageSize: 20 },
         }),
       ),
+    inboxEvent: (id: number) =>
+      data<InboxItem>(httpService.get(`/social/inbox/events/${id}`, config)),
     inbox: (before: number) =>
       data<InboxPage>(
         httpService.get('/social/inbox', {

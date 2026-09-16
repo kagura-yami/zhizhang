@@ -13,6 +13,10 @@ import {
 } from './shared';
 const latest = 2147483647;
 export default function SocialInboxScreen({ navigation }: { navigation: any }) {
+  const { token } = useAuth();
+  return <InboxContent key={token || ''} navigation={navigation} />;
+}
+function InboxContent({ navigation }: { navigation: any }) {
   const api = useSocialApi(),
     s = useStyles(stylesFor),
     { user } = useAuth();
@@ -38,6 +42,17 @@ export default function SocialInboxScreen({ navigation }: { navigation: any }) {
         direction: target.applicantId === user?.id ? 'outgoing' : 'incoming',
       });
   };
+  const resolveAndOpen = (id: number) => {
+    let currentTarget: InboxTarget | undefined;
+    void r.run(
+      async () => {
+        currentTarget = (await api.inboxEvent(id)).target;
+      },
+      () => {
+        if (currentTarget) open(currentTarget);
+      },
+    );
+  };
   return (
     <Page>
       <Text style={s.title}>社群消息</Text>
@@ -53,59 +68,62 @@ export default function SocialInboxScreen({ navigation }: { navigation: any }) {
         }}
       />
       <Status {...r} />
-      {r.value?.items.map(item => (
-        <View style={s.card} key={item.id}>
-          <Text style={s.heading}>
-            {item.unread ? '● 未读 · ' : ''}
-            {item.title}
-          </Text>
-          <Text style={s.small}>
-            {new Date(item.createdAt).toLocaleString()}
-          </Text>
-          {item.preview && (
-            <Text selectable style={s.text}>
-              {item.preview}
+      {!r.error &&
+        r.value?.items.map(item => (
+          <View style={s.card} key={item.id}>
+            <Text style={s.heading}>
+              {item.unread ? '● 未读 · ' : ''}
+              {item.title}
             </Text>
-          )}
-          {item.target.type === 'bills' && (
-            <Text style={s.muted}>{item.target.count} 笔当前可查看的账单</Text>
-          )}
-          {item.target.type === 'report' ? (
-            <>
-              <Text style={s.text}>
-                举报 #{item.target.reportId} ·{' '}
-                {item.target.status === 'upheld' ? '举报成立' : '未认定违规'}
-              </Text>
+            <Text style={s.small}>
+              {new Date(item.createdAt).toLocaleString()}
+            </Text>
+            {item.preview && (
               <Text selectable style={s.text}>
-                {item.target.reason || '暂无处理说明'}
+                {item.preview}
               </Text>
-            </>
-          ) : (
-            <Action
-              title="查看详情"
-              disabled={r.busy}
-              onPress={() => open(item.target)}
-            />
-          )}
-          {item.unread && (
-            <Action
-              title="标为已读"
-              disabled={r.busy}
-              onPress={() => {
-                void r.run(() => api.readInbox(item.readReceipt));
-              }}
-            />
-          )}
-        </View>
-      ))}
-      {r.value?.items.length === 0 && (
+            )}
+            {item.target.type === 'bills' && (
+              <Text style={s.muted}>
+                {item.target.count} 笔当前可查看的账单
+              </Text>
+            )}
+            {item.target.type === 'report' ? (
+              <>
+                <Text style={s.text}>
+                  举报 #{item.target.reportId} ·{' '}
+                  {item.target.status === 'upheld' ? '举报成立' : '未认定违规'}
+                </Text>
+                <Text selectable style={s.text}>
+                  {item.target.reason || '暂无处理说明'}
+                </Text>
+              </>
+            ) : (
+              <Action
+                title="查看详情"
+                disabled={r.busy}
+                onPress={() => resolveAndOpen(item.id)}
+              />
+            )}
+            {item.unread && (
+              <Action
+                title="标为已读"
+                disabled={r.busy}
+                onPress={() => {
+                  void r.run(() => api.readInbox(item.readReceipt));
+                }}
+              />
+            )}
+          </View>
+        ))}
+      {!r.error && r.value?.items.length === 0 && (
         <Text style={s.muted}>
           {r.value.hasMore
             ? '这一页没有仍可展示的消息，可继续查看更早消息。'
             : '没有更多可展示的消息。'}
         </Text>
       )}
-      {r.value?.receipt && r.value.items.some(i => i.unread) && (
+      {!r.error && r.value?.receipt && r.value.items.some(i => i.unread) && (
         <Action
           title="将本页消息标为已读"
           disabled={r.busy}
@@ -114,7 +132,7 @@ export default function SocialInboxScreen({ navigation }: { navigation: any }) {
           }}
         />
       )}
-      {r.value && (
+      {!r.error && r.value && (
         <View style={s.row}>
           <View style={s.grow}>
             <Action
