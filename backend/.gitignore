@@ -138,3 +138,5 @@ public/downloads/bundles/
 !prisma/migrations/202609160008_follow_generation/
 !prisma/migrations/202609160009_new_bill_notices/
 !prisma/migrations/202609160010_rankings/
+
+!prisma/migrations/202609160016_admin_tables_upgrade/

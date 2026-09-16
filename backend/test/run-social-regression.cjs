@@ -6,7 +6,7 @@ const { tmpdir } = require('node:os');
 const { join, resolve, dirname, basename } = require('node:path');
 const cwd = resolve(__dirname, '..');
 const container = 'zhizhang-regression-' + randomUUID();
-const baseline = 'cd1acb8'; // Last schema before budget history migration 011.
+const baseline = 'bf7edae78addaae80bea246f24ba4328b4b7f408'; // Before notification samples and social upgrade.
 const env = { ...process.env, DATABASE_URL: 'postgresql://test:test-only@127.0.0.1:15451/zhizhang_social_test?schema=public' };
 const prisma = ['node_modules/prisma/build/index.js'];
 function run(command, args, options = {}) {
@@ -48,10 +48,14 @@ const suites = [
     }
     if (!ready) throw new Error('Disposable PostgreSQL did not become ready');
     const baselineSql = await run(process.execPath, [...prisma, 'migrate', 'diff', '--from-empty', '--to-schema-datamodel', schemaPath, '--script'], { capture: true });
-    const migrations = (await readdir(join(cwd, 'prisma/migrations'))).filter(name => /^20260916\d{4}_/.test(name) && name >= '202609160011_').sort();
+    const migrations = (await readdir(join(cwd, 'prisma/migrations'))).filter(name => /^20260916\d{4}_/.test(name)).sort();
     if (!migrations.length) throw new Error('Required upgrade migrations are missing');
     await require('./recovery-rehearsal.cjs')({ run, sql, container, baselineSql, schemaPath,
       migrationSql: await Promise.all(migrations.map(m => readFile(join(cwd, 'prisma/migrations', m, 'migration.sql'), 'utf8'))) });
+    if (process.argv.includes('--recovery-only')) {
+      console.log('PASS: isolated recovery rehearsal only; business suites were not run.');
+      return;
+    }
     for (const [suite, suffix] of suites) {
       const db = `zhizhang_${suffix}_test`;
       // Database names are constants above; all operations target our newly created container.
