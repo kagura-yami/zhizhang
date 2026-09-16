@@ -13,6 +13,7 @@ import {
 import { Decimal } from '@prisma/client/runtime/library';
 import { PaginatedResponse } from '../common/interfaces/api-response.interface';
 import { lockSocialUsers } from '../social/social-access.service';
+import { prepareRanking, refreshRanking } from '../rankings/ranking-projection';
 import { reviewSnapshot } from '../reviews/review-snapshot';
 import { captureNewBill } from '../inbox/new-bill-notice';
 
@@ -164,6 +165,8 @@ export class BillsService {
           include: { category: true, relatedBill: { select: { id: true, amount: true, type: true, description: true, date: true, time: true } } } });
         if (existing) return existing;
       }
+      const rankingTime = new Date();
+      await prepareRanking(tx, userId, rankingTime);
       const bill = await tx.bill.create({
         data: {
           createdAt: new Date(),
@@ -187,6 +190,7 @@ export class BillsService {
         },
       });
       await captureNewBill(tx, bill);
+      await refreshRanking(tx, userId, rankingTime);
       return bill;
     });
   }
@@ -389,6 +393,8 @@ export class BillsService {
   async update(userId: string, id: number, updateBillDto: UpdateBillDto) {
     return this.prisma.$transaction(async tx => {
       await lockSocialUsers(tx, [userId]);
+      const rankingTime = new Date();
+      await prepareRanking(tx, userId, rankingTime);
       if (!await tx.bill.findFirst({ where: { id, userId }, select: { id: true } })) throw new NotFoundException('账单不存在');
 
       const updateData: any = {};
@@ -430,6 +436,7 @@ export class BillsService {
         },
       });
       await tx.billReviewThread.updateMany({ where: { billId: id, ownerId: userId }, data: { snapshot: reviewSnapshot(result), snapshotUpdatedAt: result.updatedAt } });
+      await refreshRanking(tx, userId, rankingTime);
       return result;
     });
   }
@@ -440,12 +447,16 @@ export class BillsService {
   async remove(userId: string, id: number) {
     return this.prisma.$transaction(async tx => {
       await lockSocialUsers(tx, [userId]);
+      const rankingTime = new Date();
+      await prepareRanking(tx, userId, rankingTime);
       const bill = await tx.bill.findFirst({ where: { id, userId }, include: { category: { select: { name: true } } } });
       if (!bill) throw new NotFoundException('账单不存在');
       await tx.billReviewThread.updateMany({ where: { billId: id, ownerId: userId }, data: {
         snapshot: reviewSnapshot(bill), snapshotUpdatedAt: bill.updatedAt, deletedAt: new Date(), billId: null,
       } });
-      return tx.bill.delete({ where: { id } });
+      const result = await tx.bill.delete({ where: { id } });
+      await refreshRanking(tx, userId, rankingTime);
+      return result;
     });
   }
 

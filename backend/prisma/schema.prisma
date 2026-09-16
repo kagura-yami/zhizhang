@@ -36,6 +36,7 @@ model User {
   invoices       Invoice[]        // 用户整理后的电子发票
   notificationSamples NotificationSample[]
   socialPreference SocialPreference?
+  rankingState RankingState?
   following SocialFollow[] @relation("SocialFollower")
   followers SocialFollow[] @relation("SocialFollowee")
   blockedUsers SocialBlock[] @relation("SocialBlocker")
@@ -72,6 +73,42 @@ model SocialPreference {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@map("social_preferences")
+  @@schema("public")
+}
+
+model RankingLaunch {
+  id Int @id @default(1)
+  launchedAt DateTime @default(now()) @map("launched_at") @db.Timestamptz(6)
+  @@map("ranking_launch")
+  @@schema("public")
+}
+
+model RankingState {
+  userId String @id @map("user_id") @db.Uuid
+  initialized Boolean @default(false)
+  joinedAt DateTime @default(now()) @map("joined_at") @db.Timestamptz(6)
+  dayKey String @map("day_key") @db.VarChar(10)
+  monthKey String @map("month_key") @db.VarChar(7)
+  yearKey String @map("year_key") @db.VarChar(4)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  results RankingResult[]
+  @@map("ranking_states")
+  @@schema("public")
+}
+
+model RankingResult {
+  userId String @map("user_id") @db.Uuid
+  kind String @db.VarChar(5)
+  period String @db.VarChar(10)
+  surplus Decimal @db.Decimal(30, 4)
+  effectiveDays Int @map("effective_days")
+  included Int
+  needsReview Int @map("needs_review")
+  ruleVersion String @map("rule_version") @db.VarChar(30)
+  state RankingState @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  @@id([userId, kind, period])
+  @@index([kind, period, surplus, effectiveDays])
+  @@map("ranking_results")
   @@schema("public")
 }
 

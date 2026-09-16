@@ -6,6 +6,7 @@ import { SocialAccessService, SocialTx } from './social-access.service';
 import { EnableSocialDto, SaveGrantDto, SearchSocialDto, SocialPageDto, SocialPreferencesDto, SOCIAL_CONSENT_VERSION } from './social.dto';
 import { recordRequestEvent } from './review-request.service';
 import { recordGrantEvent } from './grant-event';
+import { changeRankingParticipation } from '../rankings/ranking-projection';
 
 const publicProfile = { id: true, nickname: true, avatar: true } as const;
 const pagination = (q: SocialPageDto) => ({ skip: (q.page - 1) * q.pageSize, take: q.pageSize });
@@ -29,16 +30,22 @@ export class SocialService {
   async enable(userId: string, dto: EnableSocialDto) {
     if (dto.consentVersion !== SOCIAL_CONSENT_VERSION) throw new BadRequestException('请阅读当前社群说明');
     const { consentVersion, ...preferences } = dto;
-    return this.locked([userId], tx => tx.socialPreference.upsert({ where: { userId },
-      create: { userId, consentVersion, enabledAt: new Date(), ...preferences },
-      update: { consentVersion, ...preferences },
-    }));
+    return this.locked([userId], async tx => {
+      const now = new Date();
+      const result = await tx.socialPreference.upsert({ where: { userId },
+        create: { userId, consentVersion, enabledAt: now, ...preferences }, update: { consentVersion, ...preferences } });
+      await changeRankingParticipation(tx, userId, result.rankingScope, now);
+      return result;
+    });
   }
 
   async updatePreferences(userId: string, dto: SocialPreferencesDto) {
     return this.locked([userId], async tx => {
       await this.access.enabled(tx, userId);
-      return tx.socialPreference.update({ where: { userId }, data: dto });
+      const now = new Date();
+      const result = await tx.socialPreference.update({ where: { userId }, data: dto });
+      await changeRankingParticipation(tx, userId, result.rankingScope, now);
+      return result;
     });
   }
 

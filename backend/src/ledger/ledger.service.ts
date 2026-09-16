@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ClassifyBillDto, LedgerSummaryQueryDto } from './ledger.dto';
 import { businessPeriod } from './ledger-period';
 import { LedgerAccumulator } from './ledger-semantics';
+import { lockSocialUsers } from '../social/social-access.service';
+import { prepareRanking, refreshRanking } from '../rankings/ranking-projection';
 
 @Injectable()
 export class LedgerService {
@@ -12,6 +14,9 @@ export class LedgerService {
   async classify(userId: string, id: number, dto: ClassifyBillDto) {
     try {
       return await this.prisma.$transaction(async (tx) => {
+        await lockSocialUsers(tx, [userId]);
+        const rankingTime = new Date();
+        await prepareRanking(tx, userId, rankingTime);
         const bill = await tx.bill.findFirst({
           where: { id, userId },
           select: { id: true, type: true, updatedAt: true, relatedBill: { select: { userId: true, type: true } } },
@@ -25,7 +30,9 @@ export class LedgerService {
           throw new BadRequestException('退款必须为收入，且关联原账单必须为本人的支出');
         }
         const data = { kind: dto.kind, currency: dto.currency, billUpdatedAt: bill.updatedAt, reviewedAt: new Date() };
-        return tx.billFinancialClassification.upsert({ where: { billId: id }, create: { billId: id, ...data }, update: data });
+        const result = await tx.billFinancialClassification.upsert({ where: { billId: id }, create: { billId: id, ...data }, update: data });
+        await refreshRanking(tx, userId, rankingTime);
+        return result;
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     } catch (error) {
       if (error?.code === 'P2034') throw new ConflictException('账单正在更新，请刷新后重新确认');

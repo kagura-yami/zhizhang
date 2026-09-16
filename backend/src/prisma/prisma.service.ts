@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { lockSocialUsers } from '../social/social-access.service';
 import { captureNewBill } from '../inbox/new-bill-notice';
+import { prepareRanking, refreshRanking } from '../rankings/ranking-projection';
 
 @Injectable()
 export class PrismaService
@@ -85,7 +86,7 @@ export class PrismaService
 
     const uncategorized = await this.bill.findMany({
       where: { source: 'notification', type: 'expense', categoryId: null },
-      select: { id: true, description: true, counterparty: true, sourceApp: true },
+      select: { id: true, userId: true, description: true, counterparty: true, sourceApp: true },
     });
 
     for (const bill of uncategorized) {
@@ -93,7 +94,13 @@ export class PrismaService
       const matchedRule = rules.find((rule) => rule.keywords.some((keyword) => text.includes(keyword.toLowerCase())));
       const categoryId = matchedRule ? byName.get(matchedRule.name) : otherId;
       if (categoryId) {
-        await this.bill.update({ where: { id: bill.id }, data: { categoryId } });
+        await this.$transaction(async tx => {
+          await lockSocialUsers(tx, [bill.userId]);
+          const rankingTime = new Date();
+          await prepareRanking(tx, bill.userId, rankingTime);
+          await tx.bill.updateMany({ where: { id: bill.id, categoryId: null }, data: { categoryId } });
+          await refreshRanking(tx, bill.userId, rankingTime);
+        });
       }
     }
   }
@@ -190,6 +197,8 @@ export class PrismaService
   }) {
     return this.$transaction(async tx => {
       await lockSocialUsers(tx, [data.userId]);
+      const rankingTime = new Date();
+      await prepareRanking(tx, data.userId, rankingTime);
       const bill = await tx.bill.create({
         data: {
           ...data,
@@ -201,6 +210,7 @@ export class PrismaService
         },
       });
       await captureNewBill(tx, bill);
+      await refreshRanking(tx, data.userId, rankingTime);
       return bill;
     });
   }
@@ -216,24 +226,30 @@ export class PrismaService
     },
     userId: string,
   ) {
-    return this.bill.update({
-      where: {
-        id,
-        userId,
-      },
-      data,
-      include: {
-        category: true,
-      },
+    return this.$transaction(async tx => {
+      await lockSocialUsers(tx, [userId]);
+      const rankingTime = new Date();
+      await prepareRanking(tx, userId, rankingTime);
+      const result = await tx.bill.update({
+        where: { id, userId },
+        data,
+        include: { category: true },
+      });
+      await refreshRanking(tx, userId, rankingTime);
+      return result;
     });
   }
 
   async deleteBill(id: number, userId: string) {
-    return this.bill.delete({
-      where: {
-        id,
-        userId,
-      },
+    return this.$transaction(async tx => {
+      await lockSocialUsers(tx, [userId]);
+      const rankingTime = new Date();
+      await prepareRanking(tx, userId, rankingTime);
+      const result = await tx.bill.delete({
+        where: { id, userId },
+      });
+      await refreshRanking(tx, userId, rankingTime);
+      return result;
     });
   }
 
