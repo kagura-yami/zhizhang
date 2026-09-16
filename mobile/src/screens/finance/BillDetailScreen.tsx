@@ -19,6 +19,7 @@ import { invalidateCache } from '../../lib/queryClient';
 import { useStyles } from '../../hooks';
 import { useAlert } from '../../providers';
 import type { BillData } from '../../types/bill';
+import { BillReviewEntry } from '../social/billFeedback';
 
 export default function BillDetailScreen() {
   const navigation = useNavigation();
@@ -191,6 +192,7 @@ export default function BillDetailScreen() {
             </>
           )}
         </View>
+        <BillReviewEntry billId={billId} navigation={navigation} />
       </ScrollView>
 
       {/* 底部操作按钮 */}

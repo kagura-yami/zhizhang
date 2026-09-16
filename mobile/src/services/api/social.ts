@@ -3,6 +3,17 @@ import type { ApiResponse } from '../../types/api';
 
 export const SOCIAL_CONSENT_VERSION = '2026-09-16';
 export const REPORT_DISCLOSURE_VERSION = '2026-09-16';
+export interface BillFeedback {
+  billId: number;
+  hang: number;
+  la: number;
+  hasUnreadText: boolean;
+}
+export interface OwnerReviewSummary {
+  hang: number;
+  la: number;
+  threads: { id: number; vote: ReviewVote; reviewer: SocialPerson }[];
+}
 export type InboxTarget =
   | { type: 'review'; threadId: number; billId: number; messageId: number }
   | { type: 'bills'; ownerId: string; count: number }
@@ -162,6 +173,21 @@ export function createSocialApi(token: string) {
   // Bind requests to the session that rendered the controls, including delayed interceptor work.
   const config = { headers: { Authorization: `Bearer ${token}` } };
   return {
+    billFeedback: (id: number) =>
+      data<BillFeedback & { receipt: string }>(
+        httpService.get(`/social/inbox/bills/${id}`, config),
+      ),
+    billFeedbackSummaries: (billIds: number[]) =>
+      data<BillFeedback[]>(
+        httpService.post('/social/inbox/bills/summary', { billIds }, config),
+      ),
+    ownerReviewSummary: (id: number, page: number) =>
+      data<OwnerReviewSummary>(
+        httpService.get(`/reviews/bills/${id}/summary`, {
+          ...config,
+          params: { page, pageSize: 20 },
+        }),
+      ),
     inbox: (before: number) =>
       data<InboxPage>(
         httpService.get('/social/inbox', {

@@ -33,6 +33,7 @@ import { paymentNotificationService } from '../../services/paymentNotification';
 import type { BillData } from '../../types/bill';
 import type { BudgetProgress } from '../../types/budget';
 import type { FinancialGoalProgress } from '../../types/financial-goal';
+import { BillFeedbackLabel, useBillFeedbackSummaries } from '../social/billFeedback';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SWIPE_THRESHOLD = 80;
@@ -248,6 +249,8 @@ export default function DashboardScreen() {
     homeSections,
   } = useHomeDisplayPreference();
   const [missingSetupCount, setMissingSetupCount] = useState(0);
+  const billFeedback = useBillFeedbackSummaries(recentBills.map(bill => bill.id));
+  const feedbackById = useMemo(() => new Map(billFeedback.value?.map(item => [item.billId, item])), [billFeedback.value]);
 
   // 首页提示会影响自动记账可靠性的关键设置，点击后统一进入权限配置。
   useFocusEffect(useCallback(() => {
@@ -397,8 +400,8 @@ export default function DashboardScreen() {
   };
 
   const onRefresh = useCallback(async () => {
-    await Promise.all([refetch(), refetchBudgets(), refetchGoals()]);
-  }, [refetch, refetchBudgets, refetchGoals]);
+    await Promise.all([refetch(), refetchBudgets(), refetchGoals(), billFeedback.refresh()]);
+  }, [refetch, refetchBudgets, refetchGoals, billFeedback.refresh]);
 
   const handleAddBill = () => {
     navigation.navigate('CreateBill' as never);
@@ -623,6 +626,7 @@ export default function DashboardScreen() {
           </BrutalPressable>
         </View>
 
+        {!!billFeedback.error && <TouchableOpacity accessibilityRole="button" onPress={billFeedback.refresh} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={styles.transactionMeta}>评账状态暂不可用，点此重试</Text></TouchableOpacity>}
         {dayGroups.length > 0 ? (
           <View style={styles.transactionList}>
             {dayGroups.map((group, groupIndex) => (
@@ -665,6 +669,7 @@ export default function DashboardScreen() {
                           <Text style={styles.transactionMeta} numberOfLines={1}>
                             {formatBillTime(bill)} · {getCounterparty(bill)}
                           </Text>
+                          <BillFeedbackLabel feedback={feedbackById.get(bill.id)} />
                         </View>
                       </View>
                       <View style={[

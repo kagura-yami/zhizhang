@@ -28,6 +28,7 @@ declare global {
       SocialGrant: { userId: string; requestVersion?: number };
       SocialRequests: { direction?: 'incoming' | 'outgoing' } | undefined;
       SocialInbox: undefined;
+      SocialBillFeedback: { billId: number };
       SocialBills: { userId: string };
       SocialBillReview: { billId: number };
       SocialReceivedReviews: undefined;
