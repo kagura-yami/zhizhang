@@ -69,6 +69,7 @@ export class ClaudeAdapter implements AIAdapter {
       }
 
       const response = await fetch(url, {
+        signal: config.signal,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -79,6 +80,10 @@ export class ClaudeAdapter implements AIAdapter {
       });
 
       if (!response.ok) {
+        if (config.redactErrors) {
+          await response.body?.cancel();
+          throw new Error(`Claude API 请求失败: ${response.status}`);
+        }
         const errorText = await response.text();
         this.logger.error(
           `Claude API 错误: ${response.status} - ${errorText}`,
@@ -89,7 +94,7 @@ export class ClaudeAdapter implements AIAdapter {
       const data = await response.json();
       return this.parseResponse(data);
     } catch (error) {
-      this.logger.error(`Claude chat 失败: ${error.message}`);
+      this.logger.error(config.redactErrors ? 'Claude chat 请求失败' : `Claude chat 失败: ${error.message}`);
       throw error;
     }
   }

@@ -19,12 +19,14 @@ import { BillsModule } from '../bills/bills.module';
 import { CategoriesModule } from '../categories/categories.module';
 import { BudgetsModule } from '../budgets/budgets.module';
 import { RetrospectiveEvidenceService } from './services/retrospective-evidence.service';
+import { RetrospectiveGeneratorService } from './services/retrospective-generator.service';
 
 @Module({
   imports: [BillsModule, CategoriesModule, BudgetsModule],
   controllers: [AIController, AIConfigController, ChatController, AsrController],
   providers: [
     RetrospectiveEvidenceService,
+    RetrospectiveGeneratorService,
     AIService,
     AIConfigService,
     ChatService,

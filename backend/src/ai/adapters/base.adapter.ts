@@ -13,6 +13,9 @@ export interface AIAdapterConfig {
   apiKey: string;
   apiBaseUrl?: string;
   model: string;
+  /** Optional cancellation and redacted diagnostics for private report jobs. */
+  signal?: AbortSignal;
+  redactErrors?: boolean;
 }
 
 /**

@@ -57,6 +57,7 @@ export async function openaiCompatibleChat(
     }
 
     const response = await fetch(apiUrl, {
+      signal: config.signal,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -66,6 +67,10 @@ export async function openaiCompatibleChat(
     });
 
     if (!response.ok) {
+      if (config.redactErrors) {
+        await response.body?.cancel();
+        throw new Error(`${providerName} API 请求失败: ${response.status}`);
+      }
       const errorText = await response.text();
       logger.error(`${providerName} API 错误: ${response.status} - ${errorText}`);
       throw new Error(`${providerName} API 请求失败: ${response.status} - ${errorText}`);
@@ -74,7 +79,7 @@ export async function openaiCompatibleChat(
     const data = await response.json();
     return parseOpenAIResponse(data);
   } catch (error) {
-    logger.error(`${providerName} chat 失败: ${error.message}`);
+    logger.error(config.redactErrors ? `${providerName} chat 请求失败` : `${providerName} chat 失败: ${error.message}`);
     throw error;
   }
 }
