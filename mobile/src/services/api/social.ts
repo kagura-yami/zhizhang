@@ -3,6 +3,35 @@ import type { ApiResponse } from '../../types/api';
 
 export const SOCIAL_CONSENT_VERSION = '2026-09-16';
 export const REPORT_DISCLOSURE_VERSION = '2026-09-16';
+export type InboxTarget =
+  | { type: 'review'; threadId: number; billId: number; messageId: number }
+  | { type: 'bills'; ownerId: string; count: number }
+  | { type: 'profile'; userId: string }
+  | {
+      type: 'grant';
+      ownerId: string;
+      scope: string;
+      historyStart: string | null;
+    }
+  | { type: 'request'; ownerId: string; applicantId: string; status: string }
+  | { type: 'report'; reportId: number; status: string; reason: string | null };
+export interface InboxItem {
+  id: number;
+  kind: string;
+  createdAt: string;
+  unread: boolean;
+  title: string;
+  target: InboxTarget;
+  preview: string | null;
+  readReceipt: string;
+  systemNotificationEnabled: boolean;
+}
+export interface InboxPage {
+  items: InboxItem[];
+  nextBefore: number;
+  hasMore: boolean;
+  receipt: string | null;
+}
 export interface ReviewReport {
   id: number;
   originalMessageId: number;
@@ -34,6 +63,9 @@ export interface ReviewMessage {
   updatedAt: string;
 }
 export interface ReviewDetail {
+  pageNumber: number;
+  unreadOnPage: number;
+  readReceipt: string | null;
   id: number;
   originalBillId: number;
   vote: ReviewVote;
@@ -130,6 +162,17 @@ export function createSocialApi(token: string) {
   // Bind requests to the session that rendered the controls, including delayed interceptor work.
   const config = { headers: { Authorization: `Bearer ${token}` } };
   return {
+    inbox: (before: number) =>
+      data<InboxPage>(
+        httpService.get('/social/inbox', {
+          ...config,
+          params: { before, limit: 20 },
+        }),
+      ),
+    readInbox: (receipt: string) =>
+      data<{ count: number }>(
+        httpService.post('/social/inbox/read', { receipt }, config),
+      ),
     reportPreview: (thread: number, message: number) =>
       data<{ message: ReviewMessage; disclosureVersion: string }>(
         httpService.get(
@@ -185,11 +228,11 @@ export function createSocialApi(token: string) {
           params: { page, pageSize: 20 },
         }),
       ),
-    review: (id: number, page: number) =>
+    review: (id: number, page: number, aroundMessageId?: number) =>
       data<ReviewDetail>(
         httpService.get(`/reviews/threads/${id}`, {
           ...config,
-          params: { page, pageSize: 20 },
+          params: { page, pageSize: 20, aroundMessageId },
         }),
       ),
     sendReview: (id: number, main: boolean, body: string, clientKey: string) =>

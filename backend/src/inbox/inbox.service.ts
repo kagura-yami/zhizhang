@@ -41,7 +41,7 @@ export class InboxService {
       const message = await tx.reviewMessage.findFirst({ where: { id: p.messageId, threadId: thread.id } });
       if (!message || message.hidden || message.withdrawn || message.authorId === userId) return null;
       title = event.kind === 'review_main_created' ? '收到新的评账文字' : '收到私密回复';
-      target = { type: 'review', threadId: thread.id, billId: thread.originalBillId };
+      target = { type: 'review', threadId: thread.id, billId: thread.originalBillId, messageId: message.id };
       if (preview) body = message.body.slice(0, 120);
     } else if (event.kind === 'review_bills_created') {
       const notice = await visibleNotice(tx, userId, p.noticeId);
@@ -95,7 +95,8 @@ export class InboxService {
 
   async list(userId: string, query: InboxQueryDto) {
     // Stable forward scan: hidden entries still advance the cursor, so a client can finish scanning.
-    const candidates = await this.prisma.socialInboxEvent.findMany({ where: { userId, id: { gt: query.after } }, orderBy: { id: 'asc' }, take: query.limit + 1 });
+    const descending = query.before !== undefined;
+    const candidates = await this.prisma.socialInboxEvent.findMany({ where: { userId, id: descending ? { lt: query.before } : { gt: query.after } }, orderBy: { id: descending ? 'desc' : 'asc' }, take: query.limit + 1 });
     const rows = candidates.slice(0, query.limit);
     const identities = await this.prisma.billReviewThread.findMany({ where: { id: { in: rows.filter(e => interactions.includes(e.kind)).map(e => payloadOf(e).threadId) } }, select: { ownerId: true, reviewerId: true } });
     const ids = [userId, ...identities.flatMap(t => [t.ownerId, t.reviewerId]), ...rows.flatMap(e => {
@@ -104,13 +105,13 @@ export class InboxService {
     return this.prisma.$transaction(async tx => {
       await this.access.lockUsers(tx, ids);
       const preference = await this.access.enabled(tx, userId);
-      const fresh = await tx.socialInboxEvent.findMany({ where: { userId, id: { in: rows.map(e => e.id) } }, orderBy: { id: 'asc' } });
+      const fresh = await tx.socialInboxEvent.findMany({ where: { userId, id: { in: rows.map(e => e.id) } }, orderBy: { id: descending ? 'desc' : 'asc' } });
       const items = [];
       for (const event of fresh) {
         const item = await this.project(tx, userId, event, preference.notificationPreview);
-        if (item) items.push({ ...item, systemNotificationEnabled: event.kind === 'review_bills_created' ? preference.notifyNewBills : preference.notifyInteractions });
+        if (item) items.push({ ...item, readReceipt: this.receipt(userId, { scope: 'events', ids: [item.id] }), systemNotificationEnabled: event.kind === 'review_bills_created' ? preference.notifyNewBills : preference.notifyInteractions });
       }
-      return { items, nextAfter: rows.at(-1)?.id ?? query.after, hasMore: candidates.length > query.limit,
+      return { items, nextAfter: rows.at(-1)?.id ?? query.after, nextBefore: rows.at(-1)?.id ?? query.before, hasMore: candidates.length > query.limit,
         receipt: items.length ? this.receipt(userId, { scope: 'events', ids: items.map(item => item.id) }) : null };
     });
   }

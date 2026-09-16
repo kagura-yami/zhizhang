@@ -135,6 +135,10 @@ export default function SocialSettingsScreen({
             ))}
           </View>
           <Action
+            title="社群消息"
+            onPress={() => navigation.navigate('SocialInbox')}
+          />
+          <Action
             title="我的举报"
             onPress={() => navigation.navigate('SocialReports')}
           />

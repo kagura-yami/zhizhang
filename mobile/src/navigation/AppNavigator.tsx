@@ -46,6 +46,7 @@ import SocialReviewThreadScreen from '../screens/social/SocialReviewThreadScreen
 import SocialReviewVersionsScreen from '../screens/social/SocialReviewVersionsScreen';
 import SocialReportScreen from '../screens/social/SocialReportScreen';
 import SocialReportsScreen from '../screens/social/SocialReportsScreen';
+import SocialInboxScreen from '../screens/social/SocialInboxScreen';
 
 import { useTheme, useAuth } from '../providers';
 import { spacing, borderRadius, borderWidth } from '../theme/spacing';
@@ -374,6 +375,7 @@ export default function AppNavigator() {
             <Stack.Screen name="SocialReviewVersions" component={SocialReviewVersionsScreen} options={{ headerShown: true, title: '文字版本' }} />
             <Stack.Screen name="SocialReport" component={SocialReportScreen} options={{ headerShown: true, title: '举报披露确认' }} />
             <Stack.Screen name="SocialReports" component={SocialReportsScreen} options={{ headerShown: true, title: '我的举报' }} />
+            <Stack.Screen name="SocialInbox" component={SocialInboxScreen} options={{ headerShown: true, title: '社群消息' }} />
             <Stack.Screen
               name="About"
               component={AboutScreen}

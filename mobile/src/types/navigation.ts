@@ -26,11 +26,12 @@ declare global {
       SocialPeople: { mode?: 'search' | 'following' | 'followers' | 'friends' | 'blocks' } | undefined;
       SocialPerson: { userId: string };
       SocialGrant: { userId: string; requestVersion?: number };
-      SocialRequests: undefined;
+      SocialRequests: { direction?: 'incoming' | 'outgoing' } | undefined;
+      SocialInbox: undefined;
       SocialBills: { userId: string };
       SocialBillReview: { billId: number };
       SocialReceivedReviews: undefined;
-      SocialReviewThread: { threadId: number };
+      SocialReviewThread: { threadId: number; messageId?: number };
       SocialReviewVersions: { threadId: number; messageId: number };
       SocialReport: { threadId: number; messageId: number };
       SocialReports: undefined;

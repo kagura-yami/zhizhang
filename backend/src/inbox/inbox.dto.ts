@@ -1,7 +1,9 @@
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsInt, IsString, Max, MaxLength, Min } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsInt, IsString, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 
 export class InboxQueryDto {
+  @ValidateIf((_object, value) => value !== undefined)
+  @Type(() => Number) @IsInt() @Min(1) @Max(2147483647) before?: number;
   @Type(() => Number) @IsInt() @Min(0) @Max(2147483647) after = 0;
   @Type(() => Number) @IsInt() @Min(1) @Max(50) limit = 20;
 }

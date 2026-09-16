@@ -162,9 +162,13 @@ export default function SocialReviewThreadScreen({
   const api = useSocialApi(),
     s = useStyles(stylesFor),
     id: number = route.params.threadId;
-  const [page, setPage] = useState(1);
+  const messageId: number | undefined = route.params.messageId;
+  const [page, setPage] = useState<number | null>(null);
   const r = useSocialResource(
-    useCallback(() => api.review(id, page), [api, id, page]),
+    useCallback(
+      () => api.review(id, page ?? 1, page === null ? messageId : undefined),
+      [api, id, page, messageId],
+    ),
   );
   const d = r.value;
   return (
@@ -246,8 +250,17 @@ export default function SocialReviewThreadScreen({
               }
             />
           ))}
+          {d.readReceipt && (
+            <Action
+              title={`将本页 ${d.unreadOnPage} 条文字标为已读`}
+              disabled={r.busy}
+              onPress={() => {
+                void r.run(() => api.readInbox(d.readReceipt!));
+              }}
+            />
+          )}
           <Pager
-            page={page}
+            page={d.pageNumber}
             hasNext={d.messages.length === 20}
             change={setPage}
           />

@@ -1,5 +1,6 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { BillReviewThread, ReviewMessage } from '@prisma/client';
+import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { SocialAccessService, SocialTx } from '../social/social-access.service';
 import { ChangeReviewMessageDto, NewReviewMessageDto, ReviewPageDto } from './reviews.dto';
@@ -18,7 +19,7 @@ export function visibleReviewMessage(message: ReviewMessage) {
 
 @Injectable()
 export class ReviewsService {
-  constructor(private readonly prisma: PrismaService, private readonly access: SocialAccessService) {}
+  constructor(private readonly prisma: PrismaService, private readonly access: SocialAccessService, private readonly jwt: JwtService) {}
 
   async withThread<T>(userId: string, id: number, write: boolean, run: (tx: SocialTx, thread: BillReviewThread) => Promise<T>): Promise<T> {
     const identity = await this.prisma.billReviewThread.findUnique({ where: { id }, select: { ownerId: true, reviewerId: true } });
@@ -71,8 +72,18 @@ export class ReviewsService {
   async detail(userId: string, id: number, query: ReviewPageDto) {
     return this.withThread(userId, id, false, async (tx, thread) => {
       const bill = thread.billId ? await tx.bill.findUnique({ where: { id: thread.billId }, select: minimalBill }) : null;
-      const messages = await tx.reviewMessage.findMany({ where: { threadId: id }, orderBy: { id: 'asc' }, ...page(query) });
+      let pageNumber = query.page;
+      if (query.aroundMessageId !== undefined) {
+        if (!await tx.reviewMessage.findFirst({ where: { id: query.aroundMessageId, threadId: id }, select: { id: true } })) throw new NotFoundException('目标文字不存在');
+        pageNumber = Math.floor(await tx.reviewMessage.count({ where: { threadId: id, id: { lt: query.aroundMessageId } } }) / query.pageSize) + 1;
+      }
+      const messages = await tx.reviewMessage.findMany({ where: { threadId: id }, orderBy: { id: 'asc' }, skip: (pageNumber - 1) * query.pageSize, take: query.pageSize });
       const main = await tx.reviewMessage.findUnique({ where: { threadId_mainSlot: { threadId: id, mainSlot: 1 } } });
+      const visibleIds = messages.filter(m => !m.hidden && !m.withdrawn && m.authorId !== userId).map(m => m.id);
+      const unreadEvents = visibleIds.length ? await tx.socialInboxEvent.findMany({ where: { userId, readAt: null,
+        kind: { in: ['review_main_created', 'review_reply_created'] },
+        AND: [{ payload: { path: ['threadId'], equals: id } }, { OR: visibleIds.map(messageId => ({ payload: { path: ['messageId'], equals: messageId } })) }],
+      }, select: { id: true } }) : [];
       let canWrite = Boolean(bill);
       if (canWrite && userId === thread.ownerId) {
         try {
@@ -83,7 +94,9 @@ export class ReviewsService {
           canWrite = false;
         }
       }
-      return { id, originalBillId: thread.originalBillId, vote: thread.vote,
+      return { id, pageNumber, originalBillId: thread.originalBillId, vote: thread.vote,
+        unreadOnPage: unreadEvents.length,
+        readReceipt: unreadEvents.length ? this.jwt.sign({ purpose: 'social-read', userId, scope: 'events', ids: unreadEvents.map(e => e.id) }, { audience: 'zhizhang-social-read', expiresIn: '15m' }) : null,
         isOwner: userId === thread.ownerId, canWrite, hasMain: Boolean(main),
         otherPerson: await tx.user.findUnique({ where: { id: userId === thread.ownerId ? thread.reviewerId : thread.ownerId }, select: profile }),
         snapshot: bill ? reviewSnapshot(bill) : thread.snapshot, deleted: !bill,

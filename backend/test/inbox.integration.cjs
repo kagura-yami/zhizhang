@@ -141,6 +141,26 @@ Module({ imports: [InboxModule, BillsModule], providers: [{ provide: APP_GUARD, 
     assert.deepEqual((await summarize(a)).data, [{ billId: bill.id, hang: 2, la: 0, hasUnreadText: false }]);
     assert.equal((await call(a, `${inbox}/bills/${bill.id}`)).status, 200);
     assert.equal((await call(c, `${inbox}/bills/${bill.id}`)).status, 404);
+    const firstMessages = (await call(a, `/reviews/threads/${anotherThread}?pageSize=1`)).data;
+    assert.equal(firstMessages.unreadOnPage, 1);
+    assert.equal((await call(b, inbox + '/read', 'POST', { receipt: firstMessages.readReceipt })).status, 403);
+    await call(c, `/reviews/threads/${anotherThread}/replies`, 'POST', message('分页读取后新增的回复'));
+    await call(a, inbox + '/read', 'POST', { receipt: firstMessages.readReceipt });
+    assert.equal((await call(a, `${inbox}/threads/${anotherThread}`)).data.unread, 1);
+    const secondMessages = (await call(a, `/reviews/threads/${anotherThread}?pageSize=1&page=2`)).data;
+    assert.equal(secondMessages.unreadOnPage, 1);
+    await call(c, `/reviews/threads/${anotherThread}/replies`, 'POST', message('更晚到达的回复'));
+    await call(a, inbox + '/read', 'POST', { receipt: secondMessages.readReceipt });
+    assert.equal((await call(a, `${inbox}/threads/${anotherThread}`)).data.unread, 1);
+    const newest = (await call(a, inbox + '?before=2147483647&limit=1')).data;
+    const linked = (await call(a, `/reviews/threads/${anotherThread}?pageSize=1&aroundMessageId=${newest.items[0].target.messageId}`)).data;
+    assert.equal(linked.pageNumber, 3);
+    assert.equal(linked.messages[0].id, newest.items[0].target.messageId);
+    assert.equal((await call(a, `/reviews/threads/${anotherThread}?aroundMessageId=${main.id}`)).status, 404);
+    const older = (await call(a, inbox + '?before=' + newest.nextBefore + '&limit=1')).data;
+    assert(newest.items[0].id > older.items[0].id);
+    assert.equal((await call(a, inbox + '/read', 'POST', { receipt: newest.items[0].readReceipt })).data.count, 1);
+    assert.equal((await call(a, inbox + '?before=0')).status, 400);
     console.log('PASS inbox: auth, default privacy, opt-in current preview, switches, page cursors, signed user-bound receipts, concurrent unread boundary, idempotency, hidden/withdrawn filtering, revoked deep links');
   } finally {
     for (const u of users) await db.user.deleteMany({ where: { id: u.id } });

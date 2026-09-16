@@ -20,14 +20,16 @@ export const requestLabels = {
 };
 export default function SocialRequestsScreen({
   navigation,
+  route,
 }: {
   navigation: any;
+  route: any;
 }) {
   const api = useSocialApi(),
     s = useStyles(stylesFor),
     { confirm } = useAlert();
   const [direction, setDirection] = useState<'incoming' | 'outgoing'>(
-    'incoming',
+    route.params?.direction === 'outgoing' ? 'outgoing' : 'incoming',
   );
   const [page, setPage] = useState(1);
   const r = useSocialResource(
