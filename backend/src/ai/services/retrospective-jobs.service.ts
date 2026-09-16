@@ -58,7 +58,9 @@ export class RetrospectiveJobsService implements OnModuleInit, OnModuleDestroy {
         .catch(() => {
           if (Date.now() - this.lastWorkerWarning > 60000) {
             this.lastWorkerWarning = Date.now();
-            this.logger.warn('复盘队列暂不可用，将继续重试；中断任务按租约恢复');
+            this.logger.warn(
+              '复盘队列暂不可用，将继续重试；中断任务按租约恢复',
+            );
           }
         })
         .finally(() => {
@@ -266,6 +268,20 @@ export class RetrospectiveJobsService implements OnModuleInit, OnModuleDestroy {
         ]) {
           for (const ref of (item.citations as string[]) ?? []) cited.add(ref);
         }
+        const messageTargets = await tx.reviewMessage.findMany({
+          where: {
+            id: {
+              in: sources
+                .filter(
+                  (source) =>
+                    source.kind === 'message' && cited.has(source.ref),
+                )
+                .map((source) => source.id),
+            },
+            thread: { ownerId: userId },
+          },
+          select: { id: true, threadId: true },
+        });
         return {
           ...metadata(job),
           result: {
@@ -276,6 +292,13 @@ export class RetrospectiveJobsService implements OnModuleInit, OnModuleDestroy {
                 ref: source.ref,
                 kind: source.kind,
                 id: source.id,
+                ...(source.kind === 'message'
+                  ? {
+                      threadId: messageTargets.find(
+                        (message) => message.id === source.id,
+                      )?.threadId,
+                    }
+                  : {}),
               })),
           },
           sourceChanged: result.inputDigest !== current.inputDigest,

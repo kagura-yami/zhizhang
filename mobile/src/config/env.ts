@@ -37,8 +37,8 @@ class EnvironmentConfig {
       DEBUG_REDUX: Config.DEBUG_REDUX === 'true',
       MOCK_API: Config.MOCK_API === 'true',
       APP_NAME: Config.APP_NAME || '知账',
-      APP_VERSION: Config.APP_VERSION || '0.0.144',
-      BUILD_NUMBER: Config.BUILD_NUMBER || '165',
+      APP_VERSION: Config.APP_VERSION || '0.0.145',
+      BUILD_NUMBER: Config.BUILD_NUMBER || '166',
     };
 
     this.validateConfig();

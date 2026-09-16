@@ -112,8 +112,13 @@ export default function SocialSettingsScreen({
                 ],
                 [
                   'allowAiFeedback',
-                  '允许好友文字用于 AI 复盘',
-                  '你的复盘可使用你有权读取的好友评价；相关文字可能发送给你配置的 AI 服务。',
+                  '我的复盘使用收到的评价',
+                  '仅使用作者另行同意的评价和投票，发送给你选择的 AI 服务。关闭后，涉及这些反馈的旧复盘会失效。',
+                ],
+                [
+                  'allowAiAuthoredFeedback',
+                  '允许我的评价用于对方 AI 复盘',
+                  '你写的评价、回复和投票可发送给账单主人选择的 AI 服务。关闭后，相关旧复盘失效；已经发送给模型的内容无法收回。',
                 ],
                 [
                   'notificationPreview',
@@ -128,7 +133,7 @@ export default function SocialSettingsScreen({
                   <Switch
                     accessibilityLabel={title}
                     disabled={resource.busy}
-                    value={status.preference![key]}
+                    value={!!status.preference![key]}
                     onValueChange={value => update(key, value, description)}
                   />
                 </View>

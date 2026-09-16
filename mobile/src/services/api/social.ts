@@ -150,6 +150,7 @@ export interface SocialPerson {
 }
 export interface SocialPreferences {
   allowAiFeedback: boolean;
+  allowAiAuthoredFeedback: boolean;
   publicRelations: boolean;
   rankingScope: 'none' | 'friends' | 'global';
   showRankingAmount: boolean;
