@@ -8,13 +8,14 @@ import { ThemeColors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { useStyles } from '../../hooks';
 import GridCell from './GridCell';
+import { currentBusinessDate, LedgerCell } from '../../services/api/ledger';
 
 const NUM_COLS = 4;
 const GAP = spacing.sm;
 
 interface MonthGridProps {
   year: number;
-  monthlyData: Array<{ month: number; income: number; expense: number }>;
+  monthlyData: Array<LedgerCell & { month: number }>;
   selectedMonth: number | null;
   onMonthPress: (month: number) => void;
 }
@@ -31,8 +32,8 @@ export default function MonthGrid({
   const cellHeight = Math.max(72, cellWidth * 0.85);
 
   const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
+  const currentYear = currentBusinessDate().year;
+  const currentMonth = currentBusinessDate().month + 1;
 
   const months = useMemo(() => {
     return Array.from({ length: 12 }, (_, i) => {
@@ -40,20 +41,21 @@ export default function MonthGrid({
       const data = monthlyData.find((m) => m.month === monthNum);
       const income = data?.income ?? 0;
       const expense = data?.expense ?? 0;
-      const isFuture = year > currentYear || (year === currentYear && monthNum > currentMonth);
-      return { monthNum, income, expense, isFuture };
+      const isFuture = (year > currentYear || (year === currentYear && monthNum > currentMonth)) && !data?.total;
+      return { monthNum, income, expense, isFuture, refund: data?.refund, balance: data?.balance, pending: data?.pending };
     });
   }, [year, monthlyData, currentYear, currentMonth]);
 
   return (
     <View style={styles.container}>
       <View style={styles.grid}>
-        {months.map(({ monthNum, income, expense, isFuture }) => (
+        {months.map(({ monthNum, income, expense, isFuture, refund, balance, pending }) => (
           <View key={monthNum} style={{ marginRight: monthNum % NUM_COLS === 0 ? 0 : GAP, marginBottom: GAP }}>
             <GridCell
               label={`${monthNum}月`}
               income={isFuture ? 0 : income}
               expense={isFuture ? 0 : expense}
+              refund={refund} balance={balance} pending={pending}
               isSelected={selectedMonth === monthNum}
               isCurrentPeriod={year === currentYear && monthNum === currentMonth}
               disabled={isFuture}

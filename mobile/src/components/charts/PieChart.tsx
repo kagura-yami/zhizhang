@@ -107,7 +107,12 @@ export const PieChart: React.FC<PieChartProps> = ({
       <View style={styles.chartContainer}>
         <Svg width={size} height={size}>
           <G>
-            {arcs.map((arc, index) => (
+            {arcs.map((arc, index) => arc.angle >= 359.999999 ? (
+              <G key={index}>
+                <Circle cx={center} cy={center} r={radius - 1.5} fill={arc.color} stroke={styles._colors.stroke} strokeWidth={3} />
+                {innerR > 0 && <Circle cx={center} cy={center} r={innerR} fill={styles._colors.surface} stroke={styles._colors.stroke} strokeWidth={3} />}
+              </G>
+            ) : (
               <Path
                 key={index}
                 d={createArcPath(arc.startAngle, arc.endAngle)}
@@ -122,7 +127,7 @@ export const PieChart: React.FC<PieChartProps> = ({
               {arcs.map((arc, index) => {
                 if (arc.percentage < 3) return null;
                 const labelAngle = (arc.startAngle + arc.endAngle) / 2;
-                const labelRadius = innerR > 0 ? radius + 15 : radius * 0.75;
+                const labelRadius = innerR > 0 ? (radius + innerR) / 2 : radius * 0.75;
                 const labelPos = polarToCartesian(center, center, labelRadius, labelAngle);
 
                 return (

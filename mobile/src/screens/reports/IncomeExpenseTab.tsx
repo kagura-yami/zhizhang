@@ -1,3 +1,4 @@
+import { useAuth } from '../../providers';
 /**
  * IncomeExpenseTab - 收支页签
  * 包含 日收支/月收支/年收支 三个子 Tab
@@ -22,6 +23,7 @@ const SUB_TAB_OPTIONS = [
 ];
 
 export default function IncomeExpenseTab() {
+  const { token } = useAuth();
   const styles = useStyles(createStyles);
   const [subTab, setSubTab] = useState<SubTab>('daily');
 
@@ -59,7 +61,7 @@ export default function IncomeExpenseTab() {
         />
       </View>
 
-      <View style={styles.content}>
+      <View key={token} style={styles.content}>
         {subTab === 'daily' && (
           <DailyView
             initialYear={dailyYear}

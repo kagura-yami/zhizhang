@@ -1,3 +1,4 @@
+import type { LedgerCell } from '../../services/api/ledger';
 /**
  * MonthlySummaryList - 每月收支汇总列表
  * 在年收支视图中，点击某年后展示该年12个月的收支
@@ -8,7 +9,7 @@ import { ThemeColors } from '../../theme/colors';
 import { borderRadius, borderWidth, spacing, shadow } from '../../theme/spacing';
 import { useStyles } from '../../hooks';
 
-interface MonthSummary {
+interface MonthSummary extends LedgerCell {
   month: number;
   income: number;
   expense: number;
@@ -23,8 +24,8 @@ export default function MonthlySummaryList({ data, onMonthPress }: MonthlySummar
   const styles = useStyles(createStyles);
 
   const renderItem = ({ item }: { item: MonthSummary }) => {
-    const net = item.income - item.expense;
-    const hasData = item.income > 0 || item.expense > 0;
+    const net = item.balance;
+    const hasData = item.total > 0;
 
     return (
       <TouchableOpacity
@@ -35,6 +36,7 @@ export default function MonthlySummaryList({ data, onMonthPress }: MonthlySummar
       >
         <Text style={styles.monthText}>{item.month}月</Text>
         <View style={styles.amounts}>
+          <Text style={styles.incomeText}>退 {item.refund.toFixed(2)}{item.pending ? ` · ${item.pending}待确认` : ""}</Text>
           <View style={styles.amountCol}>
             <Text style={styles.amountLabel}>收入</Text>
             <Text style={styles.incomeText}>
@@ -99,6 +101,7 @@ const createStyles = (colors: ThemeColors) => ({
       width: 40,
     },
     amounts: {
+      flexWrap: 'wrap',
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.md,

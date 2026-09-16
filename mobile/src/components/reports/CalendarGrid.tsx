@@ -8,13 +8,14 @@ import { ThemeColors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { useStyles } from '../../hooks';
 import GridCell from './GridCell';
+import { currentBusinessDate, LedgerCell } from '../../services/api/ledger';
 
 const WEEK_DAYS = ['一', '二', '三', '四', '五', '六', '日'];
 
 interface CalendarGridProps {
   year: number;
   month: number; // 0-indexed
-  dailyData: Map<string, { income: number; expense: number }>;
+  dailyData: Map<string, LedgerCell>;
   selectedDay: string | null;
   onDayPress: (dateStr: string) => void;
 }
@@ -31,11 +32,10 @@ export default function CalendarGrid({
   const styles = useStyles(createStyles);
   const { width: screenWidth } = useWindowDimensions();
   const cellSize = (screenWidth - spacing.lg * 2 - GAP * 6) / 7;
-  const cellHeight = Math.max(cellSize, 56);
+  const cellHeight = Math.max(cellSize, 78);
 
   const today = useMemo(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return currentBusinessDate().key;
   }, []);
 
   const cells = useMemo(() => {
@@ -86,7 +86,7 @@ export default function CalendarGrid({
           const data = dailyData.get(cell.dateStr!);
           const income = data?.income ?? 0;
           const expense = data?.expense ?? 0;
-          const isFuture = cell.dateStr! > today;
+          const isFuture = cell.dateStr! > today && !data?.total;
 
           return (
             <GridCell
@@ -94,6 +94,7 @@ export default function CalendarGrid({
               label={String(cell.day)}
               income={isFuture ? 0 : income}
               expense={isFuture ? 0 : expense}
+              refund={data?.refund} balance={data?.balance} pending={data?.pending}
               isSelected={selectedDay === cell.dateStr}
               isCurrentPeriod={cell.dateStr === today}
               disabled={isFuture}

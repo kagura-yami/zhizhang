@@ -1,3 +1,4 @@
+import LedgerNotice from './LedgerNotice';
 /**
  * YearlyView - 年收支视图
  * 近5年网格 + 点击某年展示12月汇总 + 点击某月跳转月收支
@@ -21,7 +22,7 @@ export default function YearlyView({ onJumpToMonthly }: YearlyViewProps) {
   const insets = useSafeAreaInsets();
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
 
-  const { yearlyData, getMonthlyDataForYear, isLoading, refetch } = useYearlyGridData();
+  const { yearlyData, summaries, error, getMonthlyDataForYear, isLoading, refetch } = useYearlyGridData();
 
   const handleYearPress = (year: number) => {
     setSelectedYear(selectedYear === year ? null : year);
@@ -33,23 +34,7 @@ export default function YearlyView({ onJumpToMonthly }: YearlyViewProps) {
     }
   };
 
-  // 补全选中年的12个月数据
-  const fullMonthlyData = React.useMemo(() => {
-    const monthlyForYear = selectedYear ? getMonthlyDataForYear(selectedYear) : [];
-    const result = Array.from({ length: 12 }, (_, i) => ({
-      month: i + 1,
-      income: 0,
-      expense: 0,
-    }));
-    monthlyForYear.forEach((m) => {
-      const item = result.find((r) => r.month === m.month);
-      if (item) {
-        item.income = m.income;
-        item.expense = m.expense;
-      }
-    });
-    return result;
-  }, [selectedYear, getMonthlyDataForYear]);
+  const fullMonthlyData = selectedYear ? getMonthlyDataForYear(selectedYear) : [];
 
   return (
     <ScrollView
@@ -62,15 +47,17 @@ export default function YearlyView({ onJumpToMonthly }: YearlyViewProps) {
         <Text style={styles.headerTitle}>近5年收支</Text>
       </View>
 
-      <YearGrid
+      <LedgerNotice summary={summaries?.find(s => s.startDate.startsWith(String(selectedYear)))} error={error} loading={isLoading} refresh={refetch} />
+      <Text style={styles.headerTitle}>点击年份查看退款、结余和待确认明细</Text>
+      {!isLoading && !error && (<YearGrid
         years={yearlyData}
         selectedYear={selectedYear}
         onYearPress={handleYearPress}
-      />
+      />)}
 
       {yearlyData.some((item) => item.expense > 0) && (
         <View style={styles.chartCard}>
-          <Text style={styles.chartTitle}>📊 年度收支对比</Text>
+          <Text style={styles.chartTitle}>📊 年度消费对比</Text>
           <BarChart
             data={yearlyData.map((item) => ({
               label: `${item.year}`,

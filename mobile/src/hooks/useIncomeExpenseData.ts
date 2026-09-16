@@ -1,169 +1,56 @@
-/**
- * useIncomeExpenseData - 收支网格数据 hook
- * 提供日/月/年收支数据查询
- */
-import { useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
-import { billsService } from '../services/api/bills';
-import { QUERY_KEYS, CACHE_TIME, GC_TIME } from '../lib/queryClient';
+import { useCallback, useMemo } from 'react';
+import { useAuth } from '../providers';
+import { useSocialResource } from '../screens/social/shared';
+import { currentBusinessDate, getLedgerAnalytics, ledgerCell } from '../services/api/ledger';
+import { httpService } from '../services/http';
+import type { BillData } from '../types/bill';
+import type { PaginatedResponse } from '../types/api';
 
-/**
- * 获取某月的每日收支数据（日收支视图用）
- */
 export function useDailyGridData(year: number, month: number) {
+  const { token } = useAuth();
   const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`;
-  const lastDay = new Date(year, month + 1, 0).getDate();
-  const endDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-
-  const query = useQuery({
-    queryKey: QUERY_KEYS.dailyGrid(year, month),
-    queryFn: async () => {
-      const res = await billsService.getBillStatistics({ startDate, endDate });
-      return res.data;
-    },
-    staleTime: CACHE_TIME.BILLS_LIST,
-    gcTime: GC_TIME.DEFAULT,
-  });
-
-  const dailyMap = useMemo(() => {
-    const map = new Map<string, { income: number; expense: number }>();
-    if (query.data?.dailyTrends) {
-      query.data.dailyTrends.forEach((d) => {
-        map.set(d.date, { income: d.income, expense: d.expense });
-      });
-    }
-    return map;
-  }, [query.data]);
-
-  return {
-    dailyMap,
-    statistics: query.data,
-    isLoading: query.isLoading,
-    refetch: query.refetch,
-  };
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const endDate = `${year}-${String(month + 1).padStart(2, '0')}-${lastDay}`;
+  const query = useSocialResource(useCallback(() => getLedgerAnalytics(token || '', startDate, endDate), [token, startDate, endDate]));
+  const dailyMap = useMemo(() => new Map(query.value?.daily.map(d => [d.date, ledgerCell(d)]) ?? []), [query.value]);
+  return { dailyMap, summary: query.value?.summary, isLoading: query.loading, error: query.error, refetch: query.refresh };
 }
 
-/**
- * 获取某天的账单列表（日收支明细用）
- */
 export function useDailyBills(date: string | null) {
-  const query = useQuery({
-    queryKey: QUERY_KEYS.dailyBills(date || ''),
-    queryFn: async () => {
-      if (!date) return [];
-      const res = await billsService.getBills({
-        startDate: date,
-        endDate: date,
-        limit: 100,
-        orderBy: 'date',
-        orderDirection: 'desc',
-      });
-      return res.data || [];
-    },
-    enabled: !!date,
-    staleTime: CACHE_TIME.BILL_DETAIL,
-    gcTime: GC_TIME.DEFAULT,
-  });
-
-  return {
-    bills: query.data ?? [],
-    isLoading: query.isLoading,
-  };
+  const { token } = useAuth();
+  const query = useSocialResource(useCallback(async () => {
+    if (!date) return [];
+    const bills: BillData[] = [];
+    for (let page = 1; ; page++) {
+      const res = await httpService.get('/bills', {
+        params: { startDate: date, endDate: date, page, limit: 100, orderBy: 'date', orderDirection: 'desc' },
+        headers: { Authorization: `Bearer ${token || ''}` },
+      }) as PaginatedResponse<BillData>;
+      if (!res.success || !res.data) throw new Error(res.message || '明细加载失败');
+      if (!res.pagination || !Number.isFinite(res.pagination.totalPages)) throw new Error('明细分页信息缺失，请重试');
+      bills.push(...res.data);
+      if (page >= res.pagination.totalPages) return bills;
+    }
+  }, [token, date]));
+  return { bills: query.value ?? [], isLoading: query.loading, error: query.error, refetch: query.refresh };
 }
 
-/**
- * 获取某年12个月的收支数据（月收支视图用）
- */
 export function useMonthlyGridData(year: number) {
-  const query = useQuery({
-    queryKey: QUERY_KEYS.monthlyGrid(year),
-    queryFn: async () => {
-      const res = await billsService.getBillStatistics({
-        startDate: `${year}-01-01`,
-        endDate: `${year}-12-31`,
-        granularity: 'monthly',
-      });
-      return res.data;
-    },
-    staleTime: CACHE_TIME.STATISTICS,
-    gcTime: GC_TIME.DEFAULT,
-  });
-
-  const monthlyData = useMemo(() => {
-    if (!query.data?.monthlyTrends) return [];
-    return query.data.monthlyTrends.map((t) => ({
-      month: parseInt(t.month),
-      income: t.income,
-      expense: t.expense,
-    }));
-  }, [query.data]);
-
-  return {
-    monthlyData,
-    statistics: query.data,
-    isLoading: query.isLoading,
-    refetch: query.refetch,
-  };
+  const { token } = useAuth();
+  const query = useSocialResource(useCallback(() => getLedgerAnalytics(token || '', `${year}-01-01`, `${year}-12-31`), [token, year]));
+  const monthlyData = useMemo(() => query.value?.monthly.map(m => ({ month: Number(m.month.slice(5, 7)), ...ledgerCell(m) })) ?? [], [query.value]);
+  return { monthlyData, summary: query.value?.summary, isLoading: query.loading, error: query.error, refetch: query.refresh };
 }
 
-/**
- * 获取近5年的收支数据（年收支视图用）
- * 单次请求，前端按年聚合
- */
 export function useYearlyGridData() {
-  const currentYear = new Date().getFullYear();
-  const startYear = currentYear - 4;
-
-  const query = useQuery({
-    queryKey: QUERY_KEYS.yearlyGrid(startYear, currentYear),
-    queryFn: async () => {
-      const res = await billsService.getBillStatistics({
-        startDate: `${startYear}-01-01`,
-        endDate: `${currentYear}-12-31`,
-        granularity: 'monthly',
-      });
-      return res.data;
-    },
-    staleTime: CACHE_TIME.STATISTICS * 2, // 10min
-    gcTime: GC_TIME.LONG,
-  });
-
-  // 按年聚合
-  const yearlyData = useMemo(() => {
-    const years: Array<{ year: number; income: number; expense: number }> = [];
-    for (let y = startYear; y <= currentYear; y++) {
-      years.push({ year: y, income: 0, expense: 0 });
-    }
-
-    if (query.data?.monthlyTrends) {
-      query.data.monthlyTrends.forEach((t) => {
-        const yearItem = years.find((y) => y.year === t.year);
-        if (yearItem) {
-          yearItem.income += t.income;
-          yearItem.expense += t.expense;
-        }
-      });
-    }
-
-    return years;
-  }, [query.data, startYear, currentYear]);
-
-  // 获取某年的12月数据（从已缓存数据中提取）
-  const getMonthlyDataForYear = (year: number) => {
-    if (!query.data?.monthlyTrends) return [];
-    return query.data.monthlyTrends
-      .filter((t) => t.year === year)
-      .map((t) => ({
-        month: parseInt(t.month),
-        income: t.income,
-        expense: t.expense,
-      }));
-  };
-
-  return {
-    yearlyData,
-    getMonthlyDataForYear,
-    isLoading: query.isLoading,
-    refetch: query.refetch,
-  };
+  const { token } = useAuth();
+  const currentYear = currentBusinessDate().year;
+  const query = useSocialResource(useCallback(() => Promise.all(Array.from({ length: 5 }, (_, i) => {
+    const year = currentYear - 4 + i;
+    return getLedgerAnalytics(token || '', `${year}-01-01`, `${year}-12-31`);
+  })), [token, currentYear]));
+  const yearlyData = useMemo(() => query.value?.map(r => ({ year: Number(r.summary.startDate.slice(0, 4)), ...ledgerCell(r.summary) })) ?? [], [query.value]);
+  const getMonthlyDataForYear = (year: number) => query.value?.find(r => r.summary.startDate.startsWith(String(year)))?.monthly
+    .map(m => ({ month: Number(m.month.slice(5, 7)), ...ledgerCell(m) })) ?? [];
+  return { yearlyData, getMonthlyDataForYear, summaries: query.value?.map(r => r.summary), isLoading: query.loading, error: query.error, refetch: query.refresh };
 }

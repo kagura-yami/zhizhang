@@ -1,3 +1,4 @@
+import type { LedgerCell } from '../../services/api/ledger';
 /**
  * DailySummaryList - 每日收支汇总列表
  * 在月收支视图中，点击某月后展示该月每天的收支
@@ -8,7 +9,7 @@ import { ThemeColors } from '../../theme/colors';
 import { borderRadius, borderWidth, spacing, shadow } from '../../theme/spacing';
 import { useStyles } from '../../hooks';
 
-interface DaySummary {
+interface DaySummary extends LedgerCell {
   date: string;
   income: number;
   expense: number;
@@ -23,7 +24,7 @@ export default function DailySummaryList({ data, onDayPress }: DailySummaryListP
   const styles = useStyles(createStyles);
 
   // 只展示有数据的天
-  const filtered = data.filter((d) => d.income > 0 || d.expense > 0);
+  const filtered = data.filter((d) => d.total > 0);
 
   const formatDate = (dateStr: string) => {
     const parts = dateStr.split('-');
@@ -31,7 +32,7 @@ export default function DailySummaryList({ data, onDayPress }: DailySummaryListP
   };
 
   const renderItem = ({ item }: { item: DaySummary }) => {
-    const net = item.income - item.expense;
+    const net = item.balance;
     return (
       <TouchableOpacity
         style={styles.row}
@@ -40,6 +41,7 @@ export default function DailySummaryList({ data, onDayPress }: DailySummaryListP
       >
         <Text style={styles.dateText}>{formatDate(item.date)}</Text>
         <View style={styles.amounts}>
+          <Text style={styles.incomeText}>退 {item.refund.toFixed(2)}{item.pending ? ` · ${item.pending}待确认` : ""}</Text>
           {item.income > 0 && (
             <Text style={styles.incomeText}>收 +{item.income.toFixed(2)}</Text>
           )}

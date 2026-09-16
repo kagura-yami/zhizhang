@@ -2,6 +2,9 @@
  * DailyView - 日收支视图
  * 月日历网格 + 点击某天展示账单明细
  */
+import LedgerNotice from './LedgerNotice';
+import { currentBusinessDate } from '../../services/api/ledger';
+import { Status } from '../social/shared';
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, RefreshControl, StyleSheet, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -29,10 +32,10 @@ export default function DailyView({
   const styles = useStyles(createStyles);
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  const now = new Date();
+  const now = currentBusinessDate();
 
-  const [year, setYear] = useState(initialYear ?? now.getFullYear());
-  const [month, setMonth] = useState(initialMonth ?? now.getMonth());
+  const [year, setYear] = useState(initialYear ?? now.year);
+  const [month, setMonth] = useState(initialMonth ?? now.month);
   const [selectedDay, setSelectedDay] = useState<string | null>(initialSelectedDay);
 
   // 当外部初始值变化时更新
@@ -42,8 +45,8 @@ export default function DailyView({
     if (initialSelectedDay !== undefined) setSelectedDay(initialSelectedDay);
   }, [initialYear, initialMonth, initialSelectedDay]);
 
-  const { dailyMap, isLoading, refetch } = useDailyGridData(year, month);
-  const { bills, isLoading: billsLoading } = useDailyBills(selectedDay);
+  const { dailyMap, summary, error, isLoading, refetch } = useDailyGridData(year, month);
+  const { bills, error: billsError, refetch: refreshBills, isLoading: billsLoading } = useDailyBills(selectedDay);
 
   const handlePrev = () => {
     if (month === 0) {
@@ -65,7 +68,7 @@ export default function DailyView({
     setSelectedDay(null);
   };
 
-  const isNextDisabled = year === now.getFullYear() && month >= now.getMonth();
+  const isNextDisabled = year === now.year && month >= now.month;
 
   const handleDayPress = (dateStr: string) => {
     setSelectedDay(selectedDay === dateStr ? null : dateStr);
@@ -93,7 +96,7 @@ export default function DailyView({
     <ScrollView
       style={styles.container}
       contentContainerStyle={{ paddingBottom: Math.max(spacing.xxxl, insets.bottom + spacing.xxxxl) }}
-      refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} />}
+      refreshControl={<RefreshControl refreshing={isLoading} onRefresh={() => { void refetch(); void refreshBills(); }} />}
       showsVerticalScrollIndicator={false}
     >
       <PeriodNavigator
@@ -103,13 +106,14 @@ export default function DailyView({
         disableNext={isNextDisabled}
       />
 
-      <CalendarGrid
+      <LedgerNotice summary={summary} error={error} loading={isLoading} refresh={refetch} />
+      {!isLoading && !error && (<CalendarGrid
         year={year}
         month={month}
         dailyData={dailyMap}
         selectedDay={selectedDay}
         onDayPress={handleDayPress}
-      />
+      />)}
 
       {dailyMap.size > 0 && (
         <View style={styles.chartCard}>
@@ -136,6 +140,8 @@ export default function DailyView({
             </Text>
             {selectedDayData && (
               <View style={styles.daySummary}>
+                {selectedDayData.refund > 0 && <Text style={styles.incomeText}>退 +{selectedDayData.refund.toFixed(2)}</Text>}
+                {selectedDayData.pending > 0 && <Text style={styles.expenseText}>{selectedDayData.pending} 笔待确认</Text>}
                 {selectedDayData.income > 0 && (
                   <Text style={styles.incomeText}>收 +{selectedDayData.income.toFixed(2)}</Text>
                 )}
@@ -145,24 +151,25 @@ export default function DailyView({
                 <Text style={[
                   styles.balanceText,
                   {
-                    color: selectedDayData.income - selectedDayData.expense >= 0
+                    color: selectedDayData.balance >= 0
                       ? styles._colors.income
                       : styles._colors.expense,
                   },
                 ]}>
-                  余 {selectedDayData.income - selectedDayData.expense >= 0 ? '+' : ''}
-                  {(selectedDayData.income - selectedDayData.expense).toFixed(2)}
+                  余 {selectedDayData.balance >= 0 ? '+' : ''}
+                  {(selectedDayData.balance).toFixed(2)}
                 </Text>
               </View>
             )}
           </View>
 
+          <Status error={billsError} loading={false} refresh={refreshBills} />
           {billsLoading ? (
             <ActivityIndicator
               style={styles.loading}
               color={styles._colors.primary}
             />
-          ) : bills.length > 0 ? (
+          ) : billsError ? null : bills.length > 0 ? (
             bills.map((bill: any) => (
               <BillItem
                 key={bill.id}

@@ -64,6 +64,7 @@ const createStyles = (colors: ThemeColors) => ({
       padding: 3,
     },
     option: {
+      minHeight: 44,
       flex: 1,
       paddingVertical: spacing.sm + 2,
       paddingHorizontal: spacing.md,
@@ -82,7 +83,7 @@ const createStyles = (colors: ThemeColors) => ({
       color: colors.textTertiary,
     },
     labelSelected: {
-      color: colors.textPrimary,
+      color: '#1A1A1A',
       fontWeight: '800',
     },
   }),

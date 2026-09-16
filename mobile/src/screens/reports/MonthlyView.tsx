@@ -1,3 +1,5 @@
+import LedgerNotice from './LedgerNotice';
+import { currentBusinessDate, LedgerCell } from '../../services/api/ledger';
 /**
  * MonthlyView - 月收支视图
  * 12个月网格 + 点击某月展示每日汇总 + 点击某天跳转日收支
@@ -25,9 +27,9 @@ export default function MonthlyView({
 }: MonthlyViewProps) {
   const styles = useStyles(createStyles);
   const insets = useSafeAreaInsets();
-  const now = new Date();
+  const now = currentBusinessDate();
 
-  const [year, setYear] = useState(initialYear ?? now.getFullYear());
+  const [year, setYear] = useState(initialYear ?? now.year);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(initialSelectedMonth);
 
   // 当外部初始值变化时更新
@@ -36,15 +38,15 @@ export default function MonthlyView({
     if (initialSelectedMonth !== undefined) setSelectedMonth(initialSelectedMonth);
   }, [initialYear, initialSelectedMonth]);
 
-  const { monthlyData, isLoading, refetch } = useMonthlyGridData(year);
+  const { monthlyData, summary, error, isLoading, refetch } = useMonthlyGridData(year);
 
   // 当选中月份时，获取该月每日数据
-  const { dailyMap } = useDailyGridData(
+  const { dailyMap, summary: dailySummary, error: dailyError, isLoading: dailyLoading, refetch: refreshDaily } = useDailyGridData(
     year,
     selectedMonth ? selectedMonth - 1 : 0,
   );
 
-  const isNextDisabled = year >= now.getFullYear();
+  const isNextDisabled = year >= now.year;
 
   const handlePrev = () => {
     setYear(year - 1);
@@ -70,7 +72,7 @@ export default function MonthlyView({
   // 将 dailyMap 转换为 DailySummaryList 需要的数组格式
   const dailySummaryData = React.useMemo(() => {
     if (!selectedMonth) return [];
-    const result: Array<{ date: string; income: number; expense: number }> = [];
+    const result: Array<LedgerCell & { date: string }> = [];
     dailyMap.forEach((value, key) => {
       result.push({ date: key, ...value });
     });
@@ -81,7 +83,7 @@ export default function MonthlyView({
     <ScrollView
       style={styles.container}
       contentContainerStyle={{ paddingBottom: Math.max(spacing.xxxl, insets.bottom + spacing.xxxxl) }}
-      refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} />}
+      refreshControl={<RefreshControl refreshing={isLoading} onRefresh={() => { void refetch(); void refreshDaily(); }} />}
       showsVerticalScrollIndicator={false}
     >
       <PeriodNavigator
@@ -91,16 +93,17 @@ export default function MonthlyView({
         disableNext={isNextDisabled}
       />
 
-      <MonthGrid
+      <LedgerNotice summary={summary} error={error} loading={isLoading} refresh={refetch} />
+      {!isLoading && !error && (<MonthGrid
         year={year}
         monthlyData={monthlyData}
         selectedMonth={selectedMonth}
         onMonthPress={handleMonthPress}
-      />
+      />)}
 
       {(monthlyData.some((item) => item.expense > 0) && monthlyData.length > 0) && (
         <View style={styles.chartCard}>
-          <Text style={styles.chartTitle}>🥧 年度支出分类</Text>
+          <Text style={styles.chartTitle}>🥧 各月消费分布</Text>
           {monthlyData.length > 0 ? (
             <PieChart
               data={monthlyData.filter((item) => item.expense > 0).map((item) => ({
@@ -122,10 +125,11 @@ export default function MonthlyView({
           <Text style={styles.detailTitle}>
             {year}年{selectedMonth}月 每日收支
           </Text>
-          <DailySummaryList
+          <LedgerNotice summary={dailySummary} error={dailyError} loading={dailyLoading} refresh={refreshDaily} />
+          {!dailyLoading && !dailyError && <DailySummaryList
             data={dailySummaryData}
             onDayPress={handleDayPress}
-          />
+          />}
         </View>
       )}
 

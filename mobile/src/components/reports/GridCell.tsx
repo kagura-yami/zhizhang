@@ -13,6 +13,9 @@ interface GridCellProps {
   label: string;
   income: number;
   expense: number;
+  refund?: number;
+  balance?: number;
+  pending?: number;
   isSelected: boolean;
   isCurrentPeriod?: boolean;
   disabled?: boolean;
@@ -22,7 +25,7 @@ interface GridCellProps {
 }
 
 const formatAmount = (val: number, compact: boolean) => {
-  if (val === 0) return '';
+  if (val === 0) return compact ? '0' : '0.00';
   const absolute = Math.abs(val);
   if (absolute >= 10000) return `${(absolute / 10000).toFixed(1)}w`;
   if (compact && absolute >= 1000) return `${(absolute / 1000).toFixed(1)}k`;
@@ -35,6 +38,9 @@ function GridCell({
   label,
   income,
   expense,
+  refund = 0,
+  balance: confirmedBalance,
+  pending = 0,
   isSelected,
   isCurrentPeriod = false,
   disabled = false,
@@ -44,13 +50,15 @@ function GridCell({
 }: GridCellProps) {
   const styles = useStyles(createStyles);
 
-  const hasData = income > 0 || expense > 0;
-  const balance = income - expense;
+  const hasData = income > 0 || expense > 0 || refund > 0;
+  const balance = confirmedBalance ?? income + refund - expense;
   const compact = width < 64;
 
   return (
     <TouchableOpacity
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}，收入${income.toFixed(2)}，消费${expense.toFixed(2)}，退款${refund.toFixed(2)}，结余${balance.toFixed(2)}，待确认${pending}笔`}
       disabled={disabled}
       activeOpacity={0.7}
       style={[
@@ -76,10 +84,11 @@ function GridCell({
           isCurrentPeriod && !isSelected && { fontWeight: '800' },
         ]}
       >
-        {label}
+        {label}{pending > 0 ? '待' : ''}
       </Text>
       {!disabled && hasData ? (
         <View style={styles.amountWrap}>
+          {refund > 0 && <Text style={[styles.incomeText, isSelected && { color: '#FFFFFF' }]} numberOfLines={1}>退{formatAmount(refund, compact)}</Text>}
           {income > 0 && (
             <Text
               style={[
