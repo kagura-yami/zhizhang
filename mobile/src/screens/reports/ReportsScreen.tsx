@@ -7,6 +7,8 @@ import { View, StyleSheet } from 'react-native';
 import { ThemeColors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { useStyles } from '../../hooks';
+import { useNavigation } from '@react-navigation/native';
+import { Action } from '../social/shared';
 import { SegmentedControl } from '../../components/ui';
 import AssetsTab from './AssetsTab';
 import IncomeExpenseTab from './IncomeExpenseTab';
@@ -20,6 +22,7 @@ const TOP_TAB_OPTIONS = [
 
 export default function ReportsScreen() {
   const styles = useStyles(createStyles);
+  const navigation = useNavigation<any>();
   const [topTab, setTopTab] = useState<TopTab>('incomeExpense');
 
   return (
@@ -30,6 +33,7 @@ export default function ReportsScreen() {
           selectedKey={topTab}
           onSelect={(key) => setTopTab(key as TopTab)}
         />
+        <View style={{ marginTop: spacing.sm }}><Action title="分类与季度分析" onPress={() => navigation.navigate('Statistics')} /></View>
       </View>
 
       <View style={styles.content}>
