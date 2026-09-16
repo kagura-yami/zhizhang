@@ -50,6 +50,8 @@ const suites = [
     const baselineSql = await run(process.execPath, [...prisma, 'migrate', 'diff', '--from-empty', '--to-schema-datamodel', schemaPath, '--script'], { capture: true });
     const migrations = (await readdir(join(cwd, 'prisma/migrations'))).filter(name => /^20260916\d{4}_/.test(name) && name >= '202609160011_').sort();
     if (!migrations.length) throw new Error('Required upgrade migrations are missing');
+    await require('./recovery-rehearsal.cjs')({ run, sql, container, baselineSql, schemaPath,
+      migrationSql: await Promise.all(migrations.map(m => readFile(join(cwd, 'prisma/migrations', m, 'migration.sql'), 'utf8'))) });
     for (const [suite, suffix] of suites) {
       const db = `zhizhang_${suffix}_test`;
       // Database names are constants above; all operations target our newly created container.
