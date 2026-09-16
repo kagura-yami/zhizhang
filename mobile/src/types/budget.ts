@@ -34,7 +34,7 @@ export interface UpdateBudgetDto {
   name?: string;
   amount?: number;
   period?: BudgetPeriod;
-  categoryId?: number;
+  categoryId?: number | null;
   alertAt?: number;
   isActive?: boolean;
 }

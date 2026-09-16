@@ -2,7 +2,7 @@
  * 预算管理页面 - Neo-Brutalism 风格
  * 预算列表 + 新增/编辑弹窗 + 分类选择 + 进度追踪
  */
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,25 +16,29 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { useQuery, useMutation } from '@tanstack/react-query';
 import { ChevronLeft, Plus, Trash2, Pencil } from 'lucide-react-native';
 import { ThemeColors } from '../theme/colors';
 import { spacing, borderRadius, borderWidth, shadow } from '../theme/spacing';
-import { ProgressBar, BrutalPressable } from '../components/ui';
+import { BrutalPressable } from '../components/ui';
 import { useStyles } from '../hooks';
-import { useAlert } from '../providers';
-import { budgetsService } from '../services/api/budgets';
-import { categoriesService, CategoryData } from '../services/api/categories';
-import { QUERY_KEYS, invalidateCache } from '../lib/queryClient';
+import { useAlert, useAuth } from '../providers';
+import { httpService } from '../services/http';
+import { Action, Status, useSocialResource } from './social/shared';
+import { createBudgetApi, LedgerBudgetProgress } from '../services/api/budgets';
+import { CategoryData } from '../services/api/categories';
+import { invalidateCache } from '../lib/queryClient';
 import type {
-  BudgetProgress,
   BudgetPeriod,
   CreateBudgetDto,
-  UpdateBudgetDto,
 } from '../types/budget';
 
 export default function BudgetScreen() {
-  const navigation = useNavigation();
+  const { token } = useAuth();
+  return <BudgetContent key={token || 'signed-out'} token={token || ''} />;
+}
+function BudgetContent({ token }: { token: string }) {
+  const navigation = useNavigation<any>();
+  const api = useMemo(() => createBudgetApi(token), [token]);
   const styles = useStyles(createStyles);
   const { confirm } = useAlert();
   const insets = useSafeAreaInsets();
@@ -43,7 +47,7 @@ export default function BudgetScreen() {
 
   // 弹窗状态
   const [showFormModal, setShowFormModal] = useState(false);
-  const [editingBudget, setEditingBudget] = useState<BudgetProgress | null>(null);
+  const [editingBudget, setEditingBudget] = useState<LedgerBudgetProgress | null>(null);
 
   // 表单状态
   const [formName, setFormName] = useState('');
@@ -52,56 +56,28 @@ export default function BudgetScreen() {
   const [formCategoryId, setFormCategoryId] = useState<number | undefined>(undefined);
   const [formAlertAt, setFormAlertAt] = useState('80');
 
-  // 数据查询
-  const { data: budgetsData, isFetching, refetch } = useQuery({
-    queryKey: QUERY_KEYS.budgets,
-    queryFn: async () => {
-      const res = await budgetsService.getProgress();
-      return Array.isArray(res) ? res : (res.data ?? []);
-    },
-  });
-
-  const { data: categories } = useQuery({
-    queryKey: QUERY_KEYS.categories.byType('expense'),
-    queryFn: async () => {
-      const res = await categoriesService.getExpenseCategories();
-      return res.data ?? [];
-    },
-  });
-
-  const budgets = budgetsData ?? [];
+  const [formError, setFormError] = useState('');
+  const loader = useCallback(() => api.progress(), [api]);
+  const resource = useSocialResource(loader);
+  const categoryLoader = useCallback(async () => {
+    const res = await httpService.get<CategoryData[]>('/categories', {
+      params: { type: 'expense' }, headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.success || !Array.isArray(res.data)) throw new Error(res.message || '分类加载失败');
+    return res.data;
+  }, [token]);
+  const categoryResource = useSocialResource(categoryLoader);
+  const categories = categoryResource.value;
+  const { loading: isFetching, refresh: refetch } = resource;
+  const budgets = resource.value ?? [];
   const totalBudgets = budgets.length;
-  const activeBudgets = budgets.filter(b => b.isActive && !b.isOverBudget).length;
-  const overBudgets = budgets.filter(b => b.isOverBudget).length;
-
-  // 创建 mutation
-  const createMutation = useMutation({
-    mutationFn: (data: CreateBudgetDto) => budgetsService.create(data),
-    onSuccess: () => {
-      invalidateCache.budgets();
-      closeFormModal();
-    },
-  });
-
-  // 更新 mutation
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: UpdateBudgetDto }) =>
-      budgetsService.update(id, data),
-    onSuccess: () => {
-      invalidateCache.budgets();
-      closeFormModal();
-    },
-  });
-
-  // 删除 mutation
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => budgetsService.delete(id),
-    onSuccess: () => invalidateCache.budgets(),
-  });
+  const pendingBudgets = budgets.filter(b => b.comparisonStatus !== 'complete').length;
+  const overBudgets = budgets.filter(b => b.confirmedOverBudget === true).length;
 
   // 表单操作
   const openCreateModal = () => {
     setEditingBudget(null);
+    setFormError('');
     setFormName('');
     setFormAmount('');
     setFormPeriod('monthly');
@@ -110,12 +86,13 @@ export default function BudgetScreen() {
     setShowFormModal(true);
   };
 
-  const openEditModal = (budget: BudgetProgress) => {
+  const openEditModal = (budget: LedgerBudgetProgress) => {
     setEditingBudget(budget);
+    setFormError('');
     setFormName(budget.name);
     setFormAmount(String(budget.amount));
     setFormPeriod(budget.period);
-    setFormCategoryId(budget.categoryId);
+    setFormCategoryId(budget.categoryId ?? undefined);
     setFormAlertAt(String(budget.alertAt));
     setShowFormModal(true);
   };
@@ -126,30 +103,35 @@ export default function BudgetScreen() {
   };
 
   const handleSubmitForm = () => {
-    const amount = parseFloat(formAmount);
-    const alertAt = parseInt(formAlertAt, 10);
-    if (!formName.trim() || isNaN(amount) || amount <= 0) { return; }
+    const amount = Number(formAmount);
+    const alertAt = Number(formAlertAt);
+    if (!formName.trim() || !/^\d+(?:\.\d{1,4})?$/.test(formAmount.trim()) || !Number.isFinite(amount) || amount < 0) {
+      setFormError('请填写预算名称和不小于 0 的金额，最多四位小数'); return;
+    }
+    if (!Number.isInteger(alertAt) || alertAt < 1 || alertAt > 100) {
+      setFormError('预警阈值须为 1 至 100 的整数'); return;
+    }
+    setFormError('');
 
     const payload: CreateBudgetDto = {
       name: formName.trim(),
       amount,
       period: formPeriod,
       categoryId: formCategoryId,
-      alertAt: isNaN(alertAt) ? 80 : alertAt,
+      alertAt,
     };
 
-    if (editingBudget) {
-      updateMutation.mutate({ id: editingBudget.id, data: payload });
-    } else {
-      createMutation.mutate(payload);
-    }
+    void resource.run(async () => {
+      if (editingBudget) await api.update(editingBudget.id, { ...payload, categoryId: formCategoryId ?? null });
+      else await api.create(payload);
+    }, () => { invalidateCache.budgets(); closeFormModal(); void refetch(); });
   };
 
-  const handleDelete = (budget: BudgetProgress) => {
+  const handleDelete = (budget: LedgerBudgetProgress) => {
     confirm(
       '删除预算',
       `确定要删除「${budget.name}」吗？此操作不可撤销。`,
-      () => deleteMutation.mutate(budget.id),
+      () => { void resource.run(() => api.remove(budget.id), () => { invalidateCache.budgets(); void refetch(); }); },
       undefined,
       { confirmText: '删除', destructive: true },
     );
@@ -159,13 +141,14 @@ export default function BudgetScreen() {
     await refetch();
   }, [refetch]);
 
-  const getProgressColor = (budget: BudgetProgress) => {
-    if (budget.isOverBudget) { return styles._colors.error; }
+  const getProgressColor = (budget: LedgerBudgetProgress) => {
+    if (budget.confirmedOverBudget) { return styles._colors.error; }
+    if (budget.comparisonStatus !== 'complete') { return styles._colors.textSecondary; }
     if (budget.needsAlert) { return '#F59E0B'; }
     return styles._colors.success;
   };
 
-  const getCategoryIcon = (budget: BudgetProgress) => {
+  const getCategoryIcon = (budget: LedgerBudgetProgress) => {
     return budget.category?.icon || '💰';
   };
 
@@ -177,28 +160,28 @@ export default function BudgetScreen() {
           <ChevronLeft size={24} color={styles._colors.textPrimary} strokeWidth={2.5} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, compactLayout && styles.headerTitleCompact]} numberOfLines={1} maxFontSizeMultiplier={1.2}>预算管理</Text>
-        <TouchableOpacity onPress={openCreateModal} style={styles.addButton}>
-          <Plus size={20} color={styles._colors.textPrimary} strokeWidth={3} />
+        <TouchableOpacity accessibilityLabel="新建预算" disabled={resource.busy} onPress={openCreateModal} style={styles.addButton}>
+          <Plus size={20} color="#1A1A1A" strokeWidth={3} />
         </TouchableOpacity>
       </View>
 
       {/* Summary */}
       <View style={[styles.summaryBar, compactLayout && styles.summaryBarCompact]}>
         <View style={styles.summaryItem}>
-          <Text style={styles.summaryNumber} maxFontSizeMultiplier={1.2}>{totalBudgets}</Text>
+          <Text style={styles.summaryNumber} maxFontSizeMultiplier={1.2}>{resource.value ? totalBudgets : '—'}</Text>
           <Text style={styles.summaryLabel} numberOfLines={1} maxFontSizeMultiplier={1.15}>个预算</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
-          <Text style={styles.summaryNumber} maxFontSizeMultiplier={1.2}>{activeBudgets}</Text>
-          <Text style={styles.summaryLabel} numberOfLines={1} maxFontSizeMultiplier={1.15}>进行中</Text>
+          <Text style={styles.summaryNumber} maxFontSizeMultiplier={1.2}>{resource.value ? pendingBudgets : '—'}</Text>
+          <Text style={styles.summaryLabel} numberOfLines={1} maxFontSizeMultiplier={1.15}>待确认</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
           <Text style={[styles.summaryNumber, overBudgets > 0 && { color: styles._colors.error }]} maxFontSizeMultiplier={1.2}>
-            {overBudgets}
+            {resource.value ? overBudgets : '—'}
           </Text>
-          <Text style={styles.summaryLabel} numberOfLines={1} maxFontSizeMultiplier={1.15}>已超支</Text>
+          <Text style={styles.summaryLabel} numberOfLines={1} maxFontSizeMultiplier={1.15}>确认已超</Text>
         </View>
       </View>
 
@@ -209,12 +192,14 @@ export default function BudgetScreen() {
         refreshControl={<RefreshControl refreshing={isFetching} onRefresh={onRefresh} />}
         showsVerticalScrollIndicator={false}
       >
-        {budgets.length === 0 ? (
+        <Text style={styles.ruleText}>按当前预算设置核对本月或本年消费（UTC+8）。退款单列，不抵减消费；内部转账、调账和忽略项不计入。</Text>
+        <Status loading={isFetching} error={resource.error} refresh={refetch} />
+        {!isFetching && resource.value && (budgets.length === 0 ? (
           <View style={[styles.emptyState, compactLayout && styles.emptyStateCompact]}>
             <Text style={styles.emptyIcon}>💰</Text>
             <Text style={styles.emptyText} maxFontSizeMultiplier={1.2}>还没有预算计划</Text>
             <Text style={styles.emptySubtext} maxFontSizeMultiplier={1.2}>创建预算，合理控制你的开支</Text>
-            <TouchableOpacity style={styles.emptyButton} onPress={openCreateModal}>
+            <TouchableOpacity style={styles.emptyButton} disabled={resource.busy} onPress={openCreateModal}>
               <Text style={styles.emptyButtonText}>创建预算</Text>
             </TouchableOpacity>
           </View>
@@ -222,7 +207,7 @@ export default function BudgetScreen() {
           budgets.map((budget) => (
             <View key={budget.id} style={styles.budgetCard}>
               {/* Card Header */}
-              <View style={styles.budgetHeader}>
+              <View style={[styles.budgetHeader, compactLayout && { alignItems: 'stretch', flexDirection: 'column', gap: 12 }]}>
                 <View style={styles.budgetTitleRow}>
                   <View style={styles.budgetIconBox}>
                     <Text style={styles.budgetIconText}>{getCategoryIcon(budget)}</Text>
@@ -234,7 +219,7 @@ export default function BudgetScreen() {
                     )}
                   </View>
                 </View>
-                <View style={styles.badgeRow}>
+                <View style={[styles.badgeRow, compactLayout && { marginLeft: 0 }]}>
                   <View style={styles.periodBadge}>
                     <Text style={styles.periodText}>
                       {budget.period === 'monthly' ? '本月' : '本年'}
@@ -242,60 +227,65 @@ export default function BudgetScreen() {
                   </View>
                   <View style={[
                     styles.percentBadge,
-                    budget.isOverBudget && styles.overBudgetBadge,
+                    budget.confirmedOverBudget && styles.overBudgetBadge,
                   ]}>
                     <Text style={[
                       styles.percentText,
-                      budget.isOverBudget && styles.overBudgetBadgeText,
+                      budget.confirmedOverBudget && styles.overBudgetBadgeText,
                     ]}>
-                      {Math.round(budget.progress)}%
+                      {budget.progressPercent === null ? '无百分比' : `${Math.round(Number(budget.progressPercent))}%`}
                     </Text>
                   </View>
                 </View>
               </View>
 
               {/* Progress */}
-              <View style={styles.budgetProgressContainer}>
-                <ProgressBar
-                  progress={Math.min(budget.progress, 100)}
-                  color={getProgressColor(budget)}
-                  backgroundColor={styles._colors.divider}
-                  height={14}
-                />
-              </View>
+              {budget.progressPercent !== null && <View style={styles.budgetProgressContainer}>
+                <View accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: Math.max(0, Math.min(Number(budget.progressPercent), 100)), text: `${budget.progressPercent}%` }} style={{ height: 14, backgroundColor: styles._colors.divider }}>
+                  <View style={{ height: 14, width: `${Math.max(0, Math.min(Number(budget.progressPercent), 100))}%`, backgroundColor: getProgressColor(budget) }} />
+                </View>
+              </View>}
 
               {/* Amounts */}
               <View style={styles.budgetAmounts}>
                 <Text style={styles.budgetAmountSpent}>
-                  已用 ¥{budget.spent.toLocaleString()}
+                  已确认消费 ¥{Number(budget.spent).toLocaleString(undefined, { maximumFractionDigits: 4 })}
                 </Text>
                 <Text style={styles.budgetAmountTotal}>
-                  / 预算 ¥{budget.amount.toLocaleString()}
+                  / 预算 ¥{Number(budget.amount).toLocaleString(undefined, { maximumFractionDigits: 4 })}
                 </Text>
               </View>
 
               {/* Over-budget warning */}
-              {budget.isOverBudget && (
+              {budget.confirmedOverBudget && (
                 <View style={styles.warningBar}>
                   <Text style={styles.warningText}>
-                    超支 ¥{Math.abs(budget.remaining).toLocaleString()}
+                    {budget.comparisonStatus === 'complete' ? '超支' : '已确认至少超支'} ¥{Math.abs(Number(budget.remaining)).toLocaleString(undefined, { maximumFractionDigits: 4 })}
                   </Text>
                 </View>
               )}
 
+              <Text style={styles.ruleText}>退款 ¥{Number(budget.refundInflow).toLocaleString(undefined, { maximumFractionDigits: 4 })} · {budget.ledger.startDate} 至 {budget.ledger.endDate}</Text>
+              {Number(budget.amount) === 0 && <Text style={styles.ruleText}>零预算：发生消费即超支，不计算百分比。</Text>}
+              {budget.comparisonStatus !== 'complete' && <Text style={styles.warningText}>
+                {budget.comparisonStatus === 'invalid_budget' ? '预算金额无效，请编辑修正。' : `${budget.ledger.counts.needsReview} 笔待核对，当前消费和进度不完整，暂不判断最终剩余额度。`}
+              </Text>}
+              <Action title="核对本周期账单" onPress={() => navigation.navigate('LedgerReview', { startDate: budget.ledger.startDate, endDate: budget.ledger.endDate })} />
               {/* Actions */}
               <View style={styles.budgetActions}>
                 <BrutalPressable
                   style={styles.editButton}
                   shadowOffset={2}
                   shadowColor={styles._colors.stroke}
-                  onPress={() => openEditModal(budget)}
+                  onPress={() => { if (!resource.busy) openEditModal(budget); }}
                 >
                   <Pencil size={16} color={styles._colors.textPrimary} strokeWidth={2.5} />
                   <Text style={styles.editButtonText}>编辑</Text>
                 </BrutalPressable>
                 <TouchableOpacity
                   style={styles.deleteButton}
+                  disabled={resource.busy}
+                  accessibilityLabel={`删除${budget.name}`}
                   onPress={() => handleDelete(budget)}
                 >
                   <Trash2 size={16} color={styles._colors.error} strokeWidth={2.5} />
@@ -303,11 +293,11 @@ export default function BudgetScreen() {
               </View>
             </View>
           ))
-        )}
+        ))}
       </ScrollView>
 
       {/* Create/Edit Modal */}
-      <Modal visible={showFormModal} transparent animationType="fade">
+      <Modal visible={showFormModal} transparent animationType="fade" onRequestClose={closeFormModal}>
         <View style={styles.modalOverlay}>
           <ScrollView
             contentContainerStyle={styles.modalScrollContent}
@@ -318,6 +308,8 @@ export default function BudgetScreen() {
                 {editingBudget ? '编辑预算' : '新建预算'}
               </Text>
 
+              <Status loading={resource.busy} error={resource.error} refresh={refetch} />
+              {!!formError && <Text accessibilityRole="alert" style={styles.warningText}>{formError}</Text>}
               <Text style={styles.inputLabel}>预算名称</Text>
               <TextInput
                 style={styles.textInput}
@@ -361,6 +353,7 @@ export default function BudgetScreen() {
               </View>
 
               <Text style={styles.inputLabel}>关联分类（可选）</Text>
+              <Status loading={categoryResource.loading} error={categoryResource.error} refresh={categoryResource.refresh} />
               <ScrollView
                 style={styles.categoryScroll}
                 nestedScrollEnabled
@@ -409,7 +402,7 @@ export default function BudgetScreen() {
                 <TouchableOpacity
                   style={[styles.submitButton, (!formName.trim() || !formAmount) && styles.submitButtonDisabled]}
                   onPress={handleSubmitForm}
-                  disabled={!formName.trim() || !formAmount || createMutation.isPending || updateMutation.isPending}
+                  disabled={!formName.trim() || !formAmount || resource.busy || categoryResource.loading || !!categoryResource.error}
                 >
                   <Text style={styles.submitButtonText}>
                     {editingBudget ? '保存' : '创建'}
@@ -426,6 +419,7 @@ export default function BudgetScreen() {
 
 const createStyles = (colors: ThemeColors) => ({
   ...StyleSheet.create({
+    ruleText: { color: colors.textSecondary, fontSize: 14, lineHeight: 22, marginVertical: 8 },
     container: {
       flex: 1,
       backgroundColor: colors.background,
@@ -444,8 +438,8 @@ const createStyles = (colors: ThemeColors) => ({
       borderBottomColor: colors.stroke,
     },
     backButton: {
-      width: 40,
-      height: 40,
+      width: 44,
+      height: 44,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -460,8 +454,8 @@ const createStyles = (colors: ThemeColors) => ({
       fontSize: 18,
     },
     addButton: {
-      width: 40,
-      height: 40,
+      width: 44,
+      height: 44,
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
       borderColor: colors.stroke,
@@ -655,7 +649,7 @@ const createStyles = (colors: ThemeColors) => ({
     percentText: {
       fontSize: 13,
       fontWeight: '800',
-      color: colors.textPrimary,
+      color: '#1A1A1A',
       fontFamily: 'Courier',
     },
     overBudgetBadgeText: {
@@ -673,6 +667,7 @@ const createStyles = (colors: ThemeColors) => ({
 
     // Amounts
     budgetAmounts: {
+      flexWrap: 'wrap',
       flexDirection: 'row',
       alignItems: 'baseline',
       marginBottom: spacing.sm,
@@ -702,7 +697,8 @@ const createStyles = (colors: ThemeColors) => ({
       marginBottom: spacing.sm,
     },
     warningText: {
-      fontSize: 13,
+      fontSize: 14,
+      lineHeight: 22,
       fontWeight: '700',
       color: colors.error,
       fontFamily: 'Courier',
@@ -716,6 +712,7 @@ const createStyles = (colors: ThemeColors) => ({
       gap: spacing.sm,
     },
     editButton: {
+      minHeight: 44,
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.xs,
@@ -732,6 +729,8 @@ const createStyles = (colors: ThemeColors) => ({
       color: colors.textPrimary,
     },
     deleteButton: {
+      minWidth: 44,
+      minHeight: 44,
       marginLeft: 'auto',
       padding: spacing.sm,
     },
