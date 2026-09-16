@@ -2,12 +2,22 @@ import { Body, Controller, Get, Module, Param, ParseIntPipe, Put, Query } from '
 import { AuthModule } from '../auth/auth.module';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { PrismaModule } from '../prisma/prisma.module';
-import { ClassifyBillDto, LedgerSummaryQueryDto } from './ledger.dto';
+import { ClassifyBillDto, LedgerPendingQueryDto, LedgerSummaryQueryDto } from './ledger.dto';
 import { LedgerService } from './ledger.service';
 
 @Controller('ledger')
 export class LedgerController {
   constructor(private readonly ledger: LedgerService) {}
+
+  @Get('pending')
+  async pending(@CurrentUser('id') userId: string, @Query() query: LedgerPendingQueryDto) {
+    return { success: true, data: await this.ledger.pending(userId, query) };
+  }
+
+  @Get('bills/:id')
+  async context(@CurrentUser('id') userId: string, @Param('id', ParseIntPipe) id: number) {
+    return { success: true, data: await this.ledger.context(userId, id) };
+  }
 
   @Get('summary')
   async summary(@CurrentUser('id') userId: string, @Query() query: LedgerSummaryQueryDto) {

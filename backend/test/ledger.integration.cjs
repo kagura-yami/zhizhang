@@ -59,9 +59,26 @@ Module({ imports: [LedgerModule], providers: [{ provide: APP_GUARD, useClass: Jw
     await prisma.bill.createMany({ data: Array.from({ length: 501 }, () => ({ amount: '1', type: 'expense', userId: owner.id, date: new Date('2026-09-12') })) });
     const large = (await request(summaryUrl)).body.data;
     assert.equal(large.counts.total, 506); assert.equal(large.counts.needsReview, 501); assert.equal(large.pendingBillIds.length, 50); assert.equal(large.cashSurplus, '850.0000');
+    assert.equal((await request(`/ledger/bills/${purchase.id}`, otherToken)).status, 404);
+    const context = (await request(`/ledger/bills/${purchase.id}`)).body.data;
+    assert.equal(context.needsReview, false); assert.equal(context.canBeRefund, false);
+    assert.equal(context.amount, '200.0000'); assert.equal('relatedBill' in context, false);
+    const pendingUrl = '/ledger/pending?startDate=2026-09-01&endDate=2026-09-30';
+    assert.equal((await request(pendingUrl + '&afterId=-1')).status, 400);
+    assert.equal((await request(pendingUrl, otherToken)).body.data.items.length, 0);
+    const pendingIds = []; let afterId = 0;
+    do {
+      const page = (await request(pendingUrl + '&afterId=' + afterId)).body.data;
+      assert(page.items.length <= 20);
+      pendingIds.push(...page.items.map(item => item.id));
+      if (!page.hasMore) break;
+      assert(page.nextAfterId > afterId); afterId = page.nextAfterId;
+    } while (true);
+    assert.equal(pendingIds.length, 501); assert.equal(new Set(pendingIds).size, 501);
     // Editing the bill invalidates its old classification and stale confirmations fail.
     const changed = await prisma.bill.update({ where: { id: purchase.id }, data: { amount: '250' } });
     assert.equal((await classify(purchase)).status, 409);
+    assert.equal((await request(`/ledger/bills/${purchase.id}`)).body.data.needsReview, true);
     assert.equal((await request(summaryUrl)).body.data.counts.needsReview, 502);
     assert.equal((await classify(changed)).status, 200);
     assert.equal((await request(summaryUrl)).body.data.cashSurplus, '800.0000');

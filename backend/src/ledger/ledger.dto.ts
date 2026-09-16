@@ -1,4 +1,5 @@
-import { IsIn, IsISO8601, IsString, Matches } from 'class-validator';
+import { IsIn, IsInt, IsISO8601, IsString, Matches, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 import { CLASSIFICATION_KINDS, ClassificationKind } from './ledger-semantics';
 
 export class LedgerSummaryQueryDto {
@@ -21,4 +22,8 @@ export class ClassifyBillDto {
   @IsISO8601({ strict: true })
   @Matches(/(?:Z|[+-]\d{2}:\d{2})$/)
   expectedUpdatedAt: string;
+}
+
+export class LedgerPendingQueryDto extends LedgerSummaryQueryDto {
+  @Type(() => Number) @IsInt() @Min(0) afterId = 0;
 }

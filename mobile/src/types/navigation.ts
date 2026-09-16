@@ -23,6 +23,10 @@ declare global {
       Main: undefined;
       Settings: undefined;
       SocialSettings: undefined;
+      SocialRankings: undefined;
+      SocialRankingSettings: undefined;
+      LedgerReview: { startDate: string; endDate: string } | undefined;
+      LedgerClassification: { billId: number };
       SocialPeople: { mode?: 'search' | 'following' | 'followers' | 'friends' | 'blocks' } | undefined;
       SocialPerson: { userId: string };
       SocialGrant: { userId: string; requestVersion?: number };

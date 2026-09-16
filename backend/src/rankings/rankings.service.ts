@@ -47,7 +47,10 @@ export class RankingsService implements OnModuleInit, OnModuleDestroy {
 
   private async launch() {
     // Normal deployments insert this in the migration; useful for clean test databases as well.
-    return this.prisma.rankingLaunch.upsert({ where: { id: 1 }, create: { id: 1 }, update: {} });
+    const existing = await this.prisma.rankingLaunch.findUnique({ where: { id: 1 } });
+    if (existing) return existing;
+    await this.prisma.rankingLaunch.createMany({ data: [{ id: 1 }], skipDuplicates: true });
+    return this.prisma.rankingLaunch.findUniqueOrThrow({ where: { id: 1 } });
   }
 
   async periods(userId: string, query: RankingPeriodsQuery) {

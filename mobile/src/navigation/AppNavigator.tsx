@@ -35,6 +35,10 @@ import InvoiceMailboxScreen from '../screens/InvoiceMailboxScreen';
 import InvoiceCenterScreen from '../screens/InvoiceCenterScreen';
 import InvoiceDetailScreen from '../screens/InvoiceDetailScreen';
 import SocialSettingsScreen from '../screens/social/SocialSettingsScreen';
+import SocialRankingsScreen from '../screens/social/SocialRankingsScreen';
+import SocialRankingSettingsScreen from '../screens/social/SocialRankingSettingsScreen';
+import LedgerReviewScreen from '../screens/social/LedgerReviewScreen';
+import LedgerClassificationScreen from '../screens/social/LedgerClassificationScreen';
 import SocialPeopleScreen from '../screens/social/SocialPeopleScreen';
 import SocialPersonScreen from '../screens/social/SocialPersonScreen';
 import SocialGrantScreen from '../screens/social/SocialGrantScreen';
@@ -365,6 +369,10 @@ export default function AppNavigator() {
             <Stack.Screen name="Main" component={MainNavigator} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
             <Stack.Screen name="SocialSettings" component={SocialSettingsScreen} options={{ headerShown: true, title: '社群与隐私' }} />
+            <Stack.Screen name="SocialRankings" component={SocialRankingsScreen} options={{ headerShown: true, title: '结余排行榜' }} />
+            <Stack.Screen name="SocialRankingSettings" component={SocialRankingSettingsScreen} options={{ headerShown: true, title: '参榜与金额隐私' }} />
+            <Stack.Screen name="LedgerReview" component={LedgerReviewScreen} options={{ headerShown: true, title: '确认账务口径' }} />
+            <Stack.Screen name="LedgerClassification" component={LedgerClassificationScreen} options={{ headerShown: true, title: '确认这笔账' }} />
             <Stack.Screen name="SocialPeople" component={SocialPeopleScreen} options={{ headerShown: true, title: '关系管理' }} />
             <Stack.Screen name="SocialPerson" component={SocialPersonScreen} options={{ headerShown: true, title: '关系与授权' }} />
             <Stack.Screen name="SocialGrant" component={SocialGrantScreen} options={{ headerShown: true, title: '确认评账授权' }} />

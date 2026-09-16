@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { Text, View } from 'react-native';
-import { useAlert } from '../../providers';
+import { useAlert, useAuth } from '../../providers';
 import { useStyles } from '../../hooks/useStyles';
 import { requestLabels } from './SocialRequestsScreen';
 
@@ -22,19 +22,26 @@ export default function SocialPersonScreen({
   navigation: any;
 }) {
   const api = useSocialApi();
+  const { user } = useAuth();
   const id: string = route.params.userId,
     s = useStyles(stylesFor),
     { confirm } = useAlert();
   const r = useSocialResource(
     useCallback(async () => {
+      if (id === user?.id) return { person: await api.person(id), given: null, received: null,
+        requestContext: { pendingCount: 0, pendingLimit: 10, request: null, cooldownUntil: null } };
       const [person, grants, requestContext] = await Promise.all([
         api.person(id),
         api.grants(id),
         api.requestContext(id),
       ]);
       return { person, ...grants, requestContext };
-    }, [api, id]),
+    }, [api, id, user?.id]),
   );
+  if (id === user?.id) return <Page><Text style={s.title}>我的社群资料</Text><Status {...r} />
+    {r.value && <View style={s.card}><Text style={s.heading}>{r.value.person.nickname || '未设置昵称'}</Text><Text selectable style={s.small}>{id}</Text>
+      <Text style={s.muted}>这是你的账号。排行展示不会为其他人开放账单权限。</Text><Action title="社群与隐私设置" onPress={() => navigation.navigate('SocialSettings')} /></View>}
+  </Page>;
   return (
     <Page>
       <Status {...r} />

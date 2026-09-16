@@ -135,6 +135,14 @@ export default function SocialSettingsScreen({
             ))}
           </View>
           <Action
+            title="结余排行榜"
+            onPress={() => navigation.navigate('SocialRankings')}
+          />
+          <Action
+            title="确认账务口径"
+            onPress={() => navigation.navigate('LedgerReview')}
+          />
+          <Action
             title="社群消息"
             onPress={() => navigation.navigate('SocialInbox')}
           />

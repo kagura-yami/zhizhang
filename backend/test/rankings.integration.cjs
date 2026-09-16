@@ -66,6 +66,8 @@ Module({ imports: [RankingsModule, LedgerModule, BillsModule], providers: [{ pro
     await bill(friendsOnly, '1000');
     for (const u of [alpha, bravo, charlie, zero, negative, pending, transfer]) await enable(u);
     await enable(friendsOnly, 'friends');
+    await prisma.rankingLaunch.deleteMany();
+    await Promise.all([request('/rankings/periods?kind=year', alpha), request(url(), bravo)]);
     await request(url(), null, 'GET', null, 401);
     await request(url(), disabled, 'GET', null, 403);
     await request(url('day', '2026-02-30'), alpha, 'GET', null, 400);
