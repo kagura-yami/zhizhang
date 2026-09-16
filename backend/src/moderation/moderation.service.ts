@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReviewsService, visibleReviewMessage } from '../reviews/reviews.service';
@@ -31,6 +31,17 @@ export class ModerationService {
       const existing = await tx.reviewReport.findUnique({ where: { reporterId_originalMessageId_reportedRevision: key } });
       if (existing) return { id: existing.id, status: existing.status };
       if (message.hidden) throw new BadRequestException('内容已隐藏，无需重复举报');
+      // withThread holds the reporter's User row lock across count + evidence creation.
+      // This serializes submissions across threads and backend processes, not just one instance.
+      const now = Date.now();
+      const [hour, day] = await Promise.all([
+        tx.reviewReport.count({ where: { reporterId: userId, createdAt: { gt: new Date(now - 3600000) } } }),
+        tx.reviewReport.count({ where: { reporterId: userId, createdAt: { gt: new Date(now - 86400000) } } }),
+      ]);
+      if (hour >= 5 || day >= 20) throw new HttpException(
+        hour >= 5 ? '每小时最多提交 5 次新举报，请稍后重试' : '24 小时内最多提交 20 次新举报，请稍后重试',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
       const report = await tx.reviewReport.create({ data: { ...key, threadId, messageId, authorId: message.authorId,
         ownerId: thread.ownerId, reviewerId: thread.reviewerId, reason: dto.reason.trim(), disclosureVersion: dto.disclosureVersion } });
       let afterId = 0;

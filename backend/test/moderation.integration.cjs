@@ -91,12 +91,51 @@ Module({ imports: [ModerationModule, BillsModule], providers: [{ provide: APP_GU
     assert.equal((await db.reviewMessage.findUnique({ where: { id: ownerReply.id } })).hidden, false);
     const dismissedEvents = await db.socialInboxEvent.findMany({ where: { dedupeKey: { startsWith: `review-report:${id3}:` } } });
     assert.equal(dismissedEvents.length, 1); assert.equal(dismissedEvents[0].userId, b.id);
+    // Rate limits apply across threads, include decided reports, and remain race-safe.
+    const extraBill = await db.bill.create({ data: { userId: a.id, amount: 1, type: 'expense', date: new Date('2026-09-16') } });
+    const extraThread = (await call(c, `/reviews/bills/${extraBill.id}/vote`, 'PUT', { vote: 'hang' })).data.threadId;
+    await call(c, `/reviews/threads/${extraThread}/main`, 'POST', message('另一笔账单'));
+    const targets = [];
+    for (const tid of [ct, extraThread]) {
+      const row = (await call(a, `/reviews/threads/${tid}/replies`, 'POST', message('限额测试内容'))).data;
+      targets.push(`/review-reports/threads/${tid}/messages/${row.id}`);
+    }
+    const seedReports = async count => {
+      for (let i = 0; i < count; i++) {
+        const row = await db.reviewReport.create({ data: { reporterId: c.id, originalMessageId: -Math.floor(Math.random() * 2000000000),
+          reportedRevision: 1, ownerId: a.id, reviewerId: c.id, authorId: a.id, reason: '合成限额记录',
+          disclosureVersion: '2026-09-16', status: 'dismissed', createdAt: new Date(Date.now() - 7200000) } });
+        reports.push(row.id);
+      }
+    };
+    await seedReports(4);
+    await db.reviewReport.updateMany({ where: { reporterId: c.id }, data: { createdAt: new Date() } });
+    const hourRace = await Promise.all(targets.map(path => call(c, path, 'POST', reportBody)));
+    assert.deepEqual(hourRace.map(r => r.status).sort(), [201, 429]);
+    const hourWinner = hourRace.findIndex(r => r.status === 201);
+    reports.push(hourRace[hourWinner].data.id);
+    assert.equal((await call(c, targets[hourWinner], 'POST', reportBody)).data.id, hourRace[hourWinner].data.id);
+    assert.equal(await db.reviewReport.count({ where: { reporterId: c.id } }), 5);
+    await db.reviewReport.updateMany({ where: { reporterId: c.id }, data: { createdAt: new Date(Date.now() - 7200000) } });
+    await seedReports(14);
+    const more = (await call(a, `/reviews/threads/${extraThread}/replies`, 'POST', message('日限额测试'))).data;
+    const dayTargets = [targets[1 - hourWinner], `/review-reports/threads/${extraThread}/messages/${more.id}`];
+    const dayRace = await Promise.all(dayTargets.map(path => call(c, path, 'POST', reportBody)));
+    assert.deepEqual(dayRace.map(r => r.status).sort(), [201, 429]);
+    const dayWinner = dayRace.findIndex(r => r.status === 201);
+    reports.push(dayRace[dayWinner].data.id);
+    assert.equal((await call(c, dayTargets[dayWinner], 'POST', reportBody)).data.id, dayRace[dayWinner].data.id);
+    assert.equal(await db.reviewReport.count({ where: { reporterId: c.id } }), 20);
+    assert.equal(await db.reviewReportEvidence.count({ where: { report: { reporterId: c.id, originalMessageId: more.id } } }), dayWinner === 1 ? 3 : 0);
+    await db.reviewReport.updateMany({ where: { reporterId: c.id }, data: { createdAt: new Date(Date.now() - 90000000) } });
+    const afterWindow = await call(c, dayTargets[1 - dayWinner], 'POST', reportBody);
+    assert.equal(afterWindow.status, 201); reports.push(afterWindow.data.id);
     await call(a, `/bills/${bill.id}`, 'DELETE');
     await db.user.delete({ where: { id: a.id } });
     const retained = (await call('admin', `/admin-api/moderation/${id}/evidence`)).data;
     assert.equal(retained.report.reporterId, null); assert.equal(retained.report.messageId, null);
     assert.equal(retained.items[0].body, '举报目标原文');
-    console.log('PASS moderation: disclosure, isolation, immutable evidence, admin guard, audit, pagination, hiding/history, concurrent decisions, idempotent events, deletion survival');
+    console.log('PASS moderation: disclosure, isolation, immutable evidence, admin guard, audit, pagination, hiding/history, concurrent decisions, idempotent events, deletion survival, cross-thread hourly/daily limit races, replay and window expiry');
   } finally {
     await db.reviewReport.deleteMany({ where: { id: { in: reports } } });
     for (const u of users) await db.user.deleteMany({ where: { id: u.id } });

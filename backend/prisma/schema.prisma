@@ -304,6 +304,7 @@ model ReviewReport {
   evidence ReviewReportEvidence[]
   audit ReviewModerationAudit[]
   @@unique([reporterId, originalMessageId, reportedRevision])
+  @@index([reporterId, createdAt])
   @@index([status, id])
   @@map("review_reports")
   @@schema("public")
