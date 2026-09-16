@@ -23,7 +23,7 @@ function run(command, args, options = {}) {
 }
 const sql = (db, input) => run('docker', ['exec', '-i', container, 'psql', '-U', 'test', '-d', db, '-v', 'ON_ERROR_STOP=1', '-q'], { input, capture: true });
 const suites = [
-  ['ledger', 'ledger'], ['budget-progress', 'budget_progress'], ['social', 'social'], ['review-requests', 'social'],
+  ['ledger', 'ledger'], ['cash-history', 'cash_history'], ['budget-progress', 'budget_progress'], ['social', 'social'], ['review-requests', 'social'],
   ['private-reviews', 'reviews'], ['review-write-limits', 'reviews'],
   ['moderation', 'moderation'], ['inbox', 'inbox'], ['new-bill-notices', 'notices'],
   ['rankings', 'ranking'], ['retrospective-jobs', 'report'],

@@ -105,6 +105,70 @@ export class LedgerService {
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 30000 });
   }
 
+  /** Reconstructed cash surplus, never an account balance or net worth snapshot. */
+  async cashHistory(userId: string, now = new Date()) {
+    const local = new Date(now.getTime() + 8 * 3600000);
+    const year = local.getUTCFullYear(), month = local.getUTCMonth();
+    const start = new Date(Date.UTC(year, month - 11, 1));
+    const end = new Date(Date.UTC(year, month + 1, 0));
+    return this.prisma.$transaction(async tx => {
+      const earliest = await tx.bill.aggregate({ where: { userId, date: { lte: end } }, _min: { date: true } });
+      const first = earliest._min.date && earliest._min.date < start ? earliest._min.date : start;
+      const openingEnd = new Date(start.getTime() - 86400000);
+      const opening = new LedgerAccumulator(userId, first < start ? first : openingEnd, openingEnd);
+      const summary = new LedgerAccumulator(userId, first, end);
+      const windowSummary = new LedgerAccumulator(userId, start, end);
+      const monthly = new Map<string, LedgerAccumulator>();
+      const categories = new Map<number | null, { name: string | null; accumulator: LedgerAccumulator }>();
+      for (let i = 0; i < 12; i++) {
+        const monthStart = new Date(Date.UTC(year, month - 11 + i, 1));
+        const monthEnd = new Date(Date.UTC(year, month - 10 + i, 0));
+        monthly.set(monthStart.toISOString().slice(0, 7), new LedgerAccumulator(userId, monthStart, monthEnd));
+      }
+      let cursor = 0;
+      while (true) {
+        const rows = await tx.bill.findMany({
+          where: { userId, date: { lte: end }, id: { gt: cursor } },
+          orderBy: { id: 'asc' }, take: 500,
+          select: {
+            id: true, amount: true, type: true, date: true, updatedAt: true, categoryId: true,
+            category: { select: { name: true } },
+            financialClassification: { select: { kind: true, currency: true, billUpdatedAt: true } },
+            relatedBill: { select: { userId: true, type: true, date: true } },
+          },
+        });
+        for (const row of rows) {
+          summary.add(row);
+          if (row.date < start) { opening.add(row); continue; }
+          windowSummary.add(row);
+          monthly.get(row.date.toISOString().slice(0, 7)).add(row);
+          if (!categories.has(row.categoryId)) categories.set(row.categoryId, {
+            name: row.category?.name ?? null, accumulator: new LedgerAccumulator(userId, start, end),
+          });
+          categories.get(row.categoryId).accumulator.add(row);
+        }
+        if (rows.length < 500) break;
+        cursor = rows[rows.length - 1].id;
+      }
+      const openingFacts = opening.result();
+      let cumulative = new Prisma.Decimal(openingFacts.cashSurplus);
+      let cumulativeNeedsReview = openingFacts.counts.needsReview;
+      return {
+        basis: 'reconstructed_cash_surplus', classificationBasis: 'current',
+        summary: summary.result(), opening: openingFacts, window: windowSummary.result(),
+        monthly: [...monthly].map(([monthKey, accumulator]) => {
+          const facts = accumulator.result();
+          cumulative = cumulative.plus(facts.cashSurplus);
+          cumulativeNeedsReview += facts.counts.needsReview;
+          return { month: monthKey, ...facts, cumulativeCashSurplus: cumulative.toFixed(4),
+            cumulativeNeedsReview, cumulativeComplete: cumulativeNeedsReview === 0 };
+        }),
+        categories: [...categories].sort(([a], [b]) => (a ?? -1) - (b ?? -1))
+          .map(([categoryId, { name, accumulator }]) => ({ categoryId, name, ...accumulator.result() })),
+      };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 30000 });
+  }
+
   async analytics(userId: string, query: LedgerSummaryQueryDto) {
     const { start, end } = businessPeriod(query.startDate, query.endDate);
     return this.prisma.$transaction(async tx => {
