@@ -19,6 +19,7 @@ import { InvoiceMailboxModule } from './invoice-mailbox/invoice-mailbox.module';
 import { AdminModule } from './admin/admin.module';
 import { NotificationSamplesModule } from './notification-samples/notification-samples.module';
 import { LedgerModule } from './ledger/ledger.module';
+import { SocialModule } from './social/social.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { LedgerModule } from './ledger/ledger.module';
     AdminModule,
     NotificationSamplesModule,
     LedgerModule,
+    SocialModule,
   ],
   controllers: [AppController],
   providers: [

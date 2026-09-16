@@ -1,0 +1,34 @@
+import { Body, Controller, Delete, Get, Module, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { PrismaModule } from '../prisma/prisma.module';
+import { SocialAccessService } from './social-access.service';
+import { EnableSocialDto, SaveGrantDto, SearchSocialDto, SocialPageDto, SocialPreferencesDto } from './social.dto';
+import { SocialService } from './social.service';
+
+const normalizeId = { transform: (id: string) => id.toLowerCase() };
+
+@Controller('social')
+class SocialController {
+  constructor(private readonly service: SocialService) {}
+  private respond<T>(result: Promise<T>) { return result.then(data => ({ success: true, data })); }
+  @Get('me') me(@CurrentUser('id') id: string) { return this.respond(this.service.preferences(id)); }
+  @Post('enable') enable(@CurrentUser('id') id: string, @Body() dto: EnableSocialDto) { return this.respond(this.service.enable(id, dto)); }
+  @Patch('preferences') preferences(@CurrentUser('id') id: string, @Body() dto: SocialPreferencesDto) { return this.respond(this.service.updatePreferences(id, dto)); }
+  @Get('users') search(@CurrentUser('id') id: string, @Query() dto: SearchSocialDto) { return this.respond(this.service.search(id, dto)); }
+  @Get('users/:id') profile(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string) { return this.respond(this.service.profile(id, target)); }
+  @Get('users/:id/relations/:kind') relations(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string, @Param('kind') kind: string, @Query() dto: SocialPageDto) { return this.respond(this.service.relations(id, target, kind, dto)); }
+  @Put('following/:id') follow(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string) { return this.respond(this.service.follow(id, target, true)); }
+  @Delete('following/:id') unfollow(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string) { return this.respond(this.service.follow(id, target, false)); }
+  @Get('blocks') blocks(@CurrentUser('id') id: string, @Query() dto: SocialPageDto) { return this.respond(this.service.blocks(id, dto)); }
+  @Put('blocks/:id') block(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string) { return this.respond(this.service.block(id, target, true)); }
+  @Delete('blocks/:id') unblock(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string) { return this.respond(this.service.block(id, target, false)); }
+  @Get('grants/:direction') grants(@CurrentUser('id') id: string, @Param('direction') direction: string, @Query() dto: SocialPageDto) { return this.respond(this.service.grants(id, direction, dto)); }
+  @Put('grants/given/:id') grant(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string, @Body() dto: SaveGrantDto) { return this.respond(this.service.saveGrant(id, target, dto)); }
+  @Delete('grants/given/:id') revoke(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string) { return this.respond(this.service.endGrant(id, target, false)); }
+  @Delete('grants/received/:id') exit(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string) { return this.respond(this.service.endGrant(id, target, true)); }
+  @Get('owners/:id/bills') bills(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string, @Query() dto: SocialPageDto) { return this.respond(this.service.reviewableBills(id, target, dto)); }
+}
+
+@Module({ imports: [PrismaModule, AuthModule], controllers: [SocialController], providers: [SocialService, SocialAccessService], exports: [SocialService, SocialAccessService] })
+export class SocialModule {}

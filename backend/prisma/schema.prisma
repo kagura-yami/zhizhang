@@ -35,9 +35,75 @@ model User {
   invoiceMailbox InvoiceMailbox? // 用户的收票邮箱配置
   invoices       Invoice[]        // 用户整理后的电子发票
   notificationSamples NotificationSample[]
+  socialPreference SocialPreference?
+  following SocialFollow[] @relation("SocialFollower")
+  followers SocialFollow[] @relation("SocialFollowee")
+  blockedUsers SocialBlock[] @relation("SocialBlocker")
+  blockedBy SocialBlock[] @relation("SocialBlocked")
+  givenReviewGrants ReviewGrant[] @relation("GrantOwner")
+  receivedReviewGrants ReviewGrant[] @relation("GrantReviewer")
 
   @@map("users")
   @@schema("public")
+}
+
+model SocialPreference {
+  userId String @id @map("user_id") @db.Uuid
+  enabledAt DateTime @map("enabled_at") @db.Timestamptz(6)
+  consentVersion String @map("consent_version") @db.VarChar(30)
+  allowAiFeedback Boolean @default(false) @map("allow_ai_feedback")
+  publicRelations Boolean @default(false) @map("public_relations")
+  rankingScope String @default("none") @map("ranking_scope") @db.VarChar(10)
+  showRankingAmount Boolean @default(false) @map("show_ranking_amount")
+  notifyNewBills Boolean @default(true) @map("notify_new_bills")
+  notifyInteractions Boolean @default(true) @map("notify_interactions")
+  notificationPreview Boolean @default(false) @map("notification_preview")
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("social_preferences")
+  @@schema("public")
+}
+
+model SocialFollow {
+  followerId String @map("follower_id") @db.Uuid
+  followeeId String @map("followee_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  follower User @relation("SocialFollower", fields: [followerId], references: [id], onDelete: Cascade)
+  followee User @relation("SocialFollowee", fields: [followeeId], references: [id], onDelete: Cascade)
+  @@id([followerId, followeeId])
+  @@index([followeeId, followerId])
+  @@map("social_follows")
+  @@schema("public")
+}
+
+model SocialBlock {
+  blockerId String @map("blocker_id") @db.Uuid
+  blockedId String @map("blocked_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  blocker User @relation("SocialBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("SocialBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  @@id([blockerId, blockedId])
+  @@index([blockedId, blockerId])
+  @@map("social_blocks")
+  @@schema("public")
+}
+
+model ReviewGrant {
+  ownerId String @map("owner_id") @db.Uuid
+  reviewerId String @map("reviewer_id") @db.Uuid
+  scope String @default("expense") @db.VarChar(10)
+  historyStart DateTime? @map("history_start") @db.Date
+  activatedAt DateTime @map("activated_at") @db.Timestamptz(6)
+  status String @default("active") @db.VarChar(10)
+  version Int @default(1)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  owner User @relation("GrantOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  reviewer User @relation("GrantReviewer", fields: [reviewerId], references: [id], onDelete: Cascade)
+  @@id([ownerId, reviewerId])
+  @@index([reviewerId, status])
+  @@map("review_grants")
+  @@schema("public")
+
 }
 
 model BiometricCredential {
