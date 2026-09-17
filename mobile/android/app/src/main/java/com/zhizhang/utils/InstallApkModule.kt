@@ -12,9 +12,28 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.zhizhang.utils.UpdateNotificationHelper
+import com.zhizhang.update.ApkDownloadCoordinator
+import com.facebook.react.bridge.Arguments
+import com.facebook.react.modules.core.DeviceEventManagerModule
+import java.util.concurrent.Executors
 import java.io.File
 
 class InstallApkModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
+
+    companion object { private val downloads = Executors.newFixedThreadPool(2) }
+
+    @ReactMethod
+    fun downloadUpdate(url: String, version: String, promise: Promise) {
+        downloads.execute {
+            try {
+                val file = ApkDownloadCoordinator.download(reactApplicationContext, url, version) { done, total ->
+                    val event = Arguments.createMap().apply { putString("version", version); putDouble("bytesWritten", done.toDouble()); putDouble("contentLength", total.toDouble()) }
+                    reactApplicationContext.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java).emit("ApkDownloadProgress", event)
+                }
+                promise.resolve(file.absolutePath)
+            } catch (error: Exception) { promise.reject("UPDATE_DOWNLOAD_FAILED", error.message ?: "下载失败，重试将继续下载", error) }
+        }
+    }
 
     /** 让 JS 首次渲染时即可同步获得 APK 的真实版本，避免先显示 bundle 版本。 */
     override fun getConstants(): MutableMap<String, Any> {

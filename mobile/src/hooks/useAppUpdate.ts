@@ -2,7 +2,7 @@
  * 应用更新检查 Hook
  */
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { AppState, Platform, NativeModules } from 'react-native';
+import { AppState, Platform, NativeModules, DeviceEventEmitter } from 'react-native';
 import RNFS from 'react-native-fs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { appVersionApi, AppVersionInfo } from '../services/api/appVersion';
@@ -87,6 +87,29 @@ export function useAppUpdate(options: UseAppUpdateOptions = {}) {
 
     const filePath = getCachedPath(versionInfo.version);
     const promise = (async () => {
+      // 新 APK 使用统一的原生下载器，前台多页面和后台任务共享下载及断点。
+      if (typeof NativeModules.InstallApk?.downloadUpdate === 'function') {
+        setState(prev => ({ ...prev, downloading: true, progress: 0, downloadedVersion: null }));
+        const sub = DeviceEventEmitter.addListener('ApkDownloadProgress', event => {
+          if (event.version !== versionInfo.version) return;
+          const progress = event.contentLength > 0 ? Math.min(99, Math.round(event.bytesWritten / event.contentLength * 100)) : 0;
+          setState(prev => ({ ...prev, progress }));
+        });
+        try {
+          const path = await NativeModules.InstallApk.downloadUpdate(versionInfo.downloadUrl, versionInfo.version);
+          if (!(await isValidCachedApk(versionInfo.version, path))) throw new Error('安装包完整性校验失败');
+          setState(prev => ({ ...prev, downloading: false, progress: 100, downloadedVersion: versionInfo.version }));
+          return path;
+        } catch (error: any) {
+          setState(prev => ({ ...prev, downloading: false, downloadedVersion: null }));
+          if (!silent) alert('下载中断', `${error?.message || '网络暂不可用'}。网络恢复后重试，可从有效断点继续下载。`);
+          return null;
+        } finally {
+          sub.remove();
+          downloadPromiseRef.current = null;
+        }
+      }
+      // 兼容旧 APK 的 JS 热更新；新 APK 不再走独立 RNFS 下载。
       // 前台 RN 下载与 WorkManager 可能同时运行，临时文件必须实例隔离，
       // 否则一方清理/覆盖另一方的 .part 会产生半包或校验竞态。
       const partialPath = `${filePath}.part-${Date.now()}-${Math.random().toString(36).slice(2)}`;

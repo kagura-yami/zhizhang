@@ -1,6 +1,6 @@
 import React from 'react';
 import Renderer, { act } from 'react-test-renderer';
-import { NativeModules, Platform } from 'react-native';
+import { NativeModules, Platform, DeviceEventEmitter } from 'react-native';
 import RNFS from 'react-native-fs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { appVersionApi } from '../src/services/api/appVersion';
@@ -59,4 +59,23 @@ test('invalid partial download is removed and cannot reach installer', async () 
   await ready(); expect(files.size).toBe(0); expect(state.downloadedVersion).toBeNull();
   expect(mockAlert).toHaveBeenCalledWith('下载失败', '下载的安装包校验失败');
   expect(NativeModules.InstallApk.install).not.toHaveBeenCalled();
+});
+
+test('native shared downloader receives progress and bypasses RNFS downloads', async () => {
+  NativeModules.InstallApk.downloadUpdate = jest.fn(async (_url, version) => {
+    DeviceEventEmitter.emit('ApkDownloadProgress', { version, bytesWritten: 50, contentLength: 100 });
+    files.add('/cache/native.apk'); return '/cache/native.apk';
+  });
+  await check(); await flush();
+  expect(NativeModules.InstallApk.downloadUpdate).toHaveBeenCalledTimes(1);
+  expect(RNFS.downloadFile).not.toHaveBeenCalled();
+  expect(state.downloadedVersion).toBe('0.0.152'); expect(state.progress).toBe(100);
+});
+test('native interrupted download keeps partial files and offers resume', async () => {
+  files.add('/cache/app-v0.0.152.apk.part');
+  NativeModules.InstallApk.downloadUpdate = jest.fn().mockRejectedValue(new Error('网络中断'));
+  await check(); await flush();
+  expect(files.has('/cache/app-v0.0.152.apk.part')).toBe(true);
+  expect(state.downloading).toBe(false); expect(state.downloadedVersion).toBeNull();
+  expect(mockAlert).toHaveBeenCalledWith('下载中断',expect.stringContaining('有效断点继续下载'));
 });

@@ -9,8 +9,6 @@ import com.zhizhang.utils.UpdateNotificationHelper
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
-import java.io.File
-import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
 
 /**
@@ -57,6 +55,7 @@ class UpdateCheckWorker(
                         latest.optString("updateLog"),
                         downloaded
                     )
+                    if (!downloaded) return Result.retry()
                 }
                 Result.success()
             }
@@ -72,68 +71,11 @@ class UpdateCheckWorker(
         return "$baseUrl/app-version/check?currentVersion=${Uri.encode(BuildConfig.VERSION_NAME)}&platform=android&_ts=${System.currentTimeMillis()}"
     }
 
-    /**
-     * 在 WorkManager 后台任务中预下载 APK，不启动安装器。
-     * RNFS.CachesDirectoryPath 与 Android cacheDir 对应，前台进入应用后可直接复用该文件。
-     */
-    private fun downloadApk(downloadUrl: String, version: String): Boolean {
-        val cacheDir = applicationContext.cacheDir
-        val target = File(cacheDir, "app-v$version.apk")
-        if (isValidApk(target, version)) return true
-        if (target.exists()) target.delete()
-
-        // 前台 RN 下载与 WorkManager 可能同时运行，使用唯一临时文件避免互相
-        // 删除或覆盖；只有校验通过后才原子替换正式 APK。
-        val partial = File(
-            cacheDir,
-            "app-v$version.apk.part-${System.currentTimeMillis()}-${Thread.currentThread().id}"
-        )
-        cleanupStalePartials(cacheDir, version)
-        return try {
-            val request = Request.Builder().url(downloadUrl).get().build()
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    android.util.Log.w(TAG, "后台下载更新包失败: HTTP ${response.code}")
-                    return false
-                }
-                val body = response.body ?: return false
-                FileOutputStream(partial).use { output ->
-                    body.byteStream().use { input -> input.copyTo(output) }
-                }
-                if (!partial.exists() || partial.length() <= 0L || !isValidApk(partial, version)) {
-                    partial.delete()
-                    return false
-                }
-                // 同目录 rename 是原子操作；不再 fallback 到直接 copy target，避免
-                // 安装器在 copy 尚未完成时看到半包文件。
-                if (target.exists()) target.delete()
-                if (!partial.renameTo(target)) {
-                    android.util.Log.w(TAG, "更新包原子替换失败: ${target.name}")
-                    partial.delete()
-                    return false
-                }
-                android.util.Log.i(TAG, "更新包已后台下载: ${target.name}, ${target.length()} bytes")
-                isValidApk(target, version)
-            }
-        } catch (error: Exception) {
-            android.util.Log.w(TAG, "后台下载更新包异常", error)
-            partial.delete()
-            false
-        }
-    }
-
-    private fun cleanupStalePartials(cacheDir: File, version: String) {
-        val prefix = "app-v$version.apk.part-"
-        val expiry = System.currentTimeMillis() - TimeUnit.HOURS.toMillis(24)
-        cacheDir.listFiles()
-            ?.filter { it.name.startsWith(prefix) && it.lastModified() < expiry }
-            ?.forEach { it.delete() }
-    }
-
-    private fun isValidApk(file: File, expectedVersion: String): Boolean {
-        if (!file.exists() || file.length() < 1024L * 1024L) return false
-        val info = applicationContext.packageManager.getPackageArchiveInfo(file.absolutePath, 0)
-        return info != null && info.packageName == applicationContext.packageName &&
-            (expectedVersion.isBlank() || info.versionName == expectedVersion)
+    private fun downloadApk(downloadUrl: String, version: String): Boolean = try {
+        ApkDownloadCoordinator.download(applicationContext, downloadUrl, version)
+        true
+    } catch (error: Exception) {
+        android.util.Log.w(TAG, "更新包下载中断，保留断点供下次继续", error)
+        false
     }
 }

@@ -1,6 +1,6 @@
 {
   "name": "zhizhang",
-  "version": "0.0.155",
+  "version": "0.0.156",
   "private": true,
   "scripts": {
     "android": "react-native run-android",
