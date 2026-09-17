@@ -52,7 +52,23 @@ export class InboxService {
         const first = await tx.bill.findFirst({ where: notice.where, orderBy: { id: 'asc' }, select: { amount: true, type: true, category: { select: { name: true } } } });
         body = notice.count === 1 && first ? `${first.type === 'income' ? '收入' : '支出'} ¥${first.amount.toFixed(4)} · ${first.category?.name || '未分类'}` : `有 ${notice.count} 笔新的可评账单`;
       }
-    } else if (event.kind === 'social_follow_created' || event.kind === 'review_grant_updated') {
+    } else if (event.kind === 'friend_request_created' || event.kind === 'friend_request_accepted') {
+      try { await this.access.pair(tx, userId, p.followerId); }
+      catch (error) { if ([403,404].includes(error?.getStatus?.())) return null; throw error; }
+      const edge = await tx.socialFollow.findUnique({ where: { followerId_followeeId: { followerId: p.followerId, followeeId: userId } } });
+      if (!edge || edge.generation !== p.generation) return null;
+      const reverse = await tx.socialFollow.findUnique({ where: { followerId_followeeId: { followerId: userId, followeeId: p.followerId } } });
+      const person = await tx.user.findUnique({ where: { id: p.followerId }, select: { nickname: true, avatar: true } });
+      if (event.kind === 'friend_request_accepted') {
+        if (!reverse) return null;
+        title = '好友申请已通过'; target = { type: 'profile', userId: p.followerId };
+      } else {
+        const pending = !p.accepted && !reverse;
+        title = pending ? '收到好友申请' : '好友申请已处理';
+        target = { type: 'friendRequest', userId: p.followerId, requestId: event.id, pending, nickname: person?.nickname, avatar: person?.avatar };
+      }
+      if (preview) body = person?.nickname || '一位社群用户';
+    } else if (event.kind === 'social_follow_created'  || event.kind === 'review_grant_updated') {
       const otherId = event.kind === 'social_follow_created' ? p.followerId : p.ownerId;
       try { await this.access.pair(tx, userId, otherId); }
       catch (error) {

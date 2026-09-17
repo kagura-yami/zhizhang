@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import { Text, View } from 'react-native';
 import { useAlert, useAuth } from '../../providers';
 import { useStyles } from '../../hooks/useStyles';
+import SocialAvatar from './SocialAvatar';
 import { requestLabels } from './SocialRequestsScreen';
 
 import {
@@ -39,14 +40,31 @@ export default function SocialPersonScreen({
     }, [api, id, user?.id]),
   );
   if (id === user?.id) return <Page><Text style={s.title}>我的社群资料</Text><Status {...r} />
-    {r.value && <View style={s.card}><Text style={s.heading}>{r.value.person.nickname || '未设置昵称'}</Text><Text selectable style={s.small}>{id}</Text>
-      <Text style={s.muted}>这是你的账号。排行展示不会为其他人开放账单权限。</Text><Action title="社群与隐私设置" onPress={() => navigation.navigate('SocialSettings')} /></View>}
+    {r.value && <View style={s.card}><SocialAvatar avatar={r.value.person.avatar} nickname={r.value.person.nickname} size={64} /><Text style={s.heading}>{r.value.person.nickname || '未设置昵称'}</Text><Text selectable style={s.small}>{id}</Text>
+      <Text style={s.muted}>这是你的账号。排行展示不会为其他人开放账单权限。</Text><Action title="隐私设置" onPress={() => navigation.navigate('SocialPrivacy')} /></View>}
   </Page>;
   return (
     <Page>
       <Status {...r} />
       {r.value && (
         <>
+          <View style={s.card}>
+            <View style={s.row}>
+              <SocialAvatar avatar={r.value.person.avatar} nickname={r.value.person.nickname} size={64} />
+              <View style={{ flex: 1, gap: 6 }}>
+                <Text style={s.title}>{r.value.person.nickname || '未设置昵称'}</Text>
+                <Text style={s.muted}>{r.value.person.friend ? '互相关注 · 好友' : r.value.person.followedBy ? '对方已关注你' : r.value.person.following ? '你已关注对方' : '社群用户'}</Text>
+              </View>
+            </View>
+            {!r.value.person.friend && <Action primary
+              title={r.value.person.incomingFriendRequestId ? '同意好友申请' : r.value.person.friendRequestSent ? '已发送好友申请' : '申请好友'}
+              disabled={r.busy || (!!r.value.person.friendRequestSent && !r.value.person.incomingFriendRequestId)}
+              onPress={() => { void r.run(() => r.value!.person.incomingFriendRequestId ? api.acceptFriend(r.value!.person.incomingFriendRequestId) : api.requestFriend(id)); }} />}
+            <Text style={s.small}>{r.value.person.friend ? '你们已经是好友，可以在好友榜查看彼此排名。' : '发送申请后自动关注对方，对方同意并回关后成为好友。'}</Text>
+            {r.value.person.following && <Action title="取消关注" disabled={r.busy} onPress={() => confirm('取消关注', '取消后将解除好友关系，尚未处理的好友申请也会失效。', () => { void r.run(() => api.follow(id, false)); })} />}
+          </View>
+          <Text style={s.heading}>账单互动</Text>
+          <Text style={s.muted}>成为好友后，账单仍需单独授权才能查看和评价。</Text>
           {r.value.received?.status !== 'active' && (
             <View style={s.card}>
               <Text style={s.heading}>申请查看对方的账单</Text>
@@ -124,28 +142,6 @@ export default function SocialPersonScreen({
               />
             </View>
           )}
-          <View style={s.card}>
-            <Text style={s.title}>
-              {r.value.person.nickname || '未设置昵称'}
-            </Text>
-            <Text selectable style={s.small}>
-              {id}
-            </Text>
-            <Text style={s.text}>
-              {r.value.person.friend
-                ? '互相关注 · 好友'
-                : r.value.person.followedBy
-                ? '对方已关注你'
-                : '尚未互相关注'}
-            </Text>
-            <Action
-              title={r.value.person.following ? '取消关注' : '关注'}
-              disabled={r.busy}
-              onPress={() => {
-                void r.run(() => api.follow(id, !r.value!.person.following));
-              }}
-            />
-          </View>
           <View style={s.card}>
             <Text style={s.heading}>我分享给对方的账单</Text>
             <Text style={s.text}>

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Module, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Module, Param, ParseIntPipe, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -27,6 +27,8 @@ class SocialController {
   @Get('users') search(@CurrentUser('id') id: string, @Query() dto: SearchSocialDto) { return this.respond(this.service.search(id, dto)); }
   @Get('users/:id') profile(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string) { return this.respond(this.service.profile(id, target)); }
   @Get('users/:id/relations/:kind') relations(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string, @Param('kind') kind: string, @Query() dto: SocialPageDto) { return this.respond(this.service.relations(id, target, kind, dto)); }
+  @Post('users/:id/friend-request') requestFriend(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string) { return this.respond(this.service.requestFriend(id, target)); }
+  @Post('friend-requests/:id/accept') acceptFriend(@CurrentUser('id') id: string, @Param('id', ParseIntPipe) eventId: number) { return this.respond(this.service.acceptFriend(id, eventId)); }
   @Put('following/:id') follow(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string) { return this.respond(this.service.follow(id, target, true)); }
   @Delete('following/:id') unfollow(@CurrentUser('id') id: string, @Param('id', ParseUUIDPipe, normalizeId) target: string) { return this.respond(this.service.follow(id, target, false)); }
   @Get('blocks') blocks(@CurrentUser('id') id: string, @Query() dto: SocialPageDto) { return this.respond(this.service.blocks(id, dto)); }

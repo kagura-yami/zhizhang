@@ -15,6 +15,7 @@ export interface OwnerReviewSummary {
   threads: { id: number; vote: ReviewVote; reviewer: SocialPerson }[];
 }
 export type InboxTarget =
+  | { type: 'friendRequest'; userId: string; requestId: number; pending: boolean; nickname?: string; avatar?: string }
   | { type: 'review'; threadId: number; billId: number; messageId: number }
   | { type: 'bills'; ownerId: string; count: number }
   | { type: 'profile'; userId: string }
@@ -141,6 +142,8 @@ export interface RequestContext {
   cooldownUntil: string | null;
 }
 export interface SocialPerson {
+  friendRequestSent?: boolean;
+  incomingFriendRequestId?: number | null;
   id: string;
   nickname: string | null;
   avatar: string | null;
@@ -410,6 +413,8 @@ export function createSocialApi(token: string) {
           },
         ),
       ),
+    requestFriend: (id: string) => data(httpService.post(`/social/users/${id}/friend-request`, {}, config)),
+    acceptFriend: (id: number) => data(httpService.post(`/social/friend-requests/${id}/accept`, {}, config)),
     person: (id: string) =>
       data<SocialPerson>(httpService.get(`/social/users/${id}`, config)),
     grants: (id: string) =>

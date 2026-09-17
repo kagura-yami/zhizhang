@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { businessDate } from '../ledger/ledger-period';
@@ -86,7 +87,11 @@ export class SocialService {
       const edges = await tx.socialFollow.findMany({ where: { OR: [
         { followerId: userId, followeeId: targetId }, { followerId: targetId, followeeId: userId },
       ] } });
-      return { ...user, following: edges.some(e => e.followerId === userId), followedBy: edges.some(e => e.followerId === targetId),
+      const sentEdge = edges.find(e => e.followerId === userId);
+      const receivedEdge = edges.find(e => e.followerId === targetId);
+      const sent = sentEdge ? await tx.socialInboxEvent.findUnique({ where: { dedupeKey: `friend-request:${sentEdge.generation}` } }) : null;
+      const received = receivedEdge ? await tx.socialInboxEvent.findUnique({ where: { dedupeKey: `friend-request:${receivedEdge.generation}` } }) : null;
+      return { ...user, friendRequestSent: Boolean(sent && !(sent.payload as any).accepted), incomingFriendRequestId: received && !(received.payload as any).accepted && edges.length !== 2 ? received.id : null, following: edges.some(e => e.followerId === userId), followedBy: edges.some(e => e.followerId === targetId),
         friend: userId !== targetId && edges.length === 2 };
     });
   }
@@ -105,6 +110,45 @@ export class SocialService {
       }
       else await tx.socialFollow.deleteMany({ where: key });
       return { following: followed };
+    });
+  }
+
+  async requestFriend(userId: string, targetId: string) {
+    return this.locked([userId, targetId], async tx => {
+      await this.access.pair(tx, userId, targetId);
+      const key = { followerId: userId, followeeId: targetId };
+      let edge = await tx.socialFollow.upsert({ where: { followerId_followeeId: key }, create: key, update: {} });
+      const reverse = await tx.socialFollow.findUnique({ where: { followerId_followeeId: { followerId: targetId, followeeId: userId } } });
+      if (reverse) return { following: true, friend: true };
+      const previous = await tx.socialInboxEvent.findUnique({ where: { dedupeKey: `friend-request:${edge.generation}` } });
+      if ((previous?.payload as any)?.accepted) edge = await tx.socialFollow.update({ where: { followerId_followeeId: key }, data: { generation: randomUUID() } });
+      const event = await tx.socialInboxEvent.upsert({ where: { dedupeKey: `friend-request:${edge.generation}` }, create: {
+        userId: targetId, kind: 'friend_request_created', dedupeKey: `friend-request:${edge.generation}`,
+        payload: { followerId: userId, generation: edge.generation },
+      }, update: {} });
+      return { following: true, requestId: event.id };
+    });
+  }
+
+  async acceptFriend(userId: string, eventId: number) {
+    if (!Number.isInteger(eventId) || eventId < 1 || eventId > 2147483647) throw new NotFoundException('好友申请不存在');
+    const event = await this.prisma.socialInboxEvent.findFirst({ where: { id: eventId, userId, kind: 'friend_request_created' } });
+    if (!event) throw new NotFoundException('好友申请不存在');
+    const payload = event.payload as { followerId: string; generation: string; accepted?: boolean };
+    return this.locked([userId, payload.followerId], async tx => {
+      await this.access.pair(tx, userId, payload.followerId);
+      const source = await tx.socialFollow.findUnique({ where: { followerId_followeeId: { followerId: payload.followerId, followeeId: userId } } });
+      if (!source || source.generation !== payload.generation) throw new ConflictException('该申请已失效，请刷新');
+      const current = await tx.socialInboxEvent.findUnique({ where: { id: eventId } });
+      if ((current!.payload as any).accepted) return { accepted: true };
+      const key = { followerId: userId, followeeId: payload.followerId };
+      const reverse = await tx.socialFollow.upsert({ where: { followerId_followeeId: key }, create: key, update: {} });
+      await tx.socialInboxEvent.update({ where: { id: eventId }, data: { readAt: new Date(), payload: { ...payload, accepted: true } } });
+      await tx.socialInboxEvent.upsert({ where: { dedupeKey: `friend-accepted:${eventId}` }, create: {
+        userId: payload.followerId, kind: 'friend_request_accepted', dedupeKey: `friend-accepted:${eventId}`,
+        payload: { followerId: userId, generation: reverse.generation },
+      }, update: {} });
+      return { accepted: true, friend: true };
     });
   }
 

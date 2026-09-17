@@ -3,6 +3,7 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import { ChevronRight, MessageCircle, UserCheck, Flag } from 'lucide-react-native';
 import { useAuth, useTheme } from '../../providers';
 import { useStyles } from '../../hooks/useStyles';
+import SocialAvatar from './SocialAvatar';
 import { InboxTarget } from '../../services/api/social';
 import {
   Action,
@@ -37,7 +38,7 @@ function InboxContent({ navigation }: { navigation: any }) {
       navigation.navigate('SocialBills', { userId: target.ownerId });
     else if (target.type === 'grant')
       navigation.navigate('SocialPerson', { userId: target.ownerId });
-    else if (target.type === 'profile')
+    else if (target.type === 'profile' || target.type === 'friendRequest')
       navigation.navigate('SocialPerson', { userId: target.userId });
     else if (target.type === 'request')
       navigation.navigate('SocialRequests', {
@@ -101,6 +102,11 @@ function InboxContent({ navigation }: { navigation: any }) {
                 {item.target.count} 笔当前可查看的账单
               </Text>
             )}
+            {item.target.type === 'friendRequest' && <>
+              <View style={s.row}><SocialAvatar avatar={item.target.avatar} nickname={item.target.nickname} /><Text style={[s.heading, s.grow]}>{item.target.nickname || '社群用户'}</Text></View>
+              <Text style={s.muted}>{item.target.pending ? '对方已关注你，同意后将回关并成为好友。' : '该申请已处理'}</Text>
+              {item.target.pending && <Action title="同意好友申请" primary disabled={r.busy} onPress={() => { const target = item.target; if (target.type === 'friendRequest') void r.run(() => api.acceptFriend(target.requestId)); }} />}
+            </>}
             {item.target.type === 'report' ? (
               <>
                 <Text style={s.text}>
