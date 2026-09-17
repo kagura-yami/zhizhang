@@ -16,6 +16,7 @@ import {
   PanResponder,
   DeviceEventEmitter,
 } from 'react-native';
+import { Wallet } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { ThemeColors } from '../../theme/colors';
@@ -159,7 +160,7 @@ function SwipeableCardStack({
       >
         <View style={styles.progressCardHeader}>
           <View style={styles.budgetTitleRow}>
-            <Text style={styles.sectionSticker}>{card.icon}</Text>
+            <View style={[styles.progressIconWrap, { backgroundColor: (card.type === 'budget' ? colors.primary : colors.pink) + '16' }]}><Text style={styles.sectionSticker}>{card.icon}</Text></View>
             <View style={{ flex: 1 }}>
               <Text style={styles.progressCardTitle}>{card.title}</Text>
               <Text style={styles.progressCardType}>
@@ -184,8 +185,8 @@ function SwipeableCardStack({
           </View>
         </View>
         {card.progress !== null && <View style={styles.progressBarContainer}>
-          <View accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: Math.max(0, Math.min(card.progress, 100)), text: `${card.progress}%` }} style={{ height: 16, backgroundColor: colors.divider }}>
-            <View style={{ width: `${Math.max(0, Math.min(card.progress, 100))}%`, height: 16, backgroundColor: card.color }} />
+          <View accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: Math.max(0, Math.min(card.progress, 100)), text: `${card.progress}%` }} style={{ height: 10, backgroundColor: colors.divider }}>
+            <View style={{ width: `${Math.max(0, Math.min(card.progress, 100))}%`, height: 10, backgroundColor: card.color }} />
           </View>
         </View>}
         <View style={styles.budgetLabels}>
@@ -542,45 +543,36 @@ function DashboardContent({ token }: { token: string }) {
 
       <Status loading={false} error={error} refresh={refetch} />
       {data && <>
-      {/* ========== Overview Card - 主色块 ========== */}
+      {/* 收支摘要：暖色主指标 + 独立收支分区 */}
       <View style={styles.overviewCard}>
-        <View style={styles.overviewContent}>
-          <Text style={styles.overviewLabel}>{mainMetricData.label}</Text>
-          <Text style={[
-            styles.overviewBalance,
-            mainMetricData.value < 0 && styles.overviewBalanceNegative,
-          ]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
-            {mainMetricData.value < 0 ? '-¥ ' : '¥ '}{Math.abs(mainMetricData.value).toFixed(2)}
+        <View style={styles.overviewHero}>
+          <View style={styles.overviewHeading}>
+            <Text style={styles.overviewLabel}>{mainMetricData.label}</Text>
+            <View style={styles.overviewMark}><Wallet size={20} color={styles._colors.textPrimary} strokeWidth={1.8} /></View>
+          </View>
+          <Text style={styles.overviewBalance} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+            <Text style={styles.overviewCurrency}>{mainMetricData.value < 0 ? '−¥ ' : '¥ '}</Text>{Math.abs(mainMetricData.value).toFixed(2)}
           </Text>
-          <Text style={styles.overviewMonthHint}>{mainMetricData.hint}</Text>
-
-          {secondaryCards.length > 0 && <View style={styles.overviewDivider} />}
-
-          {secondaryCards.length > 0 && (
-            <View style={[styles.overviewStats, secondaryCards.length === 1 && styles.overviewStatsSingle]}>
-              {secondaryCards.map(card => (
-                <TouchableOpacity
-                  key={card.label}
-                  style={styles.statBlock}
-                  onPress={card.onPress}
-                  activeOpacity={0.8}
-                >
-                  <View style={[
-                    styles.statIconBlock,
-                    card.tone === 'income' && styles.statIconBlockIncome,
-                    card.tone === 'balance' && styles.statIconBlockBalance,
-                  ]}>
-                    <Text style={styles.statIcon}>{card.icon}</Text>
-                  </View>
-                  <View style={styles.statTextBlock}>
-                    <Text style={styles.statLabel}>{card.label}</Text>
-                    <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>{card.value < 0 ? '-¥' : '¥'} {Math.abs(card.value).toFixed(2)}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
+          <View style={styles.overviewHeading}>
+            <Text style={styles.overviewMonthHint}>{mainMetric.startsWith('daily') ? businessDate.key.replace(/-/g, '.') : `${yearName} 年 ${businessDate.month + 1} 月`}</Text>
+            {mainMetricData.hint !== mainMetricData.label && <Text style={styles.overviewMonthHint}>{mainMetricData.hint}</Text>}
+          </View>
         </View>
+        {secondaryCards.length > 0 && <View style={styles.overviewStats}>
+          {secondaryCards.map(card => (
+            <TouchableOpacity key={card.label} accessibilityRole="button" accessibilityLabel={`${card.label}，${card.value.toFixed(2)}元，查看账单`}
+              style={[styles.statBlock, { backgroundColor: (card.tone === 'expense' ? styles._colors.expense : card.tone === 'income' ? styles._colors.income : styles._colors.primary) + '10' }]}
+              onPress={card.onPress} activeOpacity={0.8}>
+              <View style={styles.statHeading}>
+                <View style={[styles.statIconBlock, { backgroundColor: (card.tone === 'expense' ? styles._colors.expense : card.tone === 'income' ? styles._colors.income : styles._colors.primary) + '20' }]}>
+                  <Text style={[styles.statIcon, { color: card.tone === 'expense' ? styles._colors.expense : card.tone === 'income' ? styles._colors.income : styles._colors.primary }]}>{card.icon}</Text>
+                </View>
+                <Text style={styles.statLabel}>{card.label}</Text>
+              </View>
+              <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>{card.value < 0 ? '−¥ ' : '¥ '}{Math.abs(card.value).toFixed(2)}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>}
       </View>
 
       </>}
@@ -762,6 +754,12 @@ const createStyles = (colors: ThemeColors) => ({
     setupReminderAction: { fontSize: 12, fontWeight: '800', color: colors.primary },
 
     // ===== Overview Card =====
+    overviewHero: { padding: 20, backgroundColor: colors.accent + '24', gap: 6 },
+    overviewHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' },
+    overviewMark: { width: 34, height: 34, borderRadius: 12, backgroundColor: colors.accent + '55', alignItems: 'center', justifyContent: 'center' },
+    overviewCurrency: { fontSize: 24, fontWeight: '600', letterSpacing: 0 },
+    statHeading: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    progressIconWrap: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
     overviewCard: {
       backgroundColor: colors.surface,
       borderRadius: borderRadius.card,
@@ -771,27 +769,6 @@ const createStyles = (colors: ThemeColors) => ({
       marginBottom: spacing.xxl,
       ...shadow.small,
     },
-    stickerTopRight: {
-      position: 'absolute',
-      right: 12,
-      top: 12,
-      width: 40,
-      height: 40,
-      borderRadius: borderRadius.small,
-      backgroundColor: colors.accent,
-      borderWidth: borderWidth.thin,
-      borderColor: colors.divider,
-      alignItems: 'center',
-      justifyContent: 'center',
-      transform: [{ rotate: '12deg' }],
-      zIndex: 10,
-    },
-    stickerText: {
-      fontSize: 20,
-    },
-    overviewContent: {
-      padding: spacing.xl,
-    },
     overviewLabel: {
       fontSize: 14,
       fontWeight: '700',
@@ -800,81 +777,44 @@ const createStyles = (colors: ThemeColors) => ({
       letterSpacing: 1,
     },
     overviewBalance: {
-      fontSize: 36,
+      fontSize: 40,
       fontWeight: '800',
       color: colors.textPrimary,
-      marginTop: spacing.sm,
+      marginTop: 0,
       letterSpacing: -1.5,
-    },
-    overviewBalanceNegative: {
-      color: colors.textPrimary,
     },
     overviewMonthHint: {
       fontSize: 12,
-      fontWeight: '700',
-      color: colors.textTertiary,
+      fontWeight: '500',
+      color: colors.textSecondary,
       marginTop: spacing.xs,
-    },
-    overviewDivider: {
-      height: borderWidth.thin,
-      backgroundColor: colors.divider,
-      marginVertical: spacing.lg,
     },
     overviewStats: {
       flexDirection: 'row',
-      gap: spacing.md,
-    },
-    overviewStatsSingle: {
-      flexDirection: 'column',
+      gap: 10,
+      padding: 12,
     },
     statBlock: {
       flex: 1,
       flexDirection: 'column',
       alignItems: 'flex-start',
-      gap: spacing.sm,
+      gap: 8,
       backgroundColor: colors.surface,
       borderRadius: borderRadius.medium,
-      paddingVertical: spacing.sm,
-      paddingHorizontal: 0,
+      paddingVertical: 14,
+      paddingHorizontal: 12,
       borderWidth: borderWidth.thin,
       borderColor: 'transparent',
     },
-    statBlockGreen: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
-      backgroundColor: 'rgba(0, 0, 0, 0.15)',
-      borderRadius: borderRadius.medium,
-      padding: spacing.md,
-      borderWidth: borderWidth.thin,
-      borderColor: 'rgba(255, 255, 255, 0.2)',
-    },
     statIconBlock: {
-      width: 32,
-      height: 32,
+      width: 24,
+      height: 24,
       borderRadius: borderRadius.small,
       backgroundColor: colors.error,
-      borderWidth: 1.5,
+      borderWidth: 0,
       borderColor: 'rgba(255, 255, 255, 0.4)',
       alignItems: 'center',
       justifyContent: 'center',
-    },
-    statIconBlockGreen: {
-      width: 32,
-      height: 32,
-      borderRadius: borderRadius.small,
-      backgroundColor: colors.success,
-      borderWidth: 1.5,
-      borderColor: 'rgba(255, 255, 255, 0.4)',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    statIconBlockIncome: {
-      backgroundColor: colors.success,
-    },
-    statIconBlockBalance: {
-      backgroundColor: colors.primary,
     },
     statIcon: {
       fontSize: 16,
@@ -887,13 +827,9 @@ const createStyles = (colors: ThemeColors) => ({
       fontWeight: '600',
     },
     statValue: {
-      fontSize: 20,
+      fontSize: 19,
       fontWeight: '800',
       color: colors.textPrimary,
-    },
-    statTextBlock: {
-      flex: 1,
-      minWidth: 0,
     },
 
     // ===== Progress Cards Stack =====
