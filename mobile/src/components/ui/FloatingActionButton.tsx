@@ -150,7 +150,7 @@ const createStyles = (colors: ThemeColors) => ({
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: borderWidth.thick,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
     },
     icon: {
       fontWeight: '800',

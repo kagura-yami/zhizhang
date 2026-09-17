@@ -133,7 +133,7 @@ const createStyles = (colors: ThemeColors) => ({
       paddingVertical: spacing.md,
       backgroundColor: colors.surface,
       borderBottomWidth: borderWidth.thin,
-      borderBottomColor: colors.stroke,
+      borderBottomColor: colors.divider,
     },
     section: {
       marginTop: spacing.lg,
@@ -149,7 +149,7 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.surface,
       borderRadius: borderRadius.card,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       padding: spacing.lg,
       minHeight: 200,
     },
@@ -165,7 +165,7 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.surface,
       borderRadius: borderRadius.card,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       padding: spacing.md,
     },
     categoryItem: {

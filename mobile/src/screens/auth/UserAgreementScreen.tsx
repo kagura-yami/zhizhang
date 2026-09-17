@@ -92,7 +92,7 @@ const createStyles = (colors: ThemeColors) => ({
       margin: spacing.lg,
       borderRadius: borderRadius.card,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       padding: spacing.xl,
     },
     updateDate: {

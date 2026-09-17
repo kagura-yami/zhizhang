@@ -70,11 +70,13 @@ function SwipeableCardStack({
   colors: ThemeColors;
 }) {
   const [topIndex, setTopIndex] = useState(0);
+  const [cardHeight, setCardHeight] = useState(0);
   const pan = useRef(new Animated.ValueXY()).current;
 
   // 当 cards 变化时重置
   useEffect(() => {
     setTopIndex(0);
+    setCardHeight(0);
     pan.setValue({ x: 0, y: 0 });
   }, [cards.length]);
 
@@ -148,7 +150,8 @@ function SwipeableCardStack({
     rendered.push(
       <Animated.View
         key={card.id + '-' + cardIndex}
-        style={[styles.progressCard, cardStyle]}
+        style={[styles.progressCard, { minHeight: cardHeight }, cardStyle]}
+        onLayout={event => { const height = event.nativeEvent.layout.height; setCardHeight(previous => Math.max(previous, height)); }}
         accessibilityElementsHidden={!isTop}
         importantForAccessibility={isTop ? 'auto' : 'no-hide-descendants'}
         pointerEvents={isTop ? 'auto' : 'none'}
@@ -540,17 +543,13 @@ function DashboardContent({ token }: { token: string }) {
       <Status loading={false} error={error} refresh={refetch} />
       {data && <>
       {/* ========== Overview Card - 主色块 ========== */}
-      <TouchableOpacity style={styles.overviewCard} activeOpacity={0.95}>
-        {/* 装饰贴纸 */}
-        <View style={styles.stickerTopRight}>
-          <Text style={styles.stickerText}>⚡</Text>
-        </View>
+      <View style={styles.overviewCard}>
         <View style={styles.overviewContent}>
           <Text style={styles.overviewLabel}>{mainMetricData.label}</Text>
           <Text style={[
             styles.overviewBalance,
             mainMetricData.value < 0 && styles.overviewBalanceNegative,
-          ]}>
+          ]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
             {mainMetricData.value < 0 ? '-¥ ' : '¥ '}{Math.abs(mainMetricData.value).toFixed(2)}
           </Text>
           <Text style={styles.overviewMonthHint}>{mainMetricData.hint}</Text>
@@ -575,19 +574,19 @@ function DashboardContent({ token }: { token: string }) {
                   </View>
                   <View style={styles.statTextBlock}>
                     <Text style={styles.statLabel}>{card.label}</Text>
-                    <Text style={styles.statValue} numberOfLines={1}>{card.value < 0 ? '-¥' : '¥'} {Math.abs(card.value).toFixed(2)}</Text>
+                    <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>{card.value < 0 ? '-¥' : '¥'} {Math.abs(card.value).toFixed(2)}</Text>
                   </View>
                 </TouchableOpacity>
               ))}
             </View>
           )}
         </View>
-      </TouchableOpacity>
+      </View>
 
       </>}
       {showBudgetCard && <Status loading={budgetResource.loading} error={budgetResource.error} refresh={refetchBudgets} />}
       <Status loading={goalResource.loading} error={goalResource.error} refresh={refetchGoals} />
-      {showBudgetCard && <Action title="管理预算" onPress={() => navigation.navigate('Budgets' as never)} />}
+      {(showBudgetCard || progressCards.length > 0) && <View style={[styles.sectionHeader, { marginBottom: 0, marginTop: 8 }]}><Text style={styles.sectionTitle}>预算与目标</Text><TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('Budgets' as never)} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={styles.viewAllText}>管理预算 ›</Text></TouchableOpacity></View>}
       {/* ========== Progress Cards - 预算 & 财务目标 ========== */}
       {progressCards.length > 0 ? (
         <View style={[styles.carouselWrapper, { paddingBottom: 16, marginTop: 12 }]}>
@@ -743,7 +742,7 @@ const createStyles = (colors: ThemeColors) => ({
       fontWeight: '600',
       color: colors.textTertiary,
       marginTop: spacing.xs,
-      fontFamily: 'Courier',
+      fontVariant: ['tabular-nums'],
     },
     setupReminder: {
       flexDirection: 'row',
@@ -764,13 +763,13 @@ const createStyles = (colors: ThemeColors) => ({
 
     // ===== Overview Card =====
     overviewCard: {
-      backgroundColor: colors.primary,
+      backgroundColor: colors.surface,
       borderRadius: borderRadius.card,
       borderWidth: borderWidth.thick,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       overflow: 'hidden',
       marginBottom: spacing.xxl,
-      ...shadow.large,
+      ...shadow.small,
     },
     stickerTopRight: {
       position: 'absolute',
@@ -781,7 +780,7 @@ const createStyles = (colors: ThemeColors) => ({
       borderRadius: borderRadius.small,
       backgroundColor: colors.accent,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       alignItems: 'center',
       justifyContent: 'center',
       transform: [{ rotate: '12deg' }],
@@ -796,29 +795,29 @@ const createStyles = (colors: ThemeColors) => ({
     overviewLabel: {
       fontSize: 14,
       fontWeight: '700',
-      color: 'rgba(255, 255, 255, 0.85)',
+      color: colors.textSecondary,
       textTransform: 'uppercase',
       letterSpacing: 1,
     },
     overviewBalance: {
-      fontSize: 40,
-      fontWeight: '900',
-      color: '#FFFFFF',
+      fontSize: 36,
+      fontWeight: '800',
+      color: colors.textPrimary,
       marginTop: spacing.sm,
       letterSpacing: -1.5,
     },
     overviewBalanceNegative: {
-      color: '#FFE0E0',
+      color: colors.textPrimary,
     },
     overviewMonthHint: {
       fontSize: 12,
       fontWeight: '700',
-      color: 'rgba(255, 255, 255, 0.72)',
+      color: colors.textTertiary,
       marginTop: spacing.xs,
     },
     overviewDivider: {
       height: borderWidth.thin,
-      backgroundColor: 'rgba(255, 255, 255, 0.3)',
+      backgroundColor: colors.divider,
       marginVertical: spacing.lg,
     },
     overviewStats: {
@@ -830,14 +829,15 @@ const createStyles = (colors: ThemeColors) => ({
     },
     statBlock: {
       flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
+      flexDirection: 'column',
+      alignItems: 'flex-start',
       gap: spacing.sm,
-      backgroundColor: 'rgba(0, 0, 0, 0.15)',
+      backgroundColor: colors.surface,
       borderRadius: borderRadius.medium,
-      padding: spacing.md,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: 0,
       borderWidth: borderWidth.thin,
-      borderColor: 'rgba(255, 255, 255, 0.2)',
+      borderColor: 'transparent',
     },
     statBlockGreen: {
       flex: 1,
@@ -882,14 +882,14 @@ const createStyles = (colors: ThemeColors) => ({
       fontWeight: '800',
     },
     statLabel: {
-      fontSize: 11,
-      color: 'rgba(255, 255, 255, 0.7)',
+      fontSize: 12,
+      color: colors.textSecondary,
       fontWeight: '600',
     },
     statValue: {
-      fontSize: 16,
+      fontSize: 20,
       fontWeight: '800',
-      color: '#FFFFFF',
+      color: colors.textPrimary,
     },
     statTextBlock: {
       flex: 1,
@@ -905,9 +905,9 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.surface,
       borderRadius: borderRadius.card,
       borderWidth: borderWidth.medium,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       padding: spacing.lg,
-      ...shadow.medium,
+      ...shadow.small,
     },
     progressCardHeader: {
       flexDirection: 'row',
@@ -924,7 +924,7 @@ const createStyles = (colors: ThemeColors) => ({
       fontSize: 11,
       fontWeight: '600',
       color: colors.textTertiary,
-      fontFamily: 'Courier',
+      fontVariant: ['tabular-nums'],
       marginTop: 1,
     },
 
@@ -940,7 +940,7 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.accent,
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.xs,
     },
@@ -948,12 +948,12 @@ const createStyles = (colors: ThemeColors) => ({
       fontSize: 14,
       fontWeight: '800',
       color: '#1A1A1A',
-      fontFamily: 'Courier',
+      fontVariant: ['tabular-nums'],
     },
     progressBarContainer: {
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       overflow: 'hidden',
       marginBottom: spacing.md,
     },
@@ -969,7 +969,7 @@ const createStyles = (colors: ThemeColors) => ({
       fontSize: 12,
       fontWeight: '600',
       color: colors.textTertiary,
-      fontFamily: 'Courier',
+      fontVariant: ['tabular-nums'],
     },
 
     // Progress empty state
@@ -977,8 +977,8 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.surface,
       borderRadius: borderRadius.card,
       borderWidth: borderWidth.medium,
-      borderColor: colors.stroke,
-      borderStyle: 'dashed',
+      borderColor: colors.divider,
+      borderStyle: 'solid',
       padding: spacing.xl,
       marginBottom: spacing.xxl,
       alignItems: 'center',
@@ -1026,7 +1026,7 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.surface,
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.xs,
     },
@@ -1068,19 +1068,19 @@ const createStyles = (colors: ThemeColors) => ({
       fontSize: 12,
       fontWeight: '700',
       color: colors.error,
-      fontFamily: 'Courier',
+      fontVariant: ['tabular-nums'],
     },
     dayIncome: {
       fontSize: 12,
       fontWeight: '700',
       color: colors.success,
-      fontFamily: 'Courier',
+      fontVariant: ['tabular-nums'],
     },
     dayBalance: {
       color: colors.textPrimary,
       fontSize: 12,
       fontWeight: '800',
-      fontFamily: 'Courier',
+      fontVariant: ['tabular-nums'],
     },
     transactionItem: {
       flexDirection: 'row',
@@ -1090,7 +1090,7 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.surface,
       borderRadius: borderRadius.card,
       borderWidth: borderWidth.medium,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
     },
     transactionLeft: {
       flexDirection: 'row',
@@ -1102,7 +1102,7 @@ const createStyles = (colors: ThemeColors) => ({
       height: 48,
       borderRadius: borderRadius.medium,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: spacing.md,
@@ -1123,31 +1123,31 @@ const createStyles = (colors: ThemeColors) => ({
       fontSize: 12,
       fontWeight: '500',
       color: colors.textTertiary,
-      fontFamily: 'Courier',
+      fontVariant: ['tabular-nums'],
     },
     amountBadge: {
       borderRadius: borderRadius.small,
-      borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
-      paddingHorizontal: spacing.md,
+      borderWidth: 0,
+      borderColor: colors.divider,
+      paddingHorizontal: spacing.sm,
       paddingVertical: spacing.xs,
     },
     incomeBadge: {
-      backgroundColor: '#DCFCE7',
+      backgroundColor: colors.income + '12',
     },
     expenseBadge: {
-      backgroundColor: '#FEE2E2',
+      backgroundColor: colors.expense + '12',
     },
     transactionAmount: {
       fontSize: 15,
       fontWeight: '800',
-      fontFamily: 'Courier',
+      fontVariant: ['tabular-nums'],
     },
     incomeAmount: {
-      color: '#16A34A',
+      color: colors.income,
     },
     expenseAmount: {
-      color: '#DC2626',
+      color: colors.expense,
     },
 
     // ===== Empty State =====
@@ -1157,7 +1157,7 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.surface,
       borderRadius: borderRadius.card,
       borderWidth: borderWidth.medium,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       ...shadow.medium,
     },
     emptyIcon: {
@@ -1176,7 +1176,7 @@ const createStyles = (colors: ThemeColors) => ({
       paddingVertical: spacing.md,
       borderRadius: borderRadius.button,
       borderWidth: borderWidth.medium,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       ...shadow.small,
     },
     emptyButtonText: {

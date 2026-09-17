@@ -165,7 +165,7 @@ const createStyles = (colors: ThemeColors) => ({
     },
     input: {
       borderWidth: borderWidth.medium,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       borderRadius: borderRadius.input,
       padding: spacing.md,
       fontSize: 15,
@@ -187,7 +187,7 @@ const createStyles = (colors: ThemeColors) => ({
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       margin: 4,
     },
     iconOptionSelected: {
@@ -201,7 +201,7 @@ const createStyles = (colors: ThemeColors) => ({
       flexDirection: 'row',
       paddingTop: spacing.md,
       borderTopWidth: borderWidth.thin,
-      borderTopColor: colors.stroke,
+      borderTopColor: colors.divider,
       gap: spacing.md,
     },
     button: {
@@ -209,7 +209,7 @@ const createStyles = (colors: ThemeColors) => ({
       paddingVertical: spacing.md,
       borderRadius: borderRadius.button,
       borderWidth: borderWidth.medium,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       alignItems: 'center',
       ...shadow.small,
     },

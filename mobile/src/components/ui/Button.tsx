@@ -89,7 +89,7 @@ const createStyles = (colors: ThemeColors) => ({
       justifyContent: 'center',
       borderRadius: borderRadius.button,
       borderWidth: borderWidth.medium,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       ...shadow.small,
     },
 
@@ -102,7 +102,7 @@ const createStyles = (colors: ThemeColors) => ({
     },
     outline: {
       backgroundColor: colors.surface,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
     },
     text: {
       backgroundColor: 'transparent',
@@ -137,7 +137,7 @@ const createStyles = (colors: ThemeColors) => ({
       color: '#FFFFFF',
     },
     secondaryText: {
-      color: colors.textPrimary,
+      color: '#1A1A1A',
     },
     outlineText: {
       color: colors.textPrimary,

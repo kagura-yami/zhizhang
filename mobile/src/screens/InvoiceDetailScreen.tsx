@@ -80,7 +80,7 @@ export default function InvoiceDetailScreen({ route }: any) {
 const createStyles = (colors: any) => StyleSheet.create({
   content: { padding: spacing.md, paddingBottom: spacing.xxl },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  card: { backgroundColor: colors.surface, borderWidth: borderWidth.thin, borderColor: colors.stroke, borderRadius: borderRadius.card, padding: spacing.md, ...shadow.small },
+  card: { backgroundColor: colors.surface, borderWidth: borderWidth.thin, borderColor: colors.divider, borderRadius: borderRadius.card, padding: spacing.md, ...shadow.small },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingBottom: spacing.sm, borderBottomWidth: borderWidth.thin, borderBottomColor: colors.divider },
   title: { flex: 1, color: colors.textPrimary, fontSize: 16, fontWeight: '800' },
   editToggle: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: borderRadius.small, backgroundColor: colors.primaryLight },

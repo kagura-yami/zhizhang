@@ -88,7 +88,7 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.surface,
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       paddingVertical: spacing.md,
       paddingHorizontal: spacing.lg,
       marginBottom: spacing.sm,

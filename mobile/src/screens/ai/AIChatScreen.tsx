@@ -2294,19 +2294,19 @@ export default function AIChatScreen({ autoVoice = false }: { autoVoice?: boolea
           <Animated.View
             style={[
               sidebarStyles.panel,
-              { width: SIDEBAR_WIDTH, backgroundColor: styles._colors.surface, borderRightColor: styles._colors.stroke },
+              { width: SIDEBAR_WIDTH, backgroundColor: styles._colors.surface, borderRightColor: styles._colors.divider },
               { transform: [{ translateX: sidebarAnim }] },
             ]}
           >
             {/* 侧边栏头部 */}
-            <View style={[sidebarStyles.panelHeader, { borderBottomColor: styles._colors.stroke }]}>
+            <View style={[sidebarStyles.panelHeader, { borderBottomColor: styles._colors.divider }]}>
               <Text style={[sidebarStyles.panelTitle, { color: styles._colors.textPrimary }]}>
                 对话记录
               </Text>
               <TouchableOpacity
                 onPress={handleNewChat}
                 activeOpacity={0.7}
-                style={[sidebarStyles.newChatBtn, { borderColor: styles._colors.stroke, backgroundColor: styles._colors.accent }]}
+                style={[sidebarStyles.newChatBtn, { borderColor: styles._colors.divider, backgroundColor: styles._colors.accent }]}
               >
                 <SquarePen size={18} color={styles._colors.textPrimary} />
               </TouchableOpacity>
@@ -2337,7 +2337,7 @@ export default function AIChatScreen({ autoVoice = false }: { autoVoice?: boolea
                           sidebarStyles.sessionItem,
                           s.id === sessionId && {
                             backgroundColor: styles._colors.primaryLight,
-                            borderColor: styles._colors.stroke,
+                            borderColor: styles._colors.divider,
                           },
                         ]}
                         onPress={() => handleSelectSession(s.id)}
@@ -2372,7 +2372,7 @@ export default function AIChatScreen({ autoVoice = false }: { autoVoice?: boolea
         onRequestClose={() => setRenameModalVisible(false)}
       >
         <View style={sidebarStyles.renameOverlay}>
-          <View style={[sidebarStyles.renameCard, { backgroundColor: styles._colors.surface, borderColor: styles._colors.stroke }]}>
+          <View style={[sidebarStyles.renameCard, { backgroundColor: styles._colors.surface, borderColor: styles._colors.divider }]}>
             <Text style={[sidebarStyles.renameTitle, { color: styles._colors.textPrimary }]}>
               重命名会话
             </Text>
@@ -2381,7 +2381,7 @@ export default function AIChatScreen({ autoVoice = false }: { autoVoice?: boolea
                 sidebarStyles.renameInput,
                 {
                   color: styles._colors.textPrimary,
-                  borderColor: styles._colors.stroke,
+                  borderColor: styles._colors.divider,
                   backgroundColor: styles._colors.background,
                 },
               ]}
@@ -2394,13 +2394,13 @@ export default function AIChatScreen({ autoVoice = false }: { autoVoice?: boolea
             />
             <View style={sidebarStyles.renameActions}>
               <TouchableOpacity
-                style={[sidebarStyles.renameCancelBtn, { borderColor: styles._colors.stroke }]}
+                style={[sidebarStyles.renameCancelBtn, { borderColor: styles._colors.divider }]}
                 onPress={() => setRenameModalVisible(false)}
               >
                 <Text style={{ color: styles._colors.textSecondary, fontSize: 15, fontWeight: '700' }}>取消</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[sidebarStyles.renameConfirmBtn, { backgroundColor: styles._colors.primary, borderColor: styles._colors.stroke }]}
+                style={[sidebarStyles.renameConfirmBtn, { backgroundColor: styles._colors.primary, borderColor: styles._colors.divider }]}
                 onPress={handleRenameConfirm}
               >
                 <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '700' }}>确定</Text>
@@ -2427,7 +2427,7 @@ export default function AIChatScreen({ autoVoice = false }: { autoVoice?: boolea
               sidebarStyles.contextCard,
               {
                 backgroundColor: styles._colors.surface,
-                borderColor: styles._colors.stroke,
+                borderColor: styles._colors.divider,
                 top: Math.min(
                   (contextMenu?.pageY ?? 0) - 20,
                   Dimensions.get('window').height - 220,
@@ -2436,7 +2436,7 @@ export default function AIChatScreen({ autoVoice = false }: { autoVoice?: boolea
             ]}
           >
             <TouchableOpacity
-              style={[sidebarStyles.contextItem, { borderBottomColor: styles._colors.stroke }]}
+              style={[sidebarStyles.contextItem, { borderBottomColor: styles._colors.divider }]}
               onPress={handleActionRename}
               activeOpacity={0.6}
             >
@@ -2446,7 +2446,7 @@ export default function AIChatScreen({ autoVoice = false }: { autoVoice?: boolea
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[sidebarStyles.contextItem, { borderBottomColor: styles._colors.stroke }]}
+              style={[sidebarStyles.contextItem, { borderBottomColor: styles._colors.divider }]}
               onPress={handleActionTogglePin}
               activeOpacity={0.6}
             >
@@ -2492,7 +2492,7 @@ const createStyles = (colors: ThemeColors) => ({
       paddingVertical: spacing.sm,
       backgroundColor: colors.surface,
       borderBottomWidth: borderWidth.thin,
-      borderBottomColor: colors.stroke,
+      borderBottomColor: colors.divider,
     },
     headerTitle: {
       fontSize: 18,
@@ -2544,7 +2544,7 @@ const createStyles = (colors: ThemeColors) => ({
       maxWidth: '80%',
       borderRadius: borderRadius.card,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       padding: spacing.md,
     },
     userContent: {
@@ -2596,7 +2596,7 @@ const createStyles = (colors: ThemeColors) => ({
       paddingVertical: spacing.sm,
       backgroundColor: colors.primary + '1A',
       borderTopWidth: borderWidth.thin,
-      borderTopColor: colors.stroke,
+      borderTopColor: colors.divider,
     },
     pendingText: {
       fontSize: 14,
@@ -2612,7 +2612,7 @@ const createStyles = (colors: ThemeColors) => ({
       paddingHorizontal: spacing.md,
       borderRadius: borderRadius.button,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
     },
     saveAllButtonText: {
       fontSize: 14,
@@ -2622,7 +2622,7 @@ const createStyles = (colors: ThemeColors) => ({
     pendingImagesContainer: {
       backgroundColor: colors.surface,
       borderTopWidth: borderWidth.thin,
-      borderTopColor: colors.stroke,
+      borderTopColor: colors.divider,
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
     },
@@ -2658,7 +2658,7 @@ const createStyles = (colors: ThemeColors) => ({
       borderRadius: borderRadius.small,
       backgroundColor: colors.background,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -2669,7 +2669,7 @@ const createStyles = (colors: ThemeColors) => ({
       paddingBottom: spacing.lg,
       backgroundColor: colors.surface,
       borderTopWidth: borderWidth.thin,
-      borderTopColor: colors.stroke,
+      borderTopColor: colors.divider,
       gap: spacing.sm,
     },
     mediaButton: {
@@ -2680,14 +2680,14 @@ const createStyles = (colors: ThemeColors) => ({
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
     },
     inputWrapper: {
       flex: 1,
       backgroundColor: colors.background,
       borderRadius: borderRadius.input,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.xs,
       minHeight: 48,
@@ -2706,7 +2706,7 @@ const createStyles = (colors: ThemeColors) => ({
       borderRadius: borderRadius.medium,
       backgroundColor: colors.income,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -2798,7 +2798,7 @@ const createStyles = (colors: ThemeColors) => ({
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
     },
     voiceInputWrapperActive: {
       backgroundColor: colors.primary + '1A',
@@ -2825,7 +2825,7 @@ const createStyles = (colors: ThemeColors) => ({
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
     },
   }),
   _colors: colors,

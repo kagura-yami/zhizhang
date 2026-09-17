@@ -77,7 +77,7 @@ const createStyles = (colors: ThemeColors) => ({
     container: {
       backgroundColor: colors.surface,
       borderTopWidth: borderWidth.medium,
-      borderTopColor: colors.stroke,
+      borderTopColor: colors.divider,
       ...shadow.small,
     },
     navigation: {
@@ -105,7 +105,7 @@ const createStyles = (colors: ThemeColors) => ({
       height: 32,
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       backgroundColor: colors.accent,
     },
     navIcon: {

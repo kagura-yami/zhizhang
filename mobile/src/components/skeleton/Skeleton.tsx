@@ -112,7 +112,7 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.surface,
       borderRadius: borderRadius.card,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       padding: 16,
     },
   }),

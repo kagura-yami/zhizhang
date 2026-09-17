@@ -6,19 +6,19 @@ import { ThemeColors } from '../theme/colors';
 
 // 使用 lucide-react-native 图标 - Neo-Brutalism 加粗描边
 const HomeIcon = ({ color, size = 24 }: { color: string; size?: number }) => (
-  <Home size={size} color={color} strokeWidth={2.5} />
+  <Home size={size} color={color} strokeWidth={2} />
 );
 
 const ChartIcon = ({ color, size = 24 }: { color: string; size?: number }) => (
-  <BarChart3 size={size} color={color} strokeWidth={2.5} />
+  <BarChart3 size={size} color={color} strokeWidth={2} />
 );
 
 const ChatIcon = ({ color, size = 24 }: { color: string; size?: number }) => (
-  <MessageCircle size={size} color={color} strokeWidth={2.5} />
+  <MessageCircle size={size} color={color} strokeWidth={2} />
 );
 
 const UserIcon = ({ color, size = 24 }: { color: string; size?: number }) => (
-  <User size={size} color={color} strokeWidth={2.5} />
+  <User size={size} color={color} strokeWidth={2} />
 );
 
 // 底部导航标签配置
@@ -32,7 +32,7 @@ const tabs: TabConfig[] = [
   { key: 'dashboard', label: '首页', IconComponent: HomeIcon },
   { key: 'reports', label: '统计', IconComponent: ChartIcon },
   { key: 'add', label: '记账', IconComponent: () => null },
-  { key: 'community', label: '社群', IconComponent: ({ color, size }) => <Users color={color} size={size} strokeWidth={2.5} /> },
+  { key: 'community', label: '社群', IconComponent: ({ color, size }) => <Users color={color} size={size} strokeWidth={2} /> },
   { key: 'ai', label: 'AI助手', IconComponent: ChatIcon },
   { key: 'settings', label: '我的', IconComponent: UserIcon },
 ];
@@ -51,7 +51,7 @@ export default function BottomTabBar({ activeTab, onTabPress, colors, communityE
       flexDirection: 'row',
       backgroundColor: colors.surface,
       borderTopWidth: borderWidth.thick,
-      borderTopColor: colors.stroke,
+      borderTopColor: colors.divider,
       paddingBottom: spacing.sm,
       paddingTop: spacing.sm,
     },
@@ -77,11 +77,11 @@ export default function BottomTabBar({ activeTab, onTabPress, colors, communityE
     },
     tabIconBlockActive: {
       backgroundColor: colors.primaryLight,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
     },
     // 中央"+"按钮 - Neo-Brutalism 方圆角 + 实心阴影
     addButtonOuter: {
-      marginTop: -22,
+      marginTop: -12,
     },
     addButtonShadow: {
       position: 'absolute',
@@ -89,6 +89,7 @@ export default function BottomTabBar({ activeTab, onTabPress, colors, communityE
       height: 52,
       borderRadius: borderRadius.medium,
       backgroundColor: colors.stroke,
+      opacity: 0.08,
       top: 3,
       left: 3,
     },
@@ -100,7 +101,7 @@ export default function BottomTabBar({ activeTab, onTabPress, colors, communityE
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: borderWidth.thick,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
     },
     addButtonLabel: {
       fontSize: 10,
@@ -120,6 +121,8 @@ export default function BottomTabBar({ activeTab, onTabPress, colors, communityE
           return (
             <TouchableOpacity
               key={tab.key}
+              accessibilityRole="button"
+              accessibilityLabel={tab.label}
               onPress={() => onTabPress(tab.key)}
               style={tabStyles.addButtonContainer}
               activeOpacity={0.8}
@@ -141,6 +144,9 @@ export default function BottomTabBar({ activeTab, onTabPress, colors, communityE
         return (
           <TouchableOpacity
             key={tab.key}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: isActive }}
+            accessibilityLabel={tab.label}
             onPress={() => onTabPress(tab.key)}
             style={tabStyles.tab}
             activeOpacity={0.7}

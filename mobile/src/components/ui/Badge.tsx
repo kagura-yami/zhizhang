@@ -70,7 +70,7 @@ const createStyles = (colors: ThemeColors) => ({
     badge: {
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       alignSelf: 'flex-start',
     },
     label: {

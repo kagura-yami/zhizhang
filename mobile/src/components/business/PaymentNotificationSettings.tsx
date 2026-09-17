@@ -147,7 +147,7 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.surface,
       borderRadius: borderRadius.card,
       borderWidth: borderWidth.medium,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       padding: spacing.lg,
       marginHorizontal: spacing.md,
       marginVertical: spacing.sm,
@@ -166,7 +166,7 @@ const createStyles = (colors: ThemeColors) => ({
       height: 32,
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       backgroundColor: colors.accent,
       alignItems: 'center',
       justifyContent: 'center',
@@ -192,7 +192,7 @@ const createStyles = (colors: ThemeColors) => ({
       alignItems: 'center',
       paddingVertical: spacing.md,
       borderTopWidth: borderWidth.thin,
-      borderTopColor: colors.stroke,
+      borderTopColor: colors.divider,
     },
     statusLeft: {
       flexDirection: 'row',
@@ -212,7 +212,7 @@ const createStyles = (colors: ThemeColors) => ({
       paddingVertical: spacing.xs,
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
     },
     statusIcon: {
       fontSize: 12,
@@ -230,7 +230,7 @@ const createStyles = (colors: ThemeColors) => ({
       paddingVertical: spacing.sm,
       borderRadius: borderRadius.button,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
     },
     actionButtonPrimary: {
       backgroundColor: colors.primary,
@@ -253,7 +253,7 @@ const createStyles = (colors: ThemeColors) => ({
       padding: spacing.md,
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       marginTop: spacing.sm,
     },
     hintText: {
@@ -266,7 +266,7 @@ const createStyles = (colors: ThemeColors) => ({
       marginTop: spacing.md,
       paddingTop: spacing.md,
       borderTopWidth: borderWidth.thin,
-      borderTopColor: colors.stroke,
+      borderTopColor: colors.divider,
     },
     supportedAppsTitle: {
       fontSize: 13,

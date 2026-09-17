@@ -363,7 +363,7 @@ const createModalStyles = (colors: ThemeColors) =>
       borderTopWidth: borderWidth.thick,
       borderLeftWidth: borderWidth.thick,
       borderRightWidth: borderWidth.thick,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       maxHeight: '90%',
     },
     header: {
@@ -373,7 +373,7 @@ const createModalStyles = (colors: ThemeColors) =>
       paddingHorizontal: spacing.lg,
       paddingVertical: spacing.md,
       borderBottomWidth: borderWidth.thin,
-      borderBottomColor: colors.stroke,
+      borderBottomColor: colors.divider,
     },
     title: {
       fontSize: 18,
@@ -387,7 +387,7 @@ const createModalStyles = (colors: ThemeColors) =>
       justifyContent: 'center',
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       backgroundColor: colors.background,
     },
     closeIcon: {
@@ -410,7 +410,7 @@ const createModalStyles = (colors: ThemeColors) =>
     },
     input: {
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       borderRadius: borderRadius.input,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm,
@@ -424,7 +424,7 @@ const createModalStyles = (colors: ThemeColors) =>
       justifyContent: 'space-between',
       alignItems: 'center',
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       borderRadius: borderRadius.input,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm + 2,
@@ -473,7 +473,7 @@ const createModalStyles = (colors: ThemeColors) =>
       paddingHorizontal: spacing.lg,
       paddingVertical: spacing.md,
       borderTopWidth: borderWidth.thin,
-      borderTopColor: colors.stroke,
+      borderTopColor: colors.divider,
     },
     button: {
       flex: 1,
@@ -486,7 +486,7 @@ const createModalStyles = (colors: ThemeColors) =>
     cancelButton: {
       backgroundColor: colors.surface,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
     },
     cancelButtonText: {
       fontSize: 15,
@@ -496,7 +496,7 @@ const createModalStyles = (colors: ThemeColors) =>
     saveButton: {
       backgroundColor: colors.primary,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       ...shadow.small,
     },
     saveButtonText: {
@@ -514,7 +514,7 @@ const createModalStyles = (colors: ThemeColors) =>
       backgroundColor: colors.surface,
       borderRadius: borderRadius.card,
       borderWidth: borderWidth.medium,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       padding: spacing.sm,
       minWidth: 200,
       ...shadow.medium,
@@ -527,7 +527,7 @@ const createModalStyles = (colors: ThemeColors) =>
     pickerItemActive: {
       backgroundColor: colors.accent,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
     },
     pickerItemRow: {
       flexDirection: 'row',
@@ -1252,7 +1252,7 @@ const createStyles = (colors: ThemeColors) => ({
       borderRadius: borderRadius.card,
       padding: spacing.lg,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
     },
     cardTitle: {
       fontSize: 16,
@@ -1368,7 +1368,7 @@ const createStyles = (colors: ThemeColors) => ({
     soundOption: {
       flex: 1,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       borderRadius: borderRadius.small,
       paddingVertical: spacing.sm,
       alignItems: 'center',
@@ -1415,7 +1415,7 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.background,
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       padding: spacing.md,
       marginBottom: spacing.sm,
     },
@@ -1459,7 +1459,7 @@ const createStyles = (colors: ThemeColors) => ({
       paddingHorizontal: spacing.sm,
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       backgroundColor: colors.surface,
     },
     aiConfigActionText: {
@@ -1469,7 +1469,7 @@ const createStyles = (colors: ThemeColors) => ({
     addAiConfigButton: {
       backgroundColor: colors.accent,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       borderRadius: borderRadius.button,
       paddingVertical: spacing.md,
       alignItems: 'center',
@@ -1483,7 +1483,7 @@ const createStyles = (colors: ThemeColors) => ({
     // Input styles
     input: {
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       borderRadius: borderRadius.input,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm,
@@ -1503,7 +1503,7 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.background,
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       padding: spacing.md,
       marginBottom: spacing.sm,
     },
@@ -1544,7 +1544,7 @@ const createStyles = (colors: ThemeColors) => ({
       marginTop: spacing.md,
       paddingTop: spacing.md,
       borderTopWidth: borderWidth.thin,
-      borderTopColor: colors.stroke,
+      borderTopColor: colors.divider,
     },
     addFormTitle: {
       fontSize: 15,
@@ -1555,7 +1555,7 @@ const createStyles = (colors: ThemeColors) => ({
     selectAppButton: {
       backgroundColor: colors.accent,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       borderRadius: borderRadius.button,
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
@@ -1585,7 +1585,7 @@ const createStyles = (colors: ThemeColors) => ({
       marginTop: spacing.sm,
       paddingVertical: spacing.md,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       borderRadius: borderRadius.button,
       backgroundColor: colors.surface,
       minHeight: 48,
@@ -1644,7 +1644,7 @@ const createStyles = (colors: ThemeColors) => ({
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       borderRadius: borderRadius.small,
       backgroundColor: colors.surface,
     },
@@ -1670,7 +1670,7 @@ const createStyles = (colors: ThemeColors) => ({
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       borderRadius: borderRadius.button,
       backgroundColor: colors.accent,
     },
@@ -1687,7 +1687,7 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.primary,
       borderRadius: borderRadius.button,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       alignItems: 'center',
       justifyContent: 'center',
       minHeight: 48,
@@ -1703,7 +1703,7 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.surface,
       borderRadius: borderRadius.card,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       padding: spacing.lg,
       marginHorizontal: spacing.lg,
       marginTop: spacing.md,
@@ -1737,7 +1737,7 @@ const createStyles = (colors: ThemeColors) => ({
       borderTopWidth: borderWidth.thick,
       borderLeftWidth: borderWidth.thick,
       borderRightWidth: borderWidth.thick,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       height: '80%',
     },
     modalHeader: {
@@ -1747,7 +1747,7 @@ const createStyles = (colors: ThemeColors) => ({
       paddingHorizontal: spacing.lg,
       paddingVertical: spacing.md,
       borderBottomWidth: borderWidth.thin,
-      borderBottomColor: colors.stroke,
+      borderBottomColor: colors.divider,
     },
     modalTitle: {
       fontSize: 18,
@@ -1761,7 +1761,7 @@ const createStyles = (colors: ThemeColors) => ({
       justifyContent: 'center',
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       backgroundColor: colors.background,
     },
     modalCloseIcon: {
@@ -1773,11 +1773,11 @@ const createStyles = (colors: ThemeColors) => ({
       paddingHorizontal: spacing.lg,
       paddingVertical: spacing.sm,
       borderBottomWidth: borderWidth.thin,
-      borderBottomColor: colors.stroke,
+      borderBottomColor: colors.divider,
     },
     searchInput: {
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       borderRadius: borderRadius.input,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm,
@@ -1802,7 +1802,7 @@ const createStyles = (colors: ThemeColors) => ({
       paddingHorizontal: spacing.lg,
       paddingVertical: spacing.md,
       borderBottomWidth: borderWidth.thin,
-      borderBottomColor: colors.stroke,
+      borderBottomColor: colors.divider,
     },
     appPickerInfo: {
       flex: 1,

@@ -66,7 +66,7 @@ const createStyles = (colors: ThemeColors) => ({
       paddingHorizontal: spacing.md,
       height: 48,
       borderWidth: borderWidth.medium,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
     },
     containerFocused: {
       borderColor: colors.accent,
@@ -87,7 +87,7 @@ const createStyles = (colors: ThemeColors) => ({
       height: 28,
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       backgroundColor: colors.divider,
       alignItems: 'center',
       justifyContent: 'center',

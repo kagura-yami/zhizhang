@@ -43,7 +43,7 @@ export const lightColors = {
 
   // 卡片和容器
   cardBackground: '#FFFFFF',
-  cardBorder: '#1A1A1A',    // 粗描边
+  cardBorder: '#E5E5E5',    // 粗描边
 
   // 透明度变体
   shadow: '#1A1A1A',         // 实心阴影色
@@ -96,7 +96,7 @@ export const darkColors = {
 
   // 卡片和容器
   cardBackground: '#27272A',
-  cardBorder: '#E5E5E5',
+  cardBorder: '#404040',
 
   // 透明度变体
   shadow: '#000000',

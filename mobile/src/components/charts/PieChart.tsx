@@ -202,7 +202,7 @@ const createStyles = (colors: ThemeColors) => ({
       height: 14,
       borderRadius: 3,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       marginRight: spacing.sm,
     },
     legendLabel: {

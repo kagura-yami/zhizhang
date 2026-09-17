@@ -100,7 +100,7 @@ function AnnualCharts({ width }: { width: number }) {
 
 const createStyles = (colors: any) => ({
   ...StyleSheet.create({
-    card: { backgroundColor: colors.surface, borderRadius: borderRadius.card, borderWidth: borderWidth.medium, borderColor: colors.stroke, padding: spacing.md, marginBottom: spacing.lg, ...shadow.small },
+    card: { backgroundColor: colors.surface, borderRadius: borderRadius.card, borderWidth: borderWidth.medium, borderColor: colors.divider, padding: spacing.md, marginBottom: spacing.lg, ...shadow.small },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
     title: { fontSize: 16, fontWeight: '800', color: colors.textPrimary },
     hint: { fontSize: 11, fontWeight: '700', color: colors.textTertiary },

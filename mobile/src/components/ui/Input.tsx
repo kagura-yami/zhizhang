@@ -93,7 +93,7 @@ const createStyles = (colors: ThemeColors) => ({
     },
     inputContainer: {
       borderWidth: borderWidth.medium,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       borderRadius: borderRadius.input,
       backgroundColor: colors.surface,
     },

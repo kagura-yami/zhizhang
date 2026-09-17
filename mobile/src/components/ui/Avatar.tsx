@@ -80,12 +80,12 @@ const createStyles = (colors: ThemeColors) => ({
     avatar: {
       backgroundColor: colors.divider,
       borderWidth: borderWidth.medium,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
     },
     placeholder: {
       backgroundColor: colors.accent,
       borderWidth: borderWidth.medium,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       alignItems: 'center',
       justifyContent: 'center',
     },

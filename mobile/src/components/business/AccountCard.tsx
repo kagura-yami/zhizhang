@@ -85,7 +85,7 @@ const createStyles = (colors: ThemeColors) => ({
     container: {
       borderRadius: borderRadius.card,
       borderWidth: borderWidth.thick,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       padding: spacing.lg,
       minWidth: 200,
       marginRight: spacing.md,

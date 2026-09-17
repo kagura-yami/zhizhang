@@ -30,24 +30,24 @@ export function DashboardSkeleton() {
       <View style={styles.overviewCard}>
         <View style={styles.overviewHeader}>
           <View>
-            <Skeleton width={80} height={14} borderRadius={4} style={{ backgroundColor: 'rgba(255,255,255,0.25)' }} />
-            <Skeleton width={180} height={40} borderRadius={8} style={{ marginTop: 10, backgroundColor: 'rgba(255,255,255,0.25)' }} />
+            <Skeleton width={80} height={14} borderRadius={4} style={{ backgroundColor: styles._colors.divider }} />
+            <Skeleton width={180} height={40} borderRadius={8} style={{ marginTop: 10, backgroundColor: styles._colors.divider }} />
           </View>
         </View>
         <View style={styles.overviewDivider} />
         <View style={styles.overviewStats}>
           <View style={styles.statBlock}>
-            <Skeleton width={32} height={32} borderRadius={8} style={{ backgroundColor: 'rgba(255,255,255,0.2)' }} />
+            <Skeleton width={32} height={32} borderRadius={8} style={{ backgroundColor: styles._colors.divider }} />
             <View>
-              <Skeleton width={40} height={11} borderRadius={3} style={{ backgroundColor: 'rgba(255,255,255,0.2)' }} />
-              <Skeleton width={80} height={16} borderRadius={4} style={{ marginTop: 4, backgroundColor: 'rgba(255,255,255,0.2)' }} />
+              <Skeleton width={40} height={11} borderRadius={3} style={{ backgroundColor: styles._colors.divider }} />
+              <Skeleton width={80} height={16} borderRadius={4} style={{ marginTop: 4, backgroundColor: styles._colors.divider }} />
             </View>
           </View>
           <View style={styles.statBlock}>
-            <Skeleton width={32} height={32} borderRadius={8} style={{ backgroundColor: 'rgba(255,255,255,0.2)' }} />
+            <Skeleton width={32} height={32} borderRadius={8} style={{ backgroundColor: styles._colors.divider }} />
             <View>
-              <Skeleton width={40} height={11} borderRadius={3} style={{ backgroundColor: 'rgba(255,255,255,0.2)' }} />
-              <Skeleton width={80} height={16} borderRadius={4} style={{ marginTop: 4, backgroundColor: 'rgba(255,255,255,0.2)' }} />
+              <Skeleton width={40} height={11} borderRadius={3} style={{ backgroundColor: styles._colors.divider }} />
+              <Skeleton width={80} height={16} borderRadius={4} style={{ marginTop: 4, backgroundColor: styles._colors.divider }} />
             </View>
           </View>
         </View>
@@ -119,10 +119,10 @@ const createStyles = (colors: ThemeColors) => ({
       marginBottom: spacing.xxl,
     },
     overviewCard: {
-      backgroundColor: colors.primary,
+      backgroundColor: colors.surface,
       borderRadius: borderRadius.card,
       borderWidth: borderWidth.thick,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       padding: spacing.xl,
       marginBottom: spacing.xxl,
       ...shadow.large,
@@ -156,7 +156,7 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.surface,
       borderRadius: borderRadius.card,
       borderWidth: borderWidth.medium,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       padding: spacing.lg,
       marginBottom: spacing.xxl,
       ...shadow.medium,
@@ -171,14 +171,14 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.divider,
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.xs,
     },
     progressContainer: {
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       overflow: 'hidden',
       marginBottom: spacing.md,
     },
@@ -199,7 +199,7 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.surface,
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.xs,
     },
@@ -210,7 +210,7 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.surface,
       borderRadius: borderRadius.card,
       borderWidth: borderWidth.medium,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       padding: spacing.md,
       ...shadow.small,
     },
@@ -231,7 +231,7 @@ const createStyles = (colors: ThemeColors) => ({
     amountBadge: {
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.xs,
       backgroundColor: colors.divider,

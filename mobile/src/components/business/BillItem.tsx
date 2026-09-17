@@ -90,7 +90,7 @@ const createStyles = (colors: ThemeColors) => ({
       paddingHorizontal: spacing.lg,
       paddingVertical: spacing.md,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
     },
     leftSection: {
       flexDirection: 'row',
@@ -102,7 +102,7 @@ const createStyles = (colors: ThemeColors) => ({
       height: 44,
       borderRadius: borderRadius.medium,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: spacing.md,
@@ -140,7 +140,7 @@ const createStyles = (colors: ThemeColors) => ({
     amountBadge: {
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.xs,
     },

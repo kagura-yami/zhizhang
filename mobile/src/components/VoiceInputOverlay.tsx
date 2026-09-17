@@ -111,7 +111,7 @@ export default function VoiceInputOverlay() {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={close}>
       <View style={styles.backdrop}>
-        <View style={[styles.panel, { backgroundColor: colors.surface, borderColor: colors.stroke }]}>
+        <View style={[styles.panel, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
           <View style={[styles.icon, { backgroundColor: colors.primary }]}>
             {recording ? <Mic size={28} color="#fff" /> : <ActivityIndicator color="#fff" />}
           </View>

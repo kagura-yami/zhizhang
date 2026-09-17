@@ -68,10 +68,10 @@ function GridCell({
           height,
           backgroundColor: isSelected ? styles._colors.primary : styles._colors.surface,
           borderColor: isSelected
-            ? styles._colors.stroke
+            ? styles._colors.primary
             : isCurrentPeriod
               ? styles._colors.primary
-              : styles._colors.stroke,
+              : styles._colors.divider,
           borderWidth: borderWidth.thin,
           opacity: disabled ? 0.4 : 1,
         },

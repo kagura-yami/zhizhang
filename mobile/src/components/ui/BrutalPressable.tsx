@@ -86,6 +86,7 @@ export default function BrutalPressable({
           width: '100%',
           height: '100%',
           backgroundColor: shadowColor,
+          opacity: 0.06,
           borderRadius,
         }}
       />

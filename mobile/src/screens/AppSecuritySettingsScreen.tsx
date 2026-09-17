@@ -31,7 +31,7 @@ const createStyles = (colors: ThemeColors) => ({
   ...StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     content: { padding: spacing.lg, paddingBottom: spacing.xl },
-    card: { backgroundColor: colors.surface, borderWidth: borderWidth.thin, borderColor: colors.stroke, borderRadius: borderRadius.card, padding: spacing.lg },
+    card: { backgroundColor: colors.surface, borderWidth: borderWidth.thin, borderColor: colors.divider, borderRadius: borderRadius.card, padding: spacing.lg },
     title: { fontSize: 17, fontWeight: '800', color: colors.textPrimary },
     description: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, lineHeight: 19, marginTop: spacing.xs, marginBottom: spacing.md },
     row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.md, borderBottomWidth: borderWidth.thin, borderBottomColor: colors.divider },

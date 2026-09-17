@@ -105,13 +105,13 @@ const createStyles = (colors: ThemeColors) => ({
       alignItems: 'center',
       borderRadius: borderRadius.medium,
       borderWidth: borderWidth.medium,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       backgroundColor: colors.surface,
       padding: spacing.sm,
     },
     categoryItemSelected: {
       backgroundColor: colors.accent,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
     },
     categoryIcon: {
       fontSize: 24,

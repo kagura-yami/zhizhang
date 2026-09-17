@@ -1,6 +1,6 @@
 /**
- * Neo-Brutalism 间距与阴影系统
- * 粗描边 + 实心偏移阴影 + 硬边
+ * 统一间距、圆角与轻量阴影
+ * 暖色底、细边框、白色圆角表面
  */
 
 export const spacing = {
@@ -21,40 +21,40 @@ export const borderRadius = {
   large: 16,
   xlarge: 20,
   round: 50,
-  card: 16,       // Neo-Brutalism: 中等圆角
+  card: 20,       // 统一卡片圆角
   button: 12,
   input: 12,
 } as const;
 
-// Neo-Brutalism 描边宽度
+// 控件和卡片使用细边框
 export const borderWidth = {
-  thin: 2,
-  medium: 3,
-  thick: 4,
+  thin: 1,
+  medium: 1,
+  thick: 1.5,
 } as const;
 
-// Neo-Brutalism 核心: 实心偏移阴影（无模糊）
+// 保持轻量层级；交互动画单独管理
 export const shadow = {
   small: {
     shadowColor: '#1A1A1A',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 1,
   },
   medium: {
     shadowColor: '#1A1A1A',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   large: {
     shadowColor: '#1A1A1A',
-    shadowOffset: { width: 6, height: 6 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
 } as const;
 

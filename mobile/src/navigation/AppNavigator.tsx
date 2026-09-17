@@ -163,7 +163,7 @@ export default function AppNavigator() {
     headerStyle: {
       backgroundColor: colors.surface,
       borderBottomWidth: borderWidth.medium,
-      borderBottomColor: colors.stroke,
+      borderBottomColor: colors.divider,
     } as any,
     headerTitleStyle: {
       fontSize: 18,

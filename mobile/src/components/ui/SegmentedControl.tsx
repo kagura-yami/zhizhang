@@ -60,7 +60,7 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.surface,
       borderRadius: borderRadius.button,
       borderWidth: borderWidth.medium,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       padding: 3,
     },
     option: {
@@ -75,7 +75,7 @@ const createStyles = (colors: ThemeColors) => ({
     optionSelected: {
       backgroundColor: colors.accent,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
     },
     label: {
       fontSize: 14,

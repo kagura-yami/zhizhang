@@ -71,7 +71,7 @@ const createStyles = (colors: ThemeColors) => ({
     container: {
       backgroundColor: colors.surface,
       borderBottomWidth: borderWidth.medium,
-      borderBottomColor: colors.stroke,
+      borderBottomColor: colors.divider,
       zIndex: 100,
     },
     header: {
@@ -101,7 +101,7 @@ const createStyles = (colors: ThemeColors) => ({
       height: 36,
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       backgroundColor: colors.accent,
       alignItems: 'center',
       justifyContent: 'center',

@@ -202,7 +202,7 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.surface,
       borderRadius: 12,
       borderWidth: 2,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
     },
     chartTitle: {
       fontSize: 15,

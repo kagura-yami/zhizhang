@@ -151,7 +151,7 @@ const createStyles = (colors: ThemeColors) => ({
       paddingVertical: spacing.md,
       borderRadius: borderRadius.button,
       borderWidth: borderWidth.medium,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       maxWidth: screenWidth - spacing.lg * 2,
       minWidth: 200,
       ...shadow.medium,

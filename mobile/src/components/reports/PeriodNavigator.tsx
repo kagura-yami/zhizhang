@@ -60,7 +60,7 @@ const createStyles = (colors: ThemeColors) => ({
       padding: spacing.sm,
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       backgroundColor: colors.surface,
     },
     title: {
