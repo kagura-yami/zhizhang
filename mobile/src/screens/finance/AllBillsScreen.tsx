@@ -350,6 +350,7 @@ const AllBillsScreen: React.FC = () => {
                         bill={{
                           id: bill.id.toString(),
                           category: bill.category?.name || '未分类',
+                          categoryColor: bill.category?.color,
                           amount: bill.amount,
                           type: bill.type,
                           date: `${occurredAt.toLocaleDateString('zh-CN')} ${occurredAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })}`,

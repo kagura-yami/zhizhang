@@ -1,3 +1,4 @@
+import { categoryIconBackground } from '../../theme/categoryColors';
 /**
  * 账单详情页面 - Neo-Brutalism 风格
  * 粗描边详情卡片 + 大糖果色分类图标 + Courier 金额
@@ -138,7 +139,7 @@ export default function BillDetailScreen() {
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         {/* 金额区域 */}
         <View style={styles.amountSection}>
-          <View style={styles.categoryIconBlock}>
+          <View style={[styles.categoryIconBlock, { backgroundColor: categoryIconBackground(bill.category?.name, bill.category?.color) }]}>
             <Text style={styles.categoryEmoji}>{bill.category?.icon || '📝'}</Text>
           </View>
           <Text style={[styles.typeBadge, { backgroundColor: isExpense ? styles._colors.expense + '20' : styles._colors.income + '20', color: amountColor }]}>

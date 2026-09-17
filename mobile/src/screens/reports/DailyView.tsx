@@ -82,6 +82,7 @@ export default function DailyView({
   const mapBill = (bill: any): BillItemData => ({
     id: String(bill.id),
     category: bill.category?.name || '未分类',
+    categoryColor: bill.category?.color,
     amount: typeof bill.amount === 'number' ? bill.amount : parseFloat(bill.amount),
     type: bill.type,
     date: bill.date?.split('T')[0] || bill.date,

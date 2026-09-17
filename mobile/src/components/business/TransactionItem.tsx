@@ -1,3 +1,4 @@
+import { categoryIconBackground } from '../../theme/categoryColors';
 /**
  * 交易记录项组件 - Neo-Brutalism 风格
  * 粗描边 + BrutalPressable + 糖果色图标块
@@ -16,6 +17,7 @@ export interface TransactionItemProps {
   description?: string;
   categoryName?: string;
   categoryIcon?: string;
+  categoryColor?: string;
   date: string;
   time?: string;
   onPress?: () => void;
@@ -27,6 +29,7 @@ export default function TransactionItem({
   description,
   categoryName,
   categoryIcon,
+  categoryColor,
   date,
   time,
   onPress,
@@ -38,7 +41,7 @@ export default function TransactionItem({
     <View style={styles.inner}>
       <View style={[
         styles.iconContainer,
-        { backgroundColor: isIncome ? styles._colors.success : styles._colors.accent },
+        { backgroundColor: categoryIconBackground(categoryName, categoryColor) },
       ]}>
         <Text style={styles.icon}>{categoryIcon || (isIncome ? '💰' : '💸')}</Text>
       </View>

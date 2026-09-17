@@ -1,3 +1,4 @@
+import { categoryIconBackground } from '../../theme/categoryColors';
 /**
  * 账单项组件 - Neo-Brutalism 风格
  * 描边卡片 + Courier 金额（列表用，无实心阴影）
@@ -21,6 +22,7 @@ export interface BillData {
   date: string;
   description?: string;
   icon: string;
+  categoryColor?: string;
   relatedBill?: { id: number; amount: number; type: 'income' | 'expense'; description?: string };
 }
 
@@ -47,7 +49,7 @@ const BillItem: React.FC<BillItemProps> = ({ bill, onPress }) => {
       <View style={styles.leftSection}>
         <View style={[
           styles.iconContainer,
-          { backgroundColor: isIncome ? styles._colors.success : styles._colors.accent },
+          { backgroundColor: categoryIconBackground(bill.category, bill.categoryColor) },
         ]}>
           <Text style={styles.icon}>{bill.icon}</Text>
         </View>

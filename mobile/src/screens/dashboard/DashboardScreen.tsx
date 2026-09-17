@@ -1,3 +1,4 @@
+import { categoryIconBackground } from '../../theme/categoryColors';
 /**
  * Dashboard 首页 - Neo-Brutalism 风格
  * 粗线框、饱和糖果色块、粗描边、平移阴影
@@ -487,21 +488,6 @@ function DashboardContent({ token }: { token: string }) {
     return iconMap[categoryName || ''] || '📝';
   };
 
-  // Neo-Brutalism 分类色块 - 饱和糖果色
-  const getCategoryBlockColor = (categoryName?: string): string => {
-    const colorMap: { [key: string]: string } = {
-      '餐饮': '#FACC15',    // 明黄
-      '交通': '#3B82F6',    // 蓝
-      '购物': '#EC4899',    // 粉
-      '收入': '#22C55E',    // 绿
-      '工资': '#22C55E',    // 绿
-      '娱乐': '#A855F7',    // 紫
-      '医疗': '#EF4444',    // 红
-      '教育': '#F97316',    // 橙
-    };
-    return colorMap[categoryName || ''] || '#E5E5E5';
-  };
-
   if (isLoading) {
     return <DashboardSkeleton />;
   }
@@ -647,7 +633,7 @@ function DashboardContent({ token }: { token: string }) {
                       <View style={styles.transactionLeft}>
                         <View style={[
                           styles.transactionIcon,
-                          { backgroundColor: getCategoryBlockColor(bill.category?.name) },
+                          { backgroundColor: categoryIconBackground(bill.category?.name, bill.category?.color) },
                         ]}>
                           <Text style={styles.transactionIconText}>
                             {bill.category?.icon || getCategoryIcon(bill.category?.name)}
