@@ -1,10 +1,11 @@
 import React, { useCallback, useState } from 'react';
-import { DeviceEventEmitter, Switch, Text, View } from 'react-native';
+import { Switch, Text, View } from 'react-native';
 import {
   SOCIAL_CONSENT_VERSION,
   SocialPreferences,
 } from '../../services/api/social';
 import { useAlert, useAuth } from '../../providers';
+import { saveCommunityState } from '../../services/communityState';
 import { useStyles } from '../../hooks/useStyles';
 import {
   Action,
@@ -84,7 +85,7 @@ export default function SocialSettingsScreen({
               status.requiredConsentVersion !== SOCIAL_CONSENT_VERSION
             }
             onPress={() => {
-              void resource.run(api.enable, () => { DeviceEventEmitter.emit('communityChanged'); void resource.refresh(); onEnabled?.(); });
+              void resource.run(async () => { await api.enable(); if (user?.id) await saveCommunityState(user.id, true); }, () => { void resource.refresh(); onEnabled?.(); });
             }}
           />
         </View>
@@ -94,7 +95,7 @@ export default function SocialSettingsScreen({
           {!privacy && <View style={s.card}>
             <View style={s.row}>
               <Text style={[s.heading, s.grow]}>启用社群</Text>
-              <Switch accessibilityLabel="启用社群" value disabled={resource.busy} onValueChange={() => confirm('关闭社群', '将退出排行榜并撤销评账授权和关注关系。你的账单、收支统计和自动记账继续保留。再次开启需重新授权。', () => { void resource.run(api.disable, () => { DeviceEventEmitter.emit('communityChanged'); setAccepted(false); void resource.refresh(); }); })} />
+              <Switch accessibilityLabel="启用社群" value disabled={resource.busy} onValueChange={() => confirm('关闭社群', '将退出排行榜并撤销评账授权和关注关系。你的账单、收支统计和自动记账继续保留。再次开启需重新授权。', () => { void resource.run(async () => { await api.disable(); if (user?.id) await saveCommunityState(user.id, false); }, () => { setAccepted(false); void resource.refresh(); }); })} />
             </View>
             <Text style={s.muted}>社群是可选扩展，不影响日常记账。</Text>
           </View>}

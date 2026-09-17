@@ -2,14 +2,14 @@
  * 应用导航器 - Neo-Brutalism 风格
  * 粗描边 Tab Bar + 糖果色活跃态 + 方圆角"+"按钮 + 实心阴影
  */
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { DeviceEventEmitter, View, StyleSheet, StatusBar, ActivityIndicator } from 'react-native';
+import React, { useState, useMemo, useEffect } from 'react';
+import { View, StyleSheet, StatusBar, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Sentry from '@sentry/react-native';
 import BottomTabBar from './BottomTabBar';
-import { useSocialApi, useSocialResource } from '../screens/social/shared';
+import { useCommunityState } from '../hooks/useCommunityState';
 
 // 导入屏幕组件
 import RetrospectivesScreen from '../screens/ai/RetrospectivesScreen';
@@ -65,16 +65,11 @@ const Stack = createNativeStackNavigator();
 function MainNavigator({ navigation }: { navigation: any }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const { isDark, colors } = useTheme();
-  const socialApi = useSocialApi();
-  const community = useSocialResource(useCallback(() => socialApi.status(), [socialApi]));
-  const communityEnabled = community.value?.enabled === true;
+  const community = useCommunityState();
+  const communityEnabled = community.enabled;
   useEffect(() => {
-    const listener = DeviceEventEmitter.addListener('communityChanged', community.refresh);
-    return () => listener.remove();
-  }, [community.refresh]);
-  useEffect(() => {
-    if (community.value?.enabled === false && activeTab === 'community') setActiveTab('dashboard');
-  }, [community.value?.enabled, activeTab]);
+    if (community.ready && !community.enabled && activeTab === 'community') setActiveTab('dashboard');
+  }, [community.ready, community.enabled, activeTab]);
 
   const dynamicStyles = useMemo(() => StyleSheet.create({
     container: {
@@ -114,6 +109,8 @@ function MainNavigator({ navigation }: { navigation: any }) {
         return <DashboardScreen />;
     }
   };
+
+  if (!community.ready) return <LoadingScreen />;
 
   return (
     <SafeAreaView style={dynamicStyles.container}>
