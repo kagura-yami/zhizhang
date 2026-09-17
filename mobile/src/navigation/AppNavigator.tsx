@@ -12,6 +12,7 @@ import BottomTabBar from './BottomTabBar';
 import { useSocialApi, useSocialResource } from '../screens/social/shared';
 
 // 导入屏幕组件
+import RetrospectivesScreen from '../screens/ai/RetrospectivesScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import GeneralSettingsScreen from '../screens/GeneralSettingsScreen';
 import PersonalizationSettingsScreen from '../screens/PersonalizationSettingsScreen';
@@ -204,6 +205,7 @@ export default function AppNavigator() {
         ) : (
           <>
             <Stack.Screen name="Main" component={MainNavigator} />
+            <Stack.Screen name="Retrospectives" component={RetrospectivesScreen} options={{ headerShown: true, title: '复盘' }} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
             <Stack.Screen name="SocialSettings" component={SocialSettingsScreen} options={{ headerShown: true, title: '启用社群' }} />
             <Stack.Screen name="SocialPrivacy" component={SocialPrivacyScreen} options={{ headerShown: true, title: '社群隐私' }} />

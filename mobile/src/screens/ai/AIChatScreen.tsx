@@ -29,7 +29,7 @@ import { ThemeColors } from '../../theme/colors';
 import { borderRadius, borderWidth, spacing, shadow } from '../../theme/spacing';
 import { useStyles } from '../../hooks';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { useAlert } from '../../providers';
+import { useAlert, useTheme } from '../../providers';
 import { aiService } from '../../services/api/ai';
 import { audioRecorderService } from '../../services/audio/audioRecorderService';
 import type { RecordingProgress } from '../../services/audio/audioRecorderService';
@@ -68,6 +68,7 @@ interface StreamStep {
 
 // 工具名称映射
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
+  create_retrospective: '生成复盘',
   create_bills: '记账',
   query_bills: '查询账单',
   delete_bills: '删除账单',
@@ -77,12 +78,13 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
 // 消息类型
 interface Message {
   id: string;
-  type: 'text' | 'bills' | 'bill_list' | 'statistics' | 'loading' | 'error' | 'streaming';
+  type: 'text' | 'bills' | 'bill_list' | 'statistics' | 'retrospective' | 'loading' | 'error' | 'streaming';
   content?: string;
   imageUrls?: string[];
   bills?: BillItem[];
   billListData?: any;
   statisticsData?: any;
+  retrospectiveId?: string;
   isUser: boolean;
   timestamp: Date;
   streamSteps?: StreamStep[];
@@ -860,8 +862,11 @@ const chatSkeletonStyles = StyleSheet.create({
 export default function AIChatScreen({ autoVoice = false }: { autoVoice?: boolean }) {
   const styles = useStyles(createStyles);
   const { alert, confirm } = useAlert();
+  const { colors } = useTheme();
   const route = useRoute();
   const navigation = useNavigation();
+  const reviewPrompt = (route.params as any)?.prompt as string | undefined;
+  useEffect(() => { if (reviewPrompt) setInputText(reviewPrompt); }, [reviewPrompt]);
   const routeSessionId = (route.params as any)?.sessionId as number | undefined;
   // 是否从会话列表导航过来（stack 模式）
   const isStackMode = routeSessionId !== undefined;
@@ -869,7 +874,7 @@ export default function AIChatScreen({ autoVoice = false }: { autoVoice?: boolea
     {
       id: 'welcome',
       type: 'text',
-      content: '你好！我是你的 AI 助手，可以帮你：\n\n📝 记账 — "午餐花了35元"\n🔍 查账 — "今天记了什么"\n📊 统计 — "这个月花了多少"\n🗑️ 删除 — "删掉刚才那条"\n💬 闲聊 — 随便聊什么都行\n\n试着发送一条消息吧！',
+      content: '你好！我是你的 AI 助手，可以帮你：\n\n📝 记账 — "午餐花了35元"\n🔍 查账 — "今天记了什么"\n📊 统计 — "这个月花了多少"\n📖 复盘 — "帮我生成上个月的消费复盘"\n🗑️ 删除 — "删掉刚才那条"\n💬 闲聊 — 随便聊什么都行\n\n试着发送一条消息吧！',
       isUser: false,
       timestamp: new Date(),
     },
@@ -1092,7 +1097,7 @@ export default function AIChatScreen({ autoVoice = false }: { autoVoice?: boolea
       {
         id: 'welcome',
         type: 'text',
-        content: '你好！我是你的 AI 助手，可以帮你：\n\n📝 记账 — "午餐花了35元"\n🔍 查账 — "今天记了什么"\n📊 统计 — "这个月花了多少"\n🗑️ 删除 — "删掉刚才那条"\n💬 闲聊 — 随便聊什么都行\n\n试着发送一条消息吧！',
+        content: '你好！我是你的 AI 助手，可以帮你：\n\n📝 记账 — "午餐花了35元"\n🔍 查账 — "今天记了什么"\n📊 统计 — "这个月花了多少"\n📖 复盘 — "帮我生成上个月的消费复盘"\n🗑️ 删除 — "删掉刚才那条"\n💬 闲聊 — 随便聊什么都行\n\n试着发送一条消息吧！',
         isUser: false,
         timestamp: new Date(),
       },
@@ -1403,7 +1408,10 @@ export default function AIChatScreen({ autoVoice = false }: { autoVoice?: boolea
               });
             }
           }
-          // tool messages are represented by their results in assistant responses
+          if (msg.role === 'tool' && msg.toolName === 'create_retrospective' && msg.toolResult?.success && msg.toolResult.data?.id) {
+            displayMessages.push({ id: `review-${msg.id}`, type: 'retrospective', content: msg.toolResult.message, retrospectiveId: msg.toolResult.data.id, isUser: false, timestamp: new Date(msg.createdAt) });
+          }
+          // Other tool messages are represented by their results in assistant responses
         }
         if (displayMessages.length > 0) {
           setMessages(displayMessages);
@@ -1608,7 +1616,9 @@ export default function AIChatScreen({ autoVoice = false }: { autoVoice?: boolea
           firstTextDelta = true;
 
           // 根据工具类型添加对应消息（插入到流式消息前面）
-          if (data.toolName === 'create_bills' && data.result.success) {
+          if (data.toolName === 'create_retrospective' && data.result.success) {
+            insertBeforeStream({ type: 'retrospective', content: data.result.message, retrospectiveId: data.result.data?.id, isUser: false });
+          } else if (data.toolName === 'create_bills'  && data.result.success) {
             const bills = (data.result.data?.bills || []) as any[];
             const billsWithIds: BillItem[] = bills.map((bill: any, index: number) => ({
               amount: bill.amount,
@@ -1857,6 +1867,15 @@ export default function AIChatScreen({ autoVoice = false }: { autoVoice?: boolea
   };
 
   const renderMessage = ({ item }: { item: Message }) => {
+    if (item.type === 'retrospective') {
+      return <View style={{ padding: 16, margin: 12, borderRadius: 16, backgroundColor: colors.surface, gap: 12 }}>
+        <Text style={{ color: colors.textPrimary, fontSize: 16 }}>复盘任务已提交</Text>
+        <Text style={{ color: colors.textSecondary, lineHeight: 22 }}>生成结果自动保存在“我的 → 财务 → 复盘”。</Text>
+        <TouchableOpacity accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }} onPress={() => (navigation as any).navigate('Retrospectives', { id: item.retrospectiveId })}>
+          <Text style={{ color: colors.primary, fontWeight: '700' }}>查看进度与报告 →</Text>
+        </TouchableOpacity>
+      </View>;
+    }
     if (item.type === 'loading') {
       return (
         <View style={[styles.messageBubble, styles.aiBubble]}>
@@ -2219,6 +2238,8 @@ export default function AIChatScreen({ autoVoice = false }: { autoVoice?: boolea
         {/* 右侧按钮：发送/语音切换 */}
         {!isVoiceMode && (inputText.trim() || pendingImages.length > 0) ? (
           <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="发送消息"
             style={[styles.sendButton, isLoading && styles.buttonDisabled]}
             onPress={() => handleSend()}
             activeOpacity={0.7}

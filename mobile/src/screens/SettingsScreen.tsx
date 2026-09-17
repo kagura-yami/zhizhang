@@ -88,6 +88,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       title: '💰 财务',
       items: [
         { id: 'budget-manage', label: '预算管理', icon: 'wallet', onPress: () => navigation?.navigate('Budgets') },
+        { id: 'retrospectives', label: '复盘', icon: 'wallet', onPress: () => navigation?.navigate('Retrospectives') },
         { id: 'financial-goals', label: '财务目标', icon: 'flag', onPress: () => navigation?.navigate('FinancialGoals') },
       ],
     },

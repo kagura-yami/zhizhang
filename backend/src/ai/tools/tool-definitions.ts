@@ -6,6 +6,18 @@ import { ToolDefinition } from '../types/chat.types';
  */
 export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
+    name: 'create_retrospective',
+    description: '用户明确要求生成、保存或重新生成账单复盘报告时使用。报告使用当前聊天模型，后台生成后保存在“我的→财务→复盘”。仅支持已结束的北京时间自然日或自然月；未说明周期时先追问，不能将普通消费问答当作生成请求。',
+    parameters: {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', enum: ['day', 'month'], description: '自然日或自然月' },
+        period: { type: 'string', description: '北京时间周期，日 YYYY-MM-DD，月 YYYY-MM' },
+      },
+      required: ['kind', 'period'],
+    },
+  },
+  {
     name: 'create_bills',
     description:
       '识别并创建账单记录。当用户提到了消费或收入，且信息足够完整（至少有金额）时调用此工具。如果用户没有指定日期，使用今天的日期。如果用户没有明确指定分类，根据描述自动推断最合适的分类。',

@@ -1,10 +1,9 @@
 import React, { useCallback, useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
-import { Bell, Sparkles, ChevronRight } from 'lucide-react-native';
+import { Bell } from 'lucide-react-native';
 import { useTheme } from '../../providers';
 import { useStyles } from '../../hooks/useStyles';
 import { Page, Status, stylesFor, useSocialApi, useSocialResource } from './shared';
-import RetrospectivePanel from '../ai/RetrospectivePanel';
 import SocialSettingsScreen from './SocialSettingsScreen';
 import SocialReviewableOwnersScreen from './SocialReviewableOwnersScreen';
 import SocialRankingsScreen from './SocialRankingsScreen';
@@ -12,7 +11,6 @@ import SocialRankingsScreen from './SocialRankingsScreen';
 export default function SocialCommunityScreen({ navigation }: { navigation: any }) {
   const api = useSocialApi(), s = useStyles(stylesFor), { colors } = useTheme();
   const [tab, setTab] = useState(0);
-  const [showRetrospective, setShowRetrospective] = useState(false);
   const r = useSocialResource(useCallback(() => api.status(), [api]));
   if (!r.value) return <Page><Status {...r} /></Page>;
   if (!r.value.enabled) return <SocialSettingsScreen navigation={navigation} onEnabled={r.refresh} />;
@@ -29,13 +27,8 @@ export default function SocialCommunityScreen({ navigation }: { navigation: any 
           <Text style={[s.buttonText, tab === index && s.primaryText]}>{label}</Text>
         </TouchableOpacity>)}
       </View>
-      <TouchableOpacity accessibilityRole="button" onPress={() => setShowRetrospective(true)} style={[s.row, { paddingVertical: 8 }]}>
-        <Sparkles size={21} color={colors.primary} />
-        <View style={s.grow}><Text style={s.text}>AI 消费复盘</Text><Text style={s.small}>一起看懂开销，找到改进方向</Text></View>
-        <ChevronRight size={18} color={colors.textSecondary} />
-      </TouchableOpacity>
+
     </View>
-    {showRetrospective && <RetrospectivePanel navigation={navigation} onClose={() => setShowRetrospective(false)} />}
     {tab === 0 ? <SocialReviewableOwnersScreen navigation={navigation} embedded /> : <SocialRankingsScreen navigation={navigation} />}
   </View>;
 }

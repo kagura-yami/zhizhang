@@ -2,28 +2,24 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react';
-import { Modal, SafeAreaView, Text, TextInput, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useAlert, useAuth } from '../../providers';
 import { useStyles } from '../../hooks/useStyles';
 import {
   createRetrospectiveApi,
-  defaultReviewPeriod,
   ReviewJob,
-  ReviewKind,
   ReviewReference,
 } from '../../services/api/retrospectives';
 import {
   Action,
-  Consent,
   Page,
   Status,
   stylesFor,
   useSocialResource,
 } from '../social/shared';
-import { messageKey, Pager } from '../social/reviewShared';
+import { Pager } from '../social/reviewShared';
 
 const labels: Record<ReviewJob['status'], string> = {
   queued: '等待生成',
@@ -102,7 +98,7 @@ function ReportView({
           </Text>
           {(job.status === 'queued' || job.status === 'running') && (
             <Text style={s.muted}>
-              正在后台处理，你可以返回聊天。完成后可在复盘记录中查看。
+              正在后台生成。完成后会自动保存在“我的 → 财务 → 复盘”。
             </Text>
           )}
           {job.status === 'failed' && (
@@ -114,15 +110,7 @@ function ReportView({
                   ? '生成期间账单或授权发生变化。'
                   : '本次未能生成有效报告，请检查模型配置后重试。'}
               </Text>
-              {job.attempts < 3 && (
-                <Action
-                  title="重试生成"
-                  disabled={resource.busy}
-                  onPress={() => {
-                    void resource.run(() => api.retry(id));
-                  }}
-                />
-              )}
+
             </View>
           )}
           {job.status === 'invalidated' && (
@@ -274,7 +262,7 @@ function ReportView({
           )}
           {['succeeded', 'failed', 'invalidated'].includes(job.status) && (
             <Action
-              title="按当前数据重新生成"
+              title="在 AI 助手中重新生成"
               onPress={() => regenerate(job)}
             />
           )}
@@ -299,232 +287,41 @@ function ReportView({
   );
 }
 
-function Content({
-  token,
-  onClose,
-  navigation,
-}: {
-  token: string;
-  onClose: () => void;
-  navigation: any;
-}) {
-  const s = useStyles(stylesFor),
-    { confirm } = useAlert();
-  const api = useMemo(() => createRetrospectiveApi(token), [token]);
-  const [kind, setKind] = useState<ReviewKind>('day'),
-    [period, setPeriod] = useState(defaultReviewPeriod('day'));
-  const [page, setPage] = useState(1),
-    [selected, setSelected] = useState<string | null>(null),
-    [modelId, setModelId] = useState<number | null>(null),
-    [accepted, setAccepted] = useState(false);
-  const key = useRef<{ fingerprint: string; value: string } | null>(null);
-  const resource = useSocialResource(
-    useCallback(async () => {
-      const [history, models] = await Promise.all([
-        api.list(page),
-        api.models(),
-      ]);
-      return { history, models };
-    }, [api, page]),
-  );
-  useEffect(() => {
-    if (
-      resource.value &&
-      !resource.value.models.some(model => model.id === modelId)
-    )
-      setModelId(
-        resource.value.models.find(model => model.isDefault)?.id ??
-          resource.value.models[0]?.id ??
-          null,
-      );
-  }, [resource.value, modelId]);
-  useEffect(() => {
-    setAccepted(false);
-  }, [kind, period, modelId]);
-  const leave = (screen: string, params?: object) => {
-    onClose();
-    navigation.navigate(screen, params);
-  };
-  const openReference = (ref: ReviewReference) => {
-    if (ref.kind === 'bill') leave('BillDetail', { billId: ref.id });
-    else if (ref.kind === 'vote' || ref.threadId)
-      leave('SocialReviewThread', {
-        threadId: ref.threadId ?? ref.id,
-        ...(ref.kind === 'message' ? { messageId: ref.id } : {}),
-      });
-  };
-  const generate = () => {
-    if (!modelId || !accepted) return;
-    const fingerprint = `${kind}:${period.trim()}:${modelId}`;
-    if (key.current?.fingerprint !== fingerprint)
-      key.current = { fingerprint, value: messageKey() };
-    let job: ReviewJob;
-    void resource.run(
-      async () => {
-        job = await api.create({
-          kind,
-          period: period.trim(),
-          configId: modelId,
-          clientKey: key.current!.value,
-        });
-      },
-      () => {
-        key.current = null;
-        setAccepted(false);
-        setSelected(job.id);
-      },
-    );
-  };
-  return (
-    <SafeAreaView style={s.screen}>
-      <View style={[s.row, { paddingHorizontal: 20 }]}>
-        <Text style={[s.heading, s.grow]}>账单复盘</Text>
-        <Action title="返回聊天" onPress={onClose} />
-      </View>
-      <Page>
-        {selected ? (
-          <ReportView
-            key={selected}
-            id={selected}
-            api={api}
-            back={() => {
-              setSelected(null);
-              void resource.refresh();
-            }}
-            openReference={openReference}
-            regenerate={job => {
-              setKind(job.kind);
-              setPeriod(job.period);
-              setAccepted(false);
-              setSelected(null);
-              void resource.refresh();
-            }}
-          />
-        ) : (
-          <>
-            <Text style={s.title}>回看账单，安排下一步</Text>
-            <Text style={s.muted}>
-              选择已结束的自然日或自然月。完整账单参与复盘，没有好友评价也能生成。
-            </Text>
-            <Status {...resource} />
-            <View style={s.card}>
-              <Text style={s.heading}>新建复盘</Text>
-              <View style={s.chipRow}>
-                {(['day', 'month'] as const).map(value => (
-                  <Action
-                    key={value}
-                    title={value === 'day' ? '按日' : '按月'}
-                    primary={kind === value}
-                    onPress={() => {
-                      setKind(value);
-                      setPeriod(defaultReviewPeriod(value));
-                    }}
-                  />
-                ))}
-              </View>
-              <Text style={s.text}>
-                {kind === 'day' ? '日期（YYYY-MM-DD）' : '月份（YYYY-MM）'}
-              </Text>
-              <TextInput
-                accessibilityLabel="复盘周期"
-                style={s.input}
-                value={period}
-                onChangeText={setPeriod}
-                autoCapitalize="none"
-                maxLength={10}
-              />
-              <Text style={s.small}>
-                按北京时间划分周期；当天和当月结束后才可复盘。
-              </Text>
-              <Text style={s.text}>使用的模型</Text>
-              <View style={s.chipRow}>
-                {resource.value?.models.map(model => (
-                  <Action
-                    key={model.id}
-                    title={model.name}
-                    primary={modelId === model.id}
-                    onPress={() => setModelId(model.id)}
-                  />
-                ))}
-              </View>
-              {resource.value && !resource.value.models.length && (
-                <Text style={s.error}>请先在模型设置中添加配置。</Text>
-              )}
-              <Action
-                title="模型设置"
-                onPress={() => leave('GeneralSettings')}
-              />
-              <Consent
-                checked={accepted}
-                onChange={setAccepted}
-                text="我同意将所选周期的账单信息及获准的反馈发送给所选 AI 服务生成复盘"
-              />
-              <Action
-                primary
-                title={resource.busy ? '正在提交…' : '生成复盘'}
-                disabled={
-                  !accepted || !modelId || resource.busy || resource.loading
-                }
-                onPress={generate}
-              />
-            </View>
-            <Action
-              title="评价用于 AI 的授权设置"
-              onPress={() => leave('SocialSettings')}
-            />
-            <Text style={s.heading}>复盘记录</Text>
-            <Text style={s.small}>
-              仅本人可见。生成任务可离开页面后继续；按需刷新查看最新状态。
-            </Text>
-            <Action
-              title="刷新记录"
-              onPress={() => {
-                void resource.refresh();
-              }}
-              disabled={resource.loading}
-            />
-            {resource.value?.history.total === 0 && (
-              <Text style={s.muted}>还没有复盘记录，从已结束的一天开始。</Text>
-            )}
-            {resource.value?.history.items.map(job => (
-              <View key={job.id} style={s.card}>
-                <Text style={s.heading}>
-                  {job.period} · {job.kind === 'day' ? '日复盘' : '月复盘'}
-                </Text>
-                <Text style={s.muted}>{labels[job.status]}</Text>
-                <Action title="查看复盘" onPress={() => setSelected(job.id)} />
-              </View>
-            ))}
-            {resource.value && (
-              <Pager
-                page={page}
-                hasNext={page * 10 < resource.value.history.total}
-                change={setPage}
-              />
-            )}
-          </>
-        )}
-      </Page>
-    </SafeAreaView>
-  );
-}
-
-export default function RetrospectivePanel({
-  onClose,
-  navigation,
-}: {
-  onClose: () => void;
-  navigation: any;
-}) {
+export default function RetrospectivesScreen({ navigation, route }: { navigation: any; route?: any }) {
   const { token } = useAuth();
-  return (
-    <Modal visible animationType="slide" onRequestClose={onClose}>
-      <Content
-        key={token || ''}
-        token={token || ''}
-        onClose={onClose}
-        navigation={navigation}
-      />
-    </Modal>
-  );
+  return <History key={token || ''} token={token || ''} navigation={navigation} initialId={route?.params?.id} />;
+}
+function History({ token, navigation, initialId }: { token: string; navigation: any; initialId?: string }) {
+  const s = useStyles(stylesFor);
+  const api = useMemo(() => createRetrospectiveApi(token), [token]);
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<string | null>(initialId || null);
+  const resource = useSocialResource(useCallback(() => api.list(page), [api, page]));
+  useEffect(() => { if (initialId) setSelected(initialId); }, [initialId]);
+  useEffect(() => {
+    if (!resource.value?.items.some(job => ['queued', 'running'].includes(job.status))) return;
+    const timer = setTimeout(() => { void resource.refresh(); }, 4000);
+    return () => clearTimeout(timer);
+  }, [resource.value, resource.refresh]);
+  const openReference = (ref: ReviewReference) => {
+    if (ref.kind === 'bill') navigation.navigate('BillDetail', { billId: ref.id });
+    else if (ref.kind === 'vote' || ref.threadId) navigation.navigate('SocialReviewThread', { threadId: ref.threadId ?? ref.id, ...(ref.kind === 'message' ? { messageId: ref.id } : {}) });
+  };
+  return <Page>
+    {selected ? <ReportView key={selected} id={selected} api={api} back={() => { setSelected(null); void resource.refresh(); }} openReference={openReference} regenerate={job => navigation.navigate('AIChat', { prompt: `请重新生成 ${job.period} 的${job.kind === 'day' ? '日' : '月'}复盘报告` })} /> : <>
+      <Text style={s.title}>我的复盘</Text>
+      <Text style={s.muted}>在 AI 助手对话中提出复盘需求，生成的报告会自动保存在这里，仅自己可见。</Text>
+      <Action title="去 AI 助手聊聊" onPress={() => navigation.navigate('AIChat')} />
+      <Status {...resource} />
+      {resource.value?.total === 0 && <View style={s.empty}><Text style={s.heading}>还没有复盘报告</Text><Text style={s.muted}>试着对 AI 助手说：“帮我生成上个月的消费复盘”。</Text></View>}
+      {resource.value?.items.map(job => <View key={job.id} style={s.card}>
+        <Text style={s.heading}>{job.period} · {job.kind === 'day' ? '日复盘' : '月复盘'}</Text>
+        <Text style={s.muted}>{labels[job.status]}</Text>
+        <Text style={s.small}>{new Date(job.createdAt).toLocaleString()}</Text>
+        <Action title="查看复盘" onPress={() => setSelected(job.id)} />
+      </View>)}
+      {resource.value && <Pager page={page} hasNext={page * 10 < resource.value.total} change={setPage} />}
+      <Action title="刷新记录" disabled={resource.loading} onPress={resource.refresh} />
+    </>}
+  </Page>;
 }

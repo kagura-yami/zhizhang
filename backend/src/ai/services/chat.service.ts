@@ -141,6 +141,7 @@ export class ChatService {
             userId,
             toolCall.name,
             toolCall.arguments,
+            { configId: config.id, turnKey: `${sessionId}:${userSeqNum}` },
           );
 
           // 保存 tool 消息
@@ -375,6 +376,7 @@ export class ChatService {
             userId,
             toolCall.name,
             toolCall.arguments,
+            { configId: config.id, turnKey: `${sessionId}:${userSeqNum}` },
           );
 
           // 保存 tool 消息
@@ -587,8 +589,9 @@ export class ChatService {
       .map((c) => c.name);
 
     const today = new Date();
-    const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][today.getDay()];
-    const dateStr = today.toISOString().split('T')[0];
+    const beijing = new Date(today.getTime() + 8 * 3600000);
+    const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][beijing.getUTCDay()];
+    const dateStr = beijing.toISOString().split('T')[0];
 
     return `你是一个智能助手，可以帮助用户记账、查询账单、统计分析，也可以进行日常闲聊和回答问题。
 
@@ -606,6 +609,7 @@ export class ChatService {
 4. 当用户要求删除账单时，调用 delete_bills 工具（需要先通过 query_bills 获取账单 ID）
 5. 当用户询问统计、消费分析、预算等问题时，调用 get_statistics 工具
 6. 日常闲聊和普通问答时，直接回复，不要调用任何工具
+7. 用户要求生成或重新生成复盘报告时，调用 create_retrospective，而不是仅用 get_statistics 回答。未明确周期先追问；仅支持已结束的北京时间自然日或自然月，不擅自换成其他周期。生成使用当前用户聊天模型，结果自动保存到“我的 → 财务 → 复盘”。只有工具返回成功才可说已创建任务，排队不代表已完成。
 
 ## 注意事项
 - 如果用户没有指定日期，默认使用今天 (${dateStr})

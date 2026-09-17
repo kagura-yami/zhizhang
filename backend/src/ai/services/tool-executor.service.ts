@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { RetrospectiveJobsService } from './retrospective-jobs.service';
 import { Injectable, Logger } from '@nestjs/common';
 import { BillsService } from '../../bills/bills.service';
 import { CategoriesService } from '../../categories/categories.service';
@@ -13,6 +15,7 @@ export class ToolExecutorService {
   constructor(
     private readonly billsService: BillsService,
     private readonly categoriesService: CategoriesService,
+    private readonly retrospectiveJobs: RetrospectiveJobsService,
   ) {}
 
   /**
@@ -22,10 +25,24 @@ export class ToolExecutorService {
     userId: string,
     toolName: string,
     args: Record<string, any>,
+    context?: { configId: number; turnKey: string },
   ): Promise<{ success: boolean; data: any; message: string }> {
     this.logger.log(`执行工具: ${toolName}, 参数: ${JSON.stringify(args)}`);
 
     switch (toolName) {
+      case 'create_retrospective': {
+        try {
+          if (!context?.configId || !context.turnKey) throw new Error('缺少当前聊天模型，请重新发送请求');
+          if (!['day', 'month'].includes(args.kind) || typeof args.period !== 'string') throw new Error('请明确需要复盘的日期或月份');
+          // 同一条用户消息中的重复工具调用复用任务，不接受模型传来的账号、模型或幂等键。
+          const hex = createHash('sha256').update(JSON.stringify([userId, context.turnKey, args.kind, args.period, context.configId])).digest('hex');
+          const clientKey = `${hex.slice(0,8)}-${hex.slice(8,12)}-4${hex.slice(13,16)}-a${hex.slice(17,20)}-${hex.slice(20,32)}`;
+          const job = await this.retrospectiveJobs.create(userId, { kind: args.kind, period: args.period, configId: context.configId, clientKey });
+          return { success: true, data: job, message: `${job.period} 的复盘任务已创建。后台生成后自动保存在“我的 → 财务 → 复盘”。当前状态：${job.status}；请勿将排队或生成中描述为已完成。` };
+        } catch (error) {
+          return { success: false, data: null, message: `复盘未创建：${error.message}` };
+        }
+      }
       case 'create_bills':
         return this.executeCreateBills(userId, args);
       case 'query_bills':

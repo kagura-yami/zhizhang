@@ -85,7 +85,8 @@ declare global {
       CategoryManagement: undefined;
 
       // AI 助手
-      AIChat: { sessionId?: number; autoVoice?: boolean } | undefined;
+      Retrospectives: { id?: string } | undefined;
+      AIChat: { sessionId?: number; autoVoice?: boolean; prompt?: string } | undefined;
       AIChatSessions: undefined;
 
       // 账户管理
