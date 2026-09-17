@@ -1,7 +1,10 @@
+import { IsOptional as DeviceOptional, IsString as DeviceString, MaxLength as DeviceMax } from 'class-validator';
 import { IsNotEmpty, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class BiometricLoginDto {
+  @DeviceOptional() @DeviceString() @DeviceMax(512)
+  devicePublicKey?: string;
   @ApiProperty({ description: '设备生物识别解锁后释放的随机设备凭据' })
   @IsString()
   @IsNotEmpty()

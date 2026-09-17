@@ -132,6 +132,11 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
+    com.zhizhang.auth.DeviceSession.context = applicationContext
+    com.facebook.react.modules.network.OkHttpClientProvider.setOkHttpClientFactory {
+      com.facebook.react.modules.network.OkHttpClientProvider.createClientBuilder()
+        .addInterceptor(com.zhizhang.auth.DeviceSession.interceptor()).build()
+    }
     loadReactNative(this)
     UpdateCheckScheduler.schedule(this)
     initializeSentry()

@@ -7,7 +7,7 @@ import env from '../config/env';
 import { logger } from '../utils/logger';
 import { storage } from '../utils/storage';
 import { STORAGE_KEYS } from '../constants/app';
-import { clearAuthSession, getAuthSession } from './security';
+import { getAuthSession } from './security';
 import { HTTP_STATUS, RETRY_CONFIG, TIMEOUT_CONFIG } from '../constants/api';
 import type { ApiResponse, ApiError, RequestConfig, RequestInterceptor, ResponseInterceptor } from '../types/api';
 
@@ -48,7 +48,7 @@ class HttpService {
         // 添加认证token
         const secureSession = await getAuthSession();
         const token = secureSession?.token || await storage.getItem<string>(STORAGE_KEYS.USER_TOKEN);
-        if (token && !config.headers.Authorization) {
+        if (token && !/^\/auth\/(login|register|biometric\/login)$/.test(config.url || '') && !config.headers.Authorization) {
           config.headers.Authorization = `Bearer ${token}`;
         }
 
@@ -151,11 +151,7 @@ class HttpService {
 
     switch (status) {
       case HTTP_STATUS.UNAUTHORIZED:
-        // 清除token并跳转到登录页
-        await clearAuthSession();
-        await storage.removeItem(STORAGE_KEYS.USER_TOKEN);
-        await storage.removeItem(STORAGE_KEYS.USER_INFO);
-        // TODO: 导航到登录页
+        // AuthProvider owns session invalidation, including protection against stale requests.
         break;
 
       case HTTP_STATUS.FORBIDDEN:
@@ -180,7 +176,7 @@ class HttpService {
       // 服务器响应错误
       return {
         code: error.response.status,
-        message: error.response.data?.message || error.message || '请求失败',
+        message: error.response.status === 401 ? '登录状态已失效，请重新登录' : error.response.data?.message || error.message || '请求失败',
         details: error.response.data,
         timestamp: new Date().toISOString(),
       };
@@ -220,8 +216,9 @@ class HttpService {
   /**
    * 添加响应拦截器
    */
-  addResponseInterceptor(interceptor: ResponseInterceptor): void {
+  addResponseInterceptor(interceptor: ResponseInterceptor): () => void {
     this.responseInterceptors.push(interceptor);
+    return () => { this.responseInterceptors = this.responseInterceptors.filter(item => item !== interceptor); };
   }
 
   /**

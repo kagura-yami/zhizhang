@@ -1,3 +1,4 @@
+import { DeviceSessionService } from './device-session.service';
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -18,7 +19,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, DeviceSessionService],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

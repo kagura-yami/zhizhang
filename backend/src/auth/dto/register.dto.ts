@@ -1,3 +1,4 @@
+import { IsOptional as DeviceOptional, IsString as DeviceString, MaxLength as DeviceMax } from 'class-validator';
 import {
   IsString,
   MinLength,
@@ -9,6 +10,8 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RegisterDto {
+  @DeviceOptional() @DeviceString() @DeviceMax(512)
+  devicePublicKey?: string;
   @ApiProperty({
     description: '用户名',
     example: 'testuser',

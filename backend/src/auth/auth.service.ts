@@ -1,3 +1,4 @@
+import { DeviceSessionService } from './device-session.service';
 import {
   Injectable,
   UnauthorizedException,
@@ -22,6 +23,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly devices: DeviceSessionService,
   ) {}
 
   /**
@@ -72,7 +74,7 @@ export class AuthService {
     this.logger.log(`用户注册成功: ${user.username}`);
 
     // 生成token
-    const token = this.generateToken(user.id, user.username);
+    const token = await this.loginToken(user.id, user.username, dto.devicePublicKey);
 
     return {
       user,
@@ -114,7 +116,7 @@ export class AuthService {
     this.logger.log(`用户登录成功: ${user.username}`);
 
     // 生成token
-    const token = this.generateToken(user.id, user.username);
+    const token = await this.loginToken(user.id, user.username, dto.devicePublicKey);
 
     return {
       user: {
@@ -140,8 +142,8 @@ export class AuthService {
     if (existing && existing.userId !== userId) throw new ConflictException('该设备凭据已绑定其他账号');
     await this.prisma.biometricCredential.upsert({
       where: { credentialHash },
-      create: { userId, credentialHash, deviceLabel: dto.deviceLabel || '本机' },
-      update: { userId, deviceLabel: dto.deviceLabel || '本机', updatedAt: new Date() },
+      create: { userId, credentialHash, devicePublicKey: dto.devicePublicKey, deviceLabel: dto.deviceLabel || '本机' },
+      update: { userId, devicePublicKey: dto.devicePublicKey, deviceLabel: dto.deviceLabel || '本机', updatedAt: new Date() },
     });
     return { username: user.username };
   }
@@ -157,12 +159,13 @@ export class AuthService {
       include: { user: true },
     });
     if (!credential || !credential.user.isActive) throw new UnauthorizedException('生物识别凭据无效或账号已禁用');
+    if (credential.devicePublicKey && credential.devicePublicKey !== dto.devicePublicKey) throw new UnauthorizedException('生物识别凭据仅限绑定设备使用');
     await this.prisma.biometricCredential.update({ where: { id: credential.id }, data: { lastUsedAt: new Date() } });
     await this.prisma.user.update({ where: { id: credential.userId }, data: { lastLoginAt: new Date() } });
     const user = credential.user;
     return {
       user: { id: user.id, username: user.username, email: user.email, nickname: user.nickname, avatar: user.avatar },
-      token: this.generateToken(user.id, user.username),
+      token: await this.loginToken(user.id, user.username, dto.devicePublicKey),
     };
   }
 
@@ -278,10 +281,11 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
 
     // 更新密码
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { password: hashedPassword },
-    });
+    await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id: userId }, data: { password: hashedPassword } }),
+      this.prisma.deviceSession.updateMany({ where: { userId }, data: { revokedAt: new Date() } }),
+      this.prisma.biometricCredential.deleteMany({ where: { userId } }),
+    ]);
 
     this.logger.log(`用户密码修改成功: ${user.username}`);
 
@@ -291,6 +295,10 @@ export class AuthService {
   /**
    * 生成JWT token
    */
+  private async loginToken(userId: string, username: string, publicKey?: string) {
+    return publicKey ? this.devices.issue(userId, username, publicKey) : this.generateToken(userId, username);
+  }
+
   private generateToken(userId: string, username: string): string {
     const payload = {
       sub: userId,

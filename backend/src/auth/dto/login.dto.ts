@@ -1,7 +1,10 @@
+import { IsOptional as DeviceOptional, IsString as DeviceString, MaxLength as DeviceMax } from 'class-validator';
 import { IsString, MinLength, MaxLength, IsNotEmpty } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class LoginDto {
+  @DeviceOptional() @DeviceString() @DeviceMax(512)
+  devicePublicKey?: string;
   @ApiProperty({
     description: '用户名',
     example: 'testuser',

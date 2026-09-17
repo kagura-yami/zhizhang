@@ -24,6 +24,7 @@ model User {
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)      // 更新时间
 
   // 关联关系
+  deviceSessions DeviceSession[]
   bills          Bill[]           // 用户的所有账单记录
   categories     Category[]       // 用户的自定义分类
   accounts       Account[]        // 用户的账户
@@ -344,6 +345,7 @@ model ReviewModerationAudit {
 }
 
 model BiometricCredential {
+  devicePublicKey String? @db.Text
   id             String    @id @default(uuid()) @db.Uuid
   userId         String    @map("user_id") @db.Uuid
   credentialHash String    @unique @map("credential_hash") @db.VarChar(128)
@@ -778,5 +780,25 @@ model ChatMessage {
   @@unique([sessionId, seqNum])
   @@index([sessionId])
   @@map("chat_messages")
+  @@schema("public")
+}
+
+model DeviceSession {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  publicKey String @db.Text
+  expiresAt DateTime @db.Timestamptz(6)
+  revokedAt DateTime? @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@map("device_sessions")
+  @@schema("public")
+}
+model DeviceProofNonce {
+  id String @id @db.VarChar(64)
+  expiresAt DateTime @db.Timestamptz(6)
+  @@index([expiresAt])
+  @@map("device_proof_nonces")
   @@schema("public")
 }

@@ -1,0 +1,32 @@
+import React from 'react';
+import Renderer, {act} from 'react-test-renderer';
+import {Alert} from 'react-native';
+import {AuthProvider,useAuth} from '../src/providers/AuthProvider';
+import {authService} from '../src/services/api/auth';
+import {clearAuthSession} from '../src/services/security';
+let mockInterceptor: any;
+const mockRemove=jest.fn();
+jest.mock('../src/services/http',()=>({httpService:{addResponseInterceptor:jest.fn((i:any)=>{mockInterceptor=i;return mockRemove;}),post:jest.fn().mockResolvedValue({success:true})}}));
+jest.mock('../src/services/api/auth',()=>({authService:{getProfile:jest.fn().mockResolvedValue({success:true,data:{id:'a',username:'a'}}),login:jest.fn()}}));
+jest.mock('../src/services/security',()=>({clearAuthSession:jest.fn().mockResolvedValue(undefined),getAutoLoginSetting:jest.fn().mockResolvedValue(true),isBiometricEnabled:jest.fn().mockResolvedValue(false),getAuthSession:jest.fn().mockResolvedValue({token:'token-a',user:{id:'a',username:'a'}}),saveAuthSession:jest.fn().mockResolvedValue(undefined)}));
+jest.mock('../src/utils/storage',()=>({storage:{getItem:jest.fn(),removeItem:jest.fn().mockResolvedValue(undefined)}}));
+jest.mock('../src/utils/nativeAuth',()=>({setNativeToken:jest.fn().mockResolvedValue(true),clearNativeToken:jest.fn().mockResolvedValue(true)}));
+jest.mock('../src/lib/queryClient',()=>({queryClient:{clear:jest.fn()}}));
+jest.mock('../src/utils/logger',()=>({logger:{info:jest.fn(),warn:jest.fn(),error:jest.fn()}}));
+let current: ReturnType<typeof useAuth>;
+function Probe(){current=useAuth();return null;}
+const error=(status:number,token?:string)=>({response:{status},code:'ERR_BAD_REQUEST',config:{headers:token?{Authorization:`Bearer ${token}`}:{}}});
+test('401 clears the visible session once; public login failures, offline and stale account errors do not sign out a new account',async()=>{
+ const alert=jest.spyOn(Alert,'alert').mockImplementation(()=>{});let tree!:Renderer.ReactTestRenderer;
+ await act(async()=>{tree=Renderer.create(<AuthProvider><Probe/></AuthProvider>);});
+ expect(current.isLoggedIn).toBe(true);
+ await act(async()=>{await mockInterceptor.onResponseError(error(503,'token-a'));await mockInterceptor.onResponseError(error(401));});
+ expect(current.isLoggedIn).toBe(true);
+ await act(async()=>{await Promise.all([mockInterceptor.onResponseError(error(401,'token-a')),mockInterceptor.onResponseError(error(401,'token-a'))]);});
+ expect(current.isLoggedIn).toBe(false);expect(current.token).toBeNull();expect(clearAuthSession).toHaveBeenCalledTimes(1);expect(alert).toHaveBeenCalledTimes(1);
+ (authService.login as jest.Mock).mockResolvedValue({success:true,data:{token:'token-b',user:{id:'b',username:'b'}}});
+ await act(async()=>{await current.login({username:'b',password:'password'});});
+ await act(async()=>{await mockInterceptor.onResponseError(error(401,'token-a'));});
+ expect(current.token).toBe('token-b');expect(current.isLoggedIn).toBe(true);
+ act(()=>tree.unmount());expect(mockRemove).toHaveBeenCalled();alert.mockRestore();
+});

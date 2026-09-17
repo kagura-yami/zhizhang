@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit
 object NotificationSampleArchive {
     private val executor = Executors.newSingleThreadExecutor()
     private val gson = Gson()
-    private val client = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS)
+    private val client = OkHttpClient.Builder().addInterceptor(com.zhizhang.auth.DeviceSession.interceptor()).connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS).callTimeout(30, TimeUnit.SECONDS).build()
     private var database: SQLiteDatabase? = null
     private var lastAttempt = 0L

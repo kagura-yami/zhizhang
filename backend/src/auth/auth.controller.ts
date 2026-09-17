@@ -1,3 +1,5 @@
+import { DeviceSessionService } from './device-session.service';
+import { DeviceChallengeDto, DeviceRenewDto } from './dto/device-session.dto';
 import {
   Controller,
   Post,
@@ -65,7 +67,26 @@ const imageFileFilter = (
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService, private readonly devices: DeviceSessionService) {}
+
+  @Public()
+  @Post('device/challenge')
+  @HttpCode(200)
+  async deviceChallenge(@Body() dto: DeviceChallengeDto) {
+    return { success: true, data: { challenge: await this.devices.challenge(dto.sessionId) } };
+  }
+  @Public()
+  @Post('device/renew')
+  @HttpCode(200)
+  async deviceRenew(@Body() dto: DeviceRenewDto) {
+    return { success: true, data: { token: await this.devices.renew(dto.challenge, dto.signature) } };
+  }
+  @Post('device/logout')
+  @HttpCode(200)
+  async deviceLogout(@CurrentUser('id') userId: string, @CurrentUser('deviceSessionId') sid?: string) {
+    if (sid) await this.devices.revoke(sid, userId);
+    return { success: true };
+  }
 
   /**
    * 用户注册

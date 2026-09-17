@@ -47,7 +47,7 @@ class VoiceCaptureService : Service() {
         private const val NOTIFICATION_ID = 7782
         private const val TAG = "VoiceCaptureService"
         private val JSON_TYPE = "application/json; charset=utf-8".toMediaType()
-        private val client = OkHttpClient.Builder()
+        private val client = OkHttpClient.Builder().addInterceptor(com.zhizhang.auth.DeviceSession.interceptor())
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .writeTimeout(15, TimeUnit.SECONDS)

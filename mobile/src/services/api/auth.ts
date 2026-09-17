@@ -1,3 +1,8 @@
+import { NativeModules, Platform } from 'react-native';
+async function deviceIdentity() {
+  if (Platform.OS !== 'android') return {};
+  return { devicePublicKey: await NativeModules.AuthTokenModule.getDevicePublicKey() };
+}
 /**
  * 认证相关API服务
  */
@@ -18,16 +23,16 @@ class AuthService {
    * 用户登录
    */
   async login(credentials: LoginCredentials): Promise<ApiResponse<AuthResponse>> {
-    return httpService.post('/auth/login', credentials);
+    return httpService.post('/auth/login', { ...credentials, ...await deviceIdentity() });
   }
 
   /** 使用设备侧指纹/人脸验证后释放的设备凭据登录。 */
   async biometricLogin(credential: string): Promise<ApiResponse<AuthResponse>> {
-    return httpService.post('/auth/biometric/login', { credential });
+    return httpService.post('/auth/biometric/login', { credential, ...await deviceIdentity() });
   }
 
   async enrollBiometric(credential: string, deviceLabel?: string): Promise<ApiResponse<{ username: string }>> {
-    return httpService.post('/auth/biometric/enroll', { credential, deviceLabel });
+    return httpService.post('/auth/biometric/enroll', { credential, deviceLabel, ...await deviceIdentity() });
   }
 
   async revokeBiometric(): Promise<ApiResponse<void>> {
@@ -38,7 +43,7 @@ class AuthService {
    * 用户注册
    */
   async register(data: RegisterData): Promise<ApiResponse<AuthResponse>> {
-    return httpService.post('/auth/register', data);
+    return httpService.post('/auth/register', { ...data, ...await deviceIdentity() });
   }
 
   /**

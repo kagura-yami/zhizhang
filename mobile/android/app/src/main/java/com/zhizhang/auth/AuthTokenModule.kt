@@ -16,6 +16,26 @@ import com.facebook.react.bridge.Promise
  */
 class AuthTokenModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
 
+    init {
+        val reference = java.lang.ref.WeakReference(reactContext)
+        DeviceSession.onRejected = { token ->
+            reference.get()?.let { context ->
+                if (context.hasActiveReactInstance()) {
+                    val event = com.facebook.react.bridge.Arguments.createMap().apply { putString("token", token) }
+                    context.getJSModule(com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                        .emit("AuthSessionRejected", event)
+                }
+            }
+        }
+    }
+
+    @ReactMethod
+    fun isSameSession(first: String, second: String, promise: Promise) {
+        val a = DeviceSession.payload(first)?.optString("sid")
+        val b = DeviceSession.payload(second)?.optString("sid")
+        promise.resolve(first == second || (!a.isNullOrEmpty() && a == b))
+    }
+
     companion object {
         private const val TAG = "AuthTokenModule"
         private const val PREFS_NAME = "AuthTokenSecurePrefs"
@@ -40,6 +60,16 @@ class AuthTokenModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
             return legacyToken
         }
 
+        fun saveToken(context: Context, token: String) = synchronized(DeviceSession) {
+            val prefs = getSecurePrefs(context)
+            val old = prefs.getString(KEY_AUTH_TOKEN, null)
+            val oldClaims = old?.let { DeviceSession.payload(it) }
+            val newClaims = DeviceSession.payload(token)
+            if (oldClaims != null && newClaims != null && oldClaims.optString("sid").isNotEmpty() &&
+                oldClaims.optString("sid") == newClaims.optString("sid") && oldClaims.optLong("exp") > newClaims.optLong("exp")) return
+            if (!prefs.edit().putString(KEY_AUTH_TOKEN, token).commit()) throw IllegalStateException("Cannot store session")
+        }
+
         private fun getSecurePrefs(context: Context): SharedPreferences {
             val masterKey = MasterKey.Builder(context)
                 .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
@@ -52,6 +82,11 @@ class AuthTokenModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
             )
         }
+    }
+
+    @ReactMethod
+    fun getDevicePublicKey(promise: Promise) {
+        try { promise.resolve(DeviceSession.publicKey()) } catch (e: Exception) { promise.reject("DEVICE_KEY_ERROR", "无法访问设备安全密钥", e) }
     }
 
     override fun getName(): String = "AuthTokenModule"
@@ -67,7 +102,7 @@ class AuthTokenModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
     fun setToken(token: String, promise: Promise) {
         try {
             Log.d(TAG, "保存 Token 到 Android Keystore 加密存储")
-            getPrefs().edit().putString(KEY_AUTH_TOKEN, token).apply()
+            saveToken(reactApplicationContext, token)
             reactApplicationContext.getSharedPreferences(LEGACY_PREFS_NAME, Context.MODE_PRIVATE)
                 .edit().remove(KEY_AUTH_TOKEN).apply()
             promise.resolve(true)
@@ -98,7 +133,7 @@ class AuthTokenModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
     fun clearToken(promise: Promise) {
         try {
             Log.d(TAG, "清除 Token")
-            getPrefs().edit().remove(KEY_AUTH_TOKEN).apply()
+            synchronized(DeviceSession) { getPrefs().edit().remove(KEY_AUTH_TOKEN).commit() }
             reactApplicationContext.getSharedPreferences(LEGACY_PREFS_NAME, Context.MODE_PRIVATE)
                 .edit().remove(KEY_AUTH_TOKEN).apply()
             promise.resolve(true)

@@ -22,7 +22,7 @@ object FinanceWidgetRepository {
     private const val PREFS = "finance_widget_cache"
     private const val KEY_STATS = "stats"
     private const val KEY_SYNCED_AT = "synced_at"
-    private val client = OkHttpClient.Builder()
+    private val client = OkHttpClient.Builder().addInterceptor(com.zhizhang.auth.DeviceSession.interceptor())
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(12, TimeUnit.SECONDS)
         .callTimeout(15, TimeUnit.SECONDS)
