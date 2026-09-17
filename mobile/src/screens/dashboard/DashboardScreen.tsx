@@ -60,66 +60,87 @@ interface ProgressCardItem {
 
 /**
  * 可滑动丢弃的卡片堆叠组件
- * 跟随手指方向甩出，露出下方卡片
+ * 横向拖动切换，垂直手势留给页面滚动
  */
 function SwipeableCardStack({
   cards,
   styles,
   colors,
+  onDraggingChange,
 }: {
   cards: ProgressCardItem[];
   styles: any;
   colors: ThemeColors;
+  onDraggingChange: (dragging: boolean) => void;
 }) {
   const [topIndex, setTopIndex] = useState(0);
   const [cardHeight, setCardHeight] = useState(0);
   const pan = useRef(new Animated.ValueXY()).current;
+  const direction = useRef<'horizontal' | 'vertical' | null>(null);
+  const animating = useRef(false);
+  useEffect(() => () => {
+    pan.stopAnimation();
+    onDraggingChange(false);
+  }, [pan, onDraggingChange]);
 
   // 当 cards 变化时重置
   useEffect(() => {
+    pan.stopAnimation();
+    animating.current = false;
+    onDraggingChange(false);
     setTopIndex(0);
     setCardHeight(0);
     pan.setValue({ x: 0, y: 0 });
   }, [cards.length]);
 
-  const panResponder = useMemo(() =>
-    PanResponder.create({
+  const panResponder = useMemo(() => {
+    const claimHorizontal = (_: unknown, g: { dx: number; dy: number }) => {
+      if (cards.length < 2 || animating.current) return false;
+      if (!direction.current && Math.max(Math.abs(g.dx), Math.abs(g.dy)) > 8) {
+        // Decide once per touch: vertical scrolling must never turn into a card swipe.
+        direction.current = Math.abs(g.dx) > Math.abs(g.dy) * 1.2 ? 'horizontal' : 'vertical';
+      }
+      return direction.current === 'horizontal';
+    };
+    const returnToOrigin = () => {
+      animating.current = true;
+      Animated.spring(pan, { toValue: { x: 0, y: 0 }, friction: 6, useNativeDriver: true })
+        .start(() => { animating.current = false; });
+    };
+    return PanResponder.create({
+      onStartShouldSetPanResponderCapture: () => { direction.current = null; return false; },
       onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, g) =>
-        Math.abs(g.dx) > 5 || Math.abs(g.dy) > 5,
-      onPanResponderMove: Animated.event(
-        [null, { dx: pan.x, dy: pan.y }],
-        { useNativeDriver: false },
-      ),
+      onMoveShouldSetPanResponder: claimHorizontal,
+      onMoveShouldSetPanResponderCapture: claimHorizontal,
+      onPanResponderGrant: () => { onDraggingChange(true); },
+      onPanResponderMove: (_, g) => { pan.setValue({ x: g.dx, y: 0 }); },
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
       onPanResponderRelease: (_, g) => {
-        const dist = Math.sqrt(g.dx * g.dx + g.dy * g.dy);
-        const vel = Math.sqrt(g.vx * g.vx + g.vy * g.vy);
-        const shouldDismiss = dist > SWIPE_THRESHOLD || vel > SWIPE_VELOCITY;
-
-        if (shouldDismiss && cards.length > 1) {
-          // 沿滑动方向飞出（放大到屏幕外）
-          const scale = SCREEN_WIDTH * 1.5 / Math.max(dist, 1);
-          const toX = g.dx * scale;
-          const toY = g.dy * scale;
+        onDraggingChange(false);
+        direction.current = null;
+        if ((Math.abs(g.dx) > SWIPE_THRESHOLD || Math.abs(g.vx) > SWIPE_VELOCITY) && cards.length > 1) {
+          animating.current = true;
           Animated.timing(pan, {
-            toValue: { x: toX, y: toY },
+            toValue: { x: Math.sign(g.dx || g.vx) * SCREEN_WIDTH * 1.5, y: 0 },
             duration: 280,
             useNativeDriver: true,
-          }).start(() => {
-            setTopIndex((prev) => (prev + 1) % cards.length);
+          }).start(({ finished }) => {
+            if (finished) setTopIndex(previous => (previous + 1) % cards.length);
             pan.setValue({ x: 0, y: 0 });
+            animating.current = false;
           });
         } else {
-          // 弹回原位
-          Animated.spring(pan, {
-            toValue: { x: 0, y: 0 },
-            friction: 6,
-            useNativeDriver: true,
-          }).start();
+          returnToOrigin();
         }
       },
-    }),
-  [cards.length, pan]);
+      onPanResponderTerminate: () => {
+        onDraggingChange(false);
+        direction.current = null;
+        returnToOrigin();
+      },
+    });
+  }, [cards.length, pan, onDraggingChange]);
 
   if (cards.length === 0) {return null;}
 
@@ -195,7 +216,7 @@ function SwipeableCardStack({
           <Text style={styles.budgetLabel}>{card.labelRight}</Text>
         </View>
         {!!card.note && <Text style={[styles.budgetLabel, { marginTop: 10, lineHeight: 22 }]}>{card.note}</Text>}
-        {isTop && cards.length > 1 && <TouchableOpacity accessibilityRole="button" onPress={() => setTopIndex(i => (i + 1) % cards.length)} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={styles.budgetLabel}>下一张（{topIndex + 1}/{cards.length}） →</Text></TouchableOpacity>}
+        {isTop && cards.length > 1 && <TouchableOpacity accessibilityRole="button" onPress={() => { if (!animating.current) setTopIndex(i => (i + 1) % cards.length); }} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={styles.budgetLabel}>下一张（{topIndex + 1}/{cards.length}） →</Text></TouchableOpacity>}
       </Animated.View>,
     );
   }
@@ -262,6 +283,7 @@ function DashboardContent({ token }: { token: string }) {
     secondaryMetric,
     homeSections,
   } = useHomeDisplayPreference();
+  const [isDraggingCard, setIsDraggingCard] = useState(false);
   const [missingSetupCount, setMissingSetupCount] = useState(0);
 
   // 首页提示会影响自动记账可靠性的关键设置，点击后统一进入权限配置。
@@ -494,6 +516,7 @@ function DashboardContent({ token }: { token: string }) {
 
   return (
     <ScrollView
+      scrollEnabled={!isDraggingCard}
       style={styles.container}
       contentContainerStyle={styles.content}
       refreshControl={
@@ -569,6 +592,7 @@ function DashboardContent({ token }: { token: string }) {
       {progressCards.length > 0 ? (
         <View style={[styles.carouselWrapper, { paddingBottom: 16, marginTop: 12 }]}>
           <SwipeableCardStack
+            onDraggingChange={setIsDraggingCard}
             cards={progressCards}
             styles={styles}
             colors={styles._colors}
