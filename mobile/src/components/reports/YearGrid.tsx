@@ -3,11 +3,12 @@
  * 每格显示年份 + 当年净额
  */
 import React from 'react';
-import { View, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { ThemeColors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { useStyles } from '../../hooks';
 import GridCell from './GridCell';
+import FixedColumnGrid from './FixedColumnGrid';
 import { currentBusinessDate, LedgerCell } from '../../services/api/ledger';
 
 const NUM_COLS = 3;
@@ -25,19 +26,14 @@ export default function YearGrid({
   onYearPress,
 }: YearGridProps) {
   const styles = useStyles(createStyles);
-  const { width: screenWidth } = useWindowDimensions();
-  const cellWidth = (screenWidth - spacing.lg * 2 - GAP * (NUM_COLS - 1)) / NUM_COLS;
-  const cellHeight = Math.max(76, cellWidth * 0.75);
-
   const currentYear = currentBusinessDate().year;
 
   return (
     <View style={styles.container}>
-      <View style={styles.grid}>
-        {years.map(({ year, income, expense, refund, balance, pending }) => {
+      <FixedColumnGrid items={years} columns={NUM_COLS} gap={GAP} itemKey={item => String(item.year)}
+        renderItem={({ year, income, expense, refund, balance, pending }, cellWidth) => {
           const isFuture = year > currentYear;
           return (
-            <View key={year} style={{ marginRight: years.indexOf(years.find(y => y.year === year)!) % NUM_COLS === NUM_COLS - 1 ? 0 : GAP, marginBottom: GAP }}>
               <GridCell
                 label={String(year)}
                 income={isFuture ? 0 : income}
@@ -48,12 +44,11 @@ export default function YearGrid({
                 disabled={isFuture}
                 onPress={() => onYearPress(year)}
                 width={cellWidth}
-                height={cellHeight}
+                height={Math.max(76, cellWidth * 0.75)}
               />
-            </View>
           );
-        })}
-      </View>
+        }}
+      />
     </View>
   );
 }
@@ -62,10 +57,6 @@ const createStyles = (colors: ThemeColors) => ({
   ...StyleSheet.create({
     container: {
       paddingHorizontal: spacing.lg,
-    },
-    grid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
     },
   }),
   _colors: colors,

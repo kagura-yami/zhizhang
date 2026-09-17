@@ -132,6 +132,7 @@ function GridCell({
 const createStyles = (colors: ThemeColors) => ({
   ...StyleSheet.create({
     cell: {
+      maxWidth: '100%',
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: borderRadius.small,

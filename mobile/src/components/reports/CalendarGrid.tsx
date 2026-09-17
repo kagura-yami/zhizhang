@@ -3,11 +3,12 @@
  * 每格显示日期 + 当日净额，支持选中状态
  */
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { ThemeColors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { useStyles } from '../../hooks';
 import GridCell from './GridCell';
+import FixedColumnGrid from './FixedColumnGrid';
 import { currentBusinessDate, LedgerCell } from '../../services/api/ledger';
 
 const WEEK_DAYS = ['一', '二', '三', '四', '五', '六', '日'];
@@ -30,9 +31,6 @@ export default function CalendarGrid({
   onDayPress,
 }: CalendarGridProps) {
   const styles = useStyles(createStyles);
-  const { width: screenWidth } = useWindowDimensions();
-  const cellSize = (screenWidth - spacing.lg * 2 - GAP * 6) / 7;
-  const cellHeight = Math.max(cellSize, 78);
 
   const today = useMemo(() => {
     return currentBusinessDate().key;
@@ -70,17 +68,18 @@ export default function CalendarGrid({
       {/* 星期表头 */}
       <View style={styles.header}>
         {WEEK_DAYS.map((day) => (
-          <View key={day} style={[styles.headerCell, { width: cellSize }]}>
+          <View key={day} style={styles.headerCell}>
             <Text style={styles.headerText}>{day}</Text>
           </View>
         ))}
       </View>
 
       {/* 日期网格 */}
-      <View style={styles.grid}>
-        {cells.map((cell) => {
+      <FixedColumnGrid items={cells} columns={7} gap={GAP} itemKey={cell => cell.key}
+        renderItem={(cell, cellSize) => {
+          const cellHeight = Math.max(cellSize, 78);
           if (cell.day === null) {
-            return <View key={cell.key} style={{ width: cellSize, height: cellHeight }} />;
+            return <View key={cell.key} style={{ height: cellHeight }} />;
           }
 
           const data = dailyData.get(cell.dateStr!);
@@ -103,8 +102,8 @@ export default function CalendarGrid({
               height={cellHeight}
             />
           );
-        })}
-      </View>
+        }}
+      />
     </View>
   );
 }
@@ -120,6 +119,8 @@ const createStyles = (colors: ThemeColors) => ({
       gap: GAP,
     },
     headerCell: {
+      flex: 1,
+      minWidth: 0,
       alignItems: 'center',
       paddingVertical: spacing.sm,
     },
@@ -127,11 +128,6 @@ const createStyles = (colors: ThemeColors) => ({
       fontSize: 13,
       fontWeight: '700',
       color: colors.textTertiary,
-    },
-    grid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: GAP,
     },
   }),
   _colors: colors,

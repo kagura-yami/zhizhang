@@ -3,11 +3,12 @@
  * 每格显示月份 + 当月净额
  */
 import React, { useMemo } from 'react';
-import { View, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { ThemeColors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { useStyles } from '../../hooks';
 import GridCell from './GridCell';
+import FixedColumnGrid from './FixedColumnGrid';
 import { currentBusinessDate, LedgerCell } from '../../services/api/ledger';
 
 const NUM_COLS = 4;
@@ -27,11 +28,6 @@ export default function MonthGrid({
   onMonthPress,
 }: MonthGridProps) {
   const styles = useStyles(createStyles);
-  const { width: screenWidth } = useWindowDimensions();
-  const cellWidth = (screenWidth - spacing.lg * 2 - GAP * (NUM_COLS - 1)) / NUM_COLS;
-  const cellHeight = Math.max(72, cellWidth * 0.85);
-
-  const now = new Date();
   const currentYear = currentBusinessDate().year;
   const currentMonth = currentBusinessDate().month + 1;
 
@@ -48,9 +44,8 @@ export default function MonthGrid({
 
   return (
     <View style={styles.container}>
-      <View style={styles.grid}>
-        {months.map(({ monthNum, income, expense, isFuture, refund, balance, pending }) => (
-          <View key={monthNum} style={{ marginRight: monthNum % NUM_COLS === 0 ? 0 : GAP, marginBottom: GAP }}>
+      <FixedColumnGrid items={months} columns={NUM_COLS} gap={GAP} itemKey={item => String(item.monthNum)}
+        renderItem={({ monthNum, income, expense, isFuture, refund, balance, pending }, cellWidth) => (
             <GridCell
               label={`${monthNum}月`}
               income={isFuture ? 0 : income}
@@ -61,11 +56,10 @@ export default function MonthGrid({
               disabled={isFuture}
               onPress={() => onMonthPress(monthNum)}
               width={cellWidth}
-              height={cellHeight}
+              height={Math.max(72, cellWidth * 0.85)}
             />
-          </View>
-        ))}
-      </View>
+        )}
+      />
     </View>
   );
 }
@@ -74,10 +68,6 @@ const createStyles = (colors: ThemeColors) => ({
   ...StyleSheet.create({
     container: {
       paddingHorizontal: spacing.lg,
-    },
-    grid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
     },
   }),
   _colors: colors,
