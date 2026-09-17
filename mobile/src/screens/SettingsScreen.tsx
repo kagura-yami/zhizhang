@@ -2,7 +2,7 @@
  * 设置屏幕 - Neo-Brutalism 风格
  * 描边用户卡片 + 糖果色图标块 + 描边设置分组
  */
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
@@ -20,11 +20,15 @@ import {
   ChevronRight,
   User,
   LogOut,
+  UserPlus,
+  Users,
+  Heart,
 } from 'lucide-react-native';
 import { ThemeColors } from '../theme/colors';
 import { spacing, borderRadius, borderWidth, shadow } from '../theme';
 import { useStyles } from '../hooks';
 import { useAuth, useAlert } from '../providers';
+import { useSocialApi, useSocialResource } from './social/shared';
 import { getAvatarUrl } from '../utils/url';
 
 interface SettingsScreenProps {
@@ -69,6 +73,8 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const { user, logout } = useAuth();
   const { confirm } = useAlert();
   const styles = useStyles(createStyles);
+  const socialApi = useSocialApi();
+  const social = useSocialResource(useCallback(() => socialApi.status(), [socialApi]));
 
   const iconMap: Record<string, React.FC<{ size: number; color: string }>> = {
     wallet: Wallet,
@@ -88,6 +94,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     {
       title: '⚙️ 应用',
       items: [
+        { id: 'social-privacy', label: '隐私设置', icon: 'settings', onPress: () => navigation?.navigate('SocialPrivacy') },
         { id: 'social-settings', label: '启用社群', icon: 'settings', onPress: () => navigation?.navigate('SocialSettings') },
         {
           id: 'app-settings',
@@ -125,8 +132,9 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
   return (
     <View style={styles.container}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <View style={styles.header}>
       <TouchableOpacity
-        style={styles.header}
         onPress={() => navigation?.navigate('EditProfile')}
         activeOpacity={0.8}
       >
@@ -141,14 +149,24 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
             )}
           </View>
           <View style={styles.userDetails}>
-            <Text style={styles.userName}>{user?.nickname || user?.username || '用户'}</Text>
-            <Text style={styles.userType}>{user?.email || '智能记账用户'}</Text>
+            <Text numberOfLines={2} style={styles.userName}>{user?.nickname || user?.username || '用户'}</Text>
+            <Text numberOfLines={1} style={styles.userType}>{user?.email || '智能记账用户'}</Text>
           </View>
           <ChevronRight size={24} color={styles._colors.stroke} strokeWidth={2.5} />
         </View>
       </TouchableOpacity>
+      <View style={styles.relationships}>
+        {([
+          ['following', '我的关注', UserPlus],
+          ['followers', '关注我的', Heart],
+          ['friends', '好友', Users],
+        ] as const).map(([mode, label, Icon]) => <TouchableOpacity key={mode} accessibilityRole="button" style={styles.relationship} onPress={() => navigation?.navigate(social.value?.enabled ? 'SocialPeople' : 'SocialSettings', { mode })}>
+          <Icon size={21} color={styles._colors.textPrimary} />
+          <Text style={styles.relationshipLabel}>{label}</Text>
+        </TouchableOpacity>)}
+      </View>
+      </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {settingGroups.map((group, groupIndex) => (
           <View key={groupIndex} style={styles.settingGroup}>
             <Text style={styles.groupTitle}>{group.title}</Text>
@@ -224,10 +242,13 @@ const createStyles = (colors: ThemeColors) => ({
       marginTop: spacing.lg,
       borderRadius: borderRadius.card,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       padding: spacing.lg,
-      ...shadow.small,
+
     },
+    relationships: { flexDirection: 'row', marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.divider },
+    relationship: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 56 },
+    relationshipLabel: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
     userInfo: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -238,7 +259,7 @@ const createStyles = (colors: ThemeColors) => ({
       height: 64,
       borderRadius: borderRadius.medium,
       borderWidth: borderWidth.medium,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       backgroundColor: colors.accent,
       overflow: 'hidden',
     },
@@ -281,7 +302,9 @@ const createStyles = (colors: ThemeColors) => ({
       paddingHorizontal: spacing.xs,
     },
     groupItems: {
-      gap: spacing.sm,
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      overflow: 'hidden',
     },
     settingItem: {
       flexDirection: 'row',
@@ -291,9 +314,8 @@ const createStyles = (colors: ThemeColors) => ({
       paddingHorizontal: spacing.md,
       minHeight: 56,
       backgroundColor: colors.surface,
-      borderRadius: borderRadius.card,
-      borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.divider,
     },
     settingLeft: {
       flexDirection: 'row',
@@ -306,7 +328,7 @@ const createStyles = (colors: ThemeColors) => ({
       height: 40,
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -327,7 +349,7 @@ const createStyles = (colors: ThemeColors) => ({
     choiceButtons: {
       flexDirection: 'row',
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       borderRadius: borderRadius.small,
       overflow: 'hidden',
     },
@@ -397,7 +419,7 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.surface,
       borderRadius: borderRadius.card,
       borderWidth: borderWidth.medium,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       padding: spacing.lg,
       ...shadow.medium,
     },
@@ -414,7 +436,7 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.accent,
       borderRadius: borderRadius.medium,
       borderWidth: borderWidth.medium,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       marginRight: spacing.md,
     },
     aboutLogoText: {
@@ -444,7 +466,7 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.background,
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
     },
     aboutCloseText: {
       fontSize: 24,
@@ -457,7 +479,7 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.primaryLight,
       borderRadius: borderRadius.small,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
       paddingHorizontal: spacing.sm,
       paddingVertical: spacing.xs,
       marginBottom: spacing.md,
@@ -500,7 +522,7 @@ const createStyles = (colors: ThemeColors) => ({
       backgroundColor: colors.primary,
       borderRadius: borderRadius.button,
       borderWidth: borderWidth.thin,
-      borderColor: colors.stroke,
+      borderColor: colors.divider,
     },
     aboutGithubText: {
       fontSize: 14,

@@ -1,101 +1,41 @@
 import React, { useCallback, useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
+import { Bell, Sparkles, ChevronRight } from 'lucide-react-native';
+import { useTheme } from '../../providers';
 import { useStyles } from '../../hooks/useStyles';
-import {
-  Action,
-  Page,
-  Status,
-  stylesFor,
-  useSocialApi,
-  useSocialResource,
-} from './shared';
+import { Page, Status, stylesFor, useSocialApi, useSocialResource } from './shared';
 import RetrospectivePanel from '../ai/RetrospectivePanel';
 import SocialSettingsScreen from './SocialSettingsScreen';
 import SocialReviewableOwnersScreen from './SocialReviewableOwnersScreen';
-import SocialReceivedReviewsScreen from './SocialReceivedReviewsScreen';
 import SocialRankingsScreen from './SocialRankingsScreen';
-import SocialPeopleScreen from './SocialPeopleScreen';
 
-const tabs = ['互评账单', '我的反馈', '排行榜', '关系管理', '更多'] as const;
-export default function SocialCommunityScreen({
-  navigation,
-}: {
-  navigation: any;
-}) {
-  const api = useSocialApi(),
-    s = useStyles(stylesFor),
-    [tab, setTab] = useState(0);
+export default function SocialCommunityScreen({ navigation }: { navigation: any }) {
+  const api = useSocialApi(), s = useStyles(stylesFor), { colors } = useTheme();
+  const [tab, setTab] = useState(0);
   const [showRetrospective, setShowRetrospective] = useState(false);
   const r = useSocialResource(useCallback(() => api.status(), [api]));
-  if (!r.value)
-    return (
-      <Page>
-        <Status {...r} />
-      </Page>
-    );
-  if (!r.value.enabled)
-    return (
-      <SocialSettingsScreen navigation={navigation} onEnabled={r.refresh} />
-    );
-  return (
-    <View style={s.screen}>
-      <View style={{ paddingHorizontal: 16, paddingTop: 8, gap: 8 }}>
-        <View style={s.row}>
-          <Text style={[s.heading, s.grow]}>社群</Text>
-          <Action
-            title="消息"
-            onPress={() => navigation.navigate('SocialInbox')}
-          />
-          <Action
-            title="隐私"
-            onPress={() => navigation.navigate('SocialPrivacy')}
-          />
-        </View>
-        <View accessibilityRole="tablist" style={[s.row, { gap: 8 }]}>
-          {tabs.map((label, index) => (
-            <TouchableOpacity
-              key={label}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: tab === index }}
-              onPress={() => setTab(index)}
-              style={[
-                s.button,
-                s.grow,
-                { paddingHorizontal: 4 },
-                tab === index && s.primary,
-              ]}
-            >
-              <Text
-                style={[
-                  s.buttonText,
-                  { fontSize: 13 },
-                  tab === index && s.primaryText,
-                ]}
-              >
-                {label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+  if (!r.value) return <Page><Status {...r} /></Page>;
+  if (!r.value.enabled) return <SocialSettingsScreen navigation={navigation} onEnabled={r.refresh} />;
+  return <View style={s.screen}>
+    <View style={{ paddingHorizontal: 20, paddingTop: 12, gap: 16 }}>
+      <View style={s.row}>
+        <Text style={[s.title, s.grow, { fontSize: 28 }]}>社群</Text>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="消息" onPress={() => navigation.navigate('SocialInbox')} style={s.iconButton}>
+          <Bell size={22} color={colors.textPrimary} />
+        </TouchableOpacity>
       </View>
-      <View style={{ paddingHorizontal: 16 }}><Action title="AI 消费复盘" onPress={() => setShowRetrospective(true)} /></View>
-      {showRetrospective && <RetrospectivePanel navigation={navigation} onClose={() => setShowRetrospective(false)} />}
-      {tab === 0 && <SocialReviewableOwnersScreen navigation={navigation} />}
-      {tab === 1 && <SocialReceivedReviewsScreen navigation={navigation} />}
-      {tab === 2 && <SocialRankingsScreen navigation={navigation} />}
-      {tab === 4 && <Page>
-        <Text style={s.title}>社群管理</Text>
-        <Action title="评账申请" onPress={() => navigation.navigate('SocialRequests')} />
-        <Action title="我的举报" onPress={() => navigation.navigate('SocialReports')} />
-        <Action title="管理已拉黑用户" onPress={() => navigation.navigate('SocialPeople', { mode: 'blocks' })} />
-      </Page>}
-      {tab === 3 && (
-        <SocialPeopleScreen
-          navigation={navigation}
-          route={{ params: { mode: 'following' } }}
-          community
-        />
-      )}
+      <View accessibilityRole="tablist" style={s.tabs}>
+        {['互评账单', '排行榜'].map((label, index) => <TouchableOpacity key={label} accessibilityRole="tab" accessibilityState={{ selected: tab === index }} onPress={() => setTab(index)} style={[s.tab, tab === index && s.tabActive]}>
+          <Text style={[s.buttonText, tab === index && s.primaryText]}>{label}</Text>
+        </TouchableOpacity>)}
+      </View>
+      <TouchableOpacity accessibilityRole="button" onPress={() => setShowRetrospective(true)} style={[s.row, { paddingVertical: 8 }]}>
+        <Sparkles size={21} color={colors.primary} />
+        <View style={s.grow}><Text style={s.text}>AI 消费复盘</Text><Text style={s.small}>一起看懂开销，找到改进方向</Text></View>
+        <ChevronRight size={18} color={colors.textSecondary} />
+      </TouchableOpacity>
     </View>
-  );
+    {showRetrospective && <RetrospectivePanel navigation={navigation} onClose={() => setShowRetrospective(false)} />}
+    {tab === 0 ? <SocialReviewableOwnersScreen navigation={navigation} embedded /> : <SocialRankingsScreen navigation={navigation} />}
+  </View>;
 }

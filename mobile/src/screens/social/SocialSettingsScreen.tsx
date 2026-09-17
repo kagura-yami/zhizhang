@@ -50,7 +50,7 @@ export default function SocialSettingsScreen({
     <Page>
       <Text style={s.title}>{privacy ? '社群隐私' : '启用社群'}</Text>
       <Text style={s.muted}>
-        {privacy ? '关注不等于授权。你可以按人选择允许评价的账单范围，并随时撤销。' : '社群是可选扩展，关闭不影响普通记账。互动、排行榜和隐私选项都在底部社群栏目中。'}
+        {privacy ? '关注不等于授权。你可以按人选择允许评价的账单范围，并随时撤销。' : '社群是可选扩展，关闭不影响普通记账。互动和排行榜位于底部社群栏目；隐私选项可在设置中管理。'}
       </Text>
       <Status {...resource} />
       {status && !status.enabled && (

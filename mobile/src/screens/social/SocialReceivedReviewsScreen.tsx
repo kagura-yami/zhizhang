@@ -48,7 +48,7 @@ export default function SocialReceivedReviewsScreen({
         </View>
       ))}
       {r.value?.length === 0 && <Text style={s.muted}>还没有收到评账。</Text>}
-      {r.value && (
+      {r.value && (page > 1 || r.value.length === 20) && (
         <Pager page={page} hasNext={r.value.length === 20} change={setPage} />
       )}
     </Page>

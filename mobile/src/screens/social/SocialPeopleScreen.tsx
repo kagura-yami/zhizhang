@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import { useAuth, useAlert } from '../../providers';
 import { useStyles } from '../../hooks/useStyles';
@@ -15,17 +15,16 @@ import {
 export default function SocialPeopleScreen({
   navigation,
   route,
-  community = false,
 }: {
   navigation: any;
   route: any;
-  community?: boolean;
 }) {
   const api = useSocialApi();
   const s = useStyles(stylesFor),
     { user } = useAuth(),
     { confirm } = useAlert();
-  const [mode, setMode] = useState<PeopleMode>(route.params?.mode || 'search');
+  const [mode, setMode] = useState<PeopleMode>(route.params?.mode || 'friends');
+  useEffect(() => { setMode(route.params?.mode || 'friends'); setPage(1); }, [route.params?.mode]);
   const [input, setInput] = useState(''),
     [query, setQuery] = useState(''),
     [page, setPage] = useState(1);
@@ -40,43 +39,16 @@ export default function SocialPeopleScreen({
   );
   return (
     <Page>
-      <Text style={s.title}>{community ? '关系管理' : '找到一起复盘的人'}</Text>
-      <Text style={s.muted}>关注只建立关系，不会自动分享任何账单。</Text>
-      <View style={s.row}>
-        <View style={s.grow}>
-          <Action
-            title="评账授权"
-            onPress={() => navigation.navigate('SocialGrants')}
-          />
+      <Text style={s.title}>{{ following: '我的关注', followers: '关注我的', friends: '好友', search: '查找用户', blocks: '已拉黑用户' }[mode]}</Text>
+      <Text style={s.muted}>关注不会自动分享账单，互相关注后成为好友。</Text>
+      {mode === 'friends' && <>
+        <Action title="查找用户" primary onPress={() => { setMode('search'); setPage(1); }} />
+        <View style={s.row}>
+          <View style={s.grow}><Action title="评账授权" onPress={() => navigation.navigate('SocialGrants')} /></View>
+          <View style={s.grow}><Action title="已拉黑用户" onPress={() => navigation.navigate('SocialPeople', { mode: 'blocks' })} /></View>
         </View>
-        <View style={s.grow}>
-          <Action
-            title="评账申请"
-            onPress={() => navigation.navigate('SocialRequests')}
-          />
-        </View>
-      </View>
-      <View style={s.chipRow}>
-        {(
-          [
-            ['search', '查找'],
-            ['following', '我的关注'],
-            ['followers', '关注我的'],
-            ['friends', '好友'],
-            ['blocks', '已拉黑'],
-          ] as const
-        ).map(([key, label]) => (
-          <Action
-            key={key}
-            title={label}
-            primary={mode === key}
-            onPress={() => {
-              setMode(key);
-              setPage(1);
-            }}
-          />
-        ))}
-      </View>
+      </>}
+      {mode === 'search' && <Action title="返回好友列表" onPress={() => { setMode('friends'); setPage(1); }} />}
       {mode === 'search' && (
         <>
           <Text style={s.text}>昵称或完整用户 ID</Text>
@@ -142,7 +114,7 @@ export default function SocialPeopleScreen({
             : '没有符合条件的用户。'}
         </Text>
       )}
-      {resource.value && (
+      {resource.value && (page > 1 || resource.value.length === 20) && (
         <View style={s.row}>
           <View style={s.grow}>
             <Action

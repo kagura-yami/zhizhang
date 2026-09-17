@@ -29,6 +29,7 @@ export function Pager({
   change: (value: number) => void;
 }) {
   const s = useStyles(stylesFor);
+  if (page === 1 && !hasNext) return null;
   return (
     <View style={s.row}>
       <View style={s.grow}>

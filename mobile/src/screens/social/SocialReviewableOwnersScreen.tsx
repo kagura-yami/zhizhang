@@ -17,8 +17,10 @@ const scopes: Record<string, string> = {
 };
 export default function SocialReviewableOwnersScreen({
   navigation,
+  embedded = false,
 }: {
   navigation: any;
+  embedded?: boolean;
 }) {
   const api = useSocialApi(),
     s = useStyles(stylesFor),
@@ -28,9 +30,9 @@ export default function SocialReviewableOwnersScreen({
   );
   return (
     <Page>
-      <Text style={s.title}>互评账单</Text>
+      {!embedded && <Text style={s.title}>互评账单</Text>}
       <Text style={s.muted}>
-        先选一个授权给你的账号，再逐笔评价。关注和互关不会自动开放账单。
+        看看好友的消费，分享你的想法。账单仅在授权后可见。
       </Text>
       <Status {...r} />
       {r.value?.items.map(row => (
@@ -64,18 +66,15 @@ export default function SocialReviewableOwnersScreen({
         </View>
       ))}
       {r.value?.items.length === 0 && (
-        <View style={s.card}>
-          <Text style={s.heading}>还没有可查看的账号</Text>
+        <View style={s.empty}>
+          <Text style={[s.heading, { textAlign: 'center' }]}>和好友一起看懂开销</Text>
           <Text style={s.muted}>
-            可以查找认识的人，在对方资料页申请评账。对方批准后会出现在这里。
+            在“我的 → 好友”中建立联系并申请评账，获准后就能在这里看到对方。
           </Text>
-          <Action
-            title="查找用户"
-            onPress={() => navigation.navigate('SocialPeople')}
-          />
+
         </View>
       )}
-      {r.value && (
+      {r.value && (page > 1 || r.value.total > 20) && (
         <Pager
           page={page}
           hasNext={page * 20 < r.value.total}
